@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<title>Ön Filtreleme + TDHP Tahmini — Test Arayüzü</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 1.6rem; }
+  .durum-cubugu { padding: 0.6rem 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
+  .durum-hazir { background: #e6f4ea; color: #1e4620; }
+  .durum-hazir-degil { background: #fdecea; color: #611a15; }
+  fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 1rem 1.2rem; margin-bottom: 1.2rem; }
+  legend { font-weight: 600; padding: 0 0.4rem; }
+  label { display: block; margin-top: 0.6rem; font-size: 0.9rem; font-weight: 500; }
+  input[type=text], textarea { width: 100%; box-sizing: border-box; padding: 0.4rem; margin-top: 0.2rem; font-family: monospace; font-size: 0.85rem; }
+  textarea { height: 140px; }
+  button { margin-top: 1rem; padding: 0.6rem 1.2rem; font-size: 0.95rem; cursor: pointer; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: white; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.ikincil { background: white; color: #1a1a1a; }
+  button.kucuk { margin-top: 0.3rem; padding: 0.3rem 0.7rem; font-size: 0.82rem; }
+  .sonuc-kutusu { border-radius: 8px; padding: 1rem 1.2rem; margin-top: 1rem; }
+  .sonuc-uygun { background: #e6f4ea; }
+  .sonuc-uyari { background: #fff8e1; }
+  .sonuc-hata { background: #fdecea; }
+  .sonuc-beklemede { background: #eef1f7; }
+  table { width: 100%; border-collapse: collapse; margin-top: 0.6rem; font-size: 0.9rem; }
+  th, td { border: 1px solid #ccc; padding: 0.4rem 0.6rem; text-align: left; vertical-align: top; }
+  th { background: #f5f5f5; }
+  .satir-uyumsuz { background: #fff3f0; }
+  .kucuk-not { font-size: 0.8rem; color: #555; }
+  .surukle-birak { margin-top: 0.2rem; padding: 0.8rem; border: 2px dashed #ccc; border-radius: 8px; text-align: center; transition: border-color 0.15s, background 0.15s; }
+  .surukle-birak.surukle-uzerinde { border-color: #1a1a1a; background: #f5f5f5; }
+  .surukle-birak-metni { margin: 0.4rem 0 0 0; }
+  pre { white-space: pre-wrap; word-break: break-word; font-size: 0.8rem; background: #f7f7f7; padding: 0.6rem; border-radius: 6px; }
+  .sekmeler { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .sekme-btn { margin: 0; background: #eef1f7; color: #1a1a1a; border: 1px solid #ccc; }
+  .sekme-btn.aktif { background: #1a1a1a; color: white; }
+  .rozet { display: inline-block; padding: 0.1rem 0.5rem; border-radius: 10px; font-size: 0.78rem; font-weight: 600; }
+  .rozet-uygun { background: #e6f4ea; color: #1e4620; }
+  .rozet-uyari { background: #fff8e1; color: #7a5a00; }
+  .rozet-hata { background: #fdecea; color: #611a15; }
+  .rozet-bekliyor { background: #eef1f7; color: #33415c; }
+  .ilerleme { font-size: 0.9rem; color: #333; margin: 0.6rem 0; }
+  .dosya-listesi { font-size: 0.82rem; color: #444; margin-top: 0.4rem; max-height: 120px; overflow-y: auto; }
+  .bitti-banner { margin: 1rem 0; padding: 1rem 1.2rem; border-radius: 10px; border: 2px solid #1e7e34;
+                  background: #e6f4ea; color: #14532d; font-size: 1.05rem; animation: bitti-belir 0.4s ease; }
+  .bitti-banner.bitti-uyari { border-color: #b8860b; background: #fff8e1; color: #7a5a00; }
+  .bitti-banner .bitti-baslik { font-size: 1.3rem; font-weight: 700; display: block; margin-bottom: 0.3rem; }
+  .bitti-banner .bitti-sayim { font-size: 0.95rem; }
+  .bitti-banner .bitti-sayim b { font-size: 1.05rem; }
+  @keyframes bitti-belir { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<h1>Ön Filtreleme (KDV/Mevzuat) → TDHP Tahmini — Test Arayüzü</h1>
+<div id="durum-cubugu" class="durum-cubugu">Durum kontrol ediliyor...</div>
+
+<div class="sekmeler">
+  <button class="sekme-btn aktif" id="sekme-tek-btn" onclick="sekmeGoster('tek')">Tek Fatura</button>
+  <button class="sekme-btn" id="sekme-toplu-btn" onclick="sekmeGoster('toplu')">Toplu İşlem</button>
+</div>
+
+<!-- ==================== TEK FATURA ==================== -->
+<div id="sekme-tek">
+<fieldset>
+  <legend>1. Fatura Bilgisi</legend>
+
+  <label for="xml-dosya">UBL-TR XML dosyası seç (veya aşağıya yapıştır)</label>
+  <div id="surukle-birak-alani" class="surukle-birak">
+    <input type="file" id="xml-dosya" accept=".xml">
+    <p class="kucuk-not surukle-birak-metni">...ya da dosyayı buraya sürükleyip bırak</p>
+  </div>
+
+  <label for="xml-metin">Ham UBL-TR XML</label>
+  <textarea id="xml-metin" placeholder="<Invoice>...</Invoice>"></textarea>
+
+  <label for="satici-vkn">Sizin şirketinizin VKN'si</label>
+  <input type="text" id="satici-vkn" placeholder="0460351893">
+  <p class="kucuk-not">Sistem bu VKN'yi faturanın satıcı/alıcı tarafıyla karşılaştırıp
+  faturanın bize mi kesilmiş (inbox) yoksa bizim mi kestiğimiz (outbox) olduğunu otomatik
+  tespit eder.</p>
+
+  <label for="nace-kodlari">Satıcının NACE kod(ları) (virgülle ayrılmış) — sadece BİZİM kestiğimiz faturalarda gerekli</label>
+  <input type="text" id="nace-kodlari" placeholder="251100, 252900">
+  <p class="kucuk-not">Fatura dışarıdan geldiyse (inbox) bu alan kullanılmaz, boş bırakılabilir —
+  ön filtreleme (KDV/NACE kontrolü) sadece bizim kestiğimiz faturalarda çalışır.</p>
+
+  <button id="gonder-btn" onclick="faturaGonder(false)">Faturayı İşle</button>
+</fieldset>
+
+<div id="sonuc-alani"></div>
+</div>
+
+<!-- ==================== TOPLU İŞLEM ==================== -->
+<div id="sekme-toplu" style="display:none">
+<fieldset>
+  <legend>1. Faturalar (birden çok XML)</legend>
+
+  <label for="toplu-xml-dosya">Birden çok UBL-TR XML dosyası seç</label>
+  <div id="toplu-surukle-birak-alani" class="surukle-birak">
+    <input type="file" id="toplu-xml-dosya" accept=".xml" multiple>
+    <p class="kucuk-not surukle-birak-metni">...ya da dosyaları buraya sürükleyip bırak (birden çok olabilir)</p>
+  </div>
+  <div id="toplu-dosya-listesi" class="dosya-listesi"></div>
+
+  <label for="toplu-satici-vkn">Sizin şirketinizin VKN'si (tüm faturalar için ortak)</label>
+  <input type="text" id="toplu-satici-vkn" placeholder="0460351893">
+
+  <label for="toplu-nace-kodlari">NACE kod(ları) (virgülle ayrılmış, tüm faturalara uygulanır) — sadece outbox'ta kullanılır</label>
+  <input type="text" id="toplu-nace-kodlari" placeholder="251100, 252900">
+
+  <p class="kucuk-not">Sistem hiç durmadan tüm faturaları sırayla işler. İnsan incelemesi
+  ya da kur seçimi gerektiren faturalar "⏳ Onay Bekleyenler" bölümüne alınır; siz orada
+  onayladıkça hesaplanıp sonuç tablosunun başına eklenir.</p>
+
+  <button id="toplu-gonder-btn" onclick="topluBaslat()">Toplu İşle</button>
+</fieldset>
+
+<div id="toplu-ilerleme" class="ilerleme"></div>
+
+<div id="toplu-bitti-banner" class="bitti-banner" style="display:none"></div>
+
+<div id="toplu-bekleyenler-alani"></div>
+
+<h2 id="toplu-sonuc-baslik" style="display:none">Sonuçlar</h2>
+<div id="toplu-sonuc-alani"></div>
+</div>
+
+<script>
+let sonGonderilenIstek = null;
+let sonAlinanTdhpTahmini = null;
+const BASLIK = document.title;  // sekme başlığının orijinali (bitince geçici olarak değiştirilir)
+
+// ---- sekme yönetimi ----
+function sekmeGoster(ad) {
+  document.getElementById('sekme-tek').style.display = ad === 'tek' ? 'block' : 'none';
+  document.getElementById('sekme-toplu').style.display = ad === 'toplu' ? 'block' : 'none';
+  document.getElementById('sekme-tek-btn').classList.toggle('aktif', ad === 'tek');
+  document.getElementById('sekme-toplu-btn').classList.toggle('aktif', ad === 'toplu');
+}
+
+async function durumGetir() {
+  const cubuk = document.getElementById('durum-cubugu');
+  try {
+    const r = await fetch('/durum');
+    const d = await r.json();
+    if (d.model_eval_hazir) {
+      cubuk.className = 'durum-cubugu durum-hazir';
+      cubuk.textContent = '✅ model_eval tarafı hazır — tam akış (ön filtre + TDHP tahmini) çalışabilir.';
+    } else {
+      cubuk.className = 'durum-cubugu durum-hazir-degil';
+      cubuk.textContent = '⚠️ model_eval tarafı henüz hazır değil (' + d.model_eval_mesaj + '). Ön filtreleme yine de test edilebilir, TDHP tahmini adımı bu eklenene kadar çalışmaz.';
+    }
+  } catch (e) {
+    cubuk.className = 'durum-cubugu durum-hazir-degil';
+    cubuk.textContent = '⚠️ Entegrasyon servisine durum sorgusu başarısız: ' + e;
+  }
+}
+durumGetir();
+
+// ============================================================
+// TEK FATURA (mevcut davranış — değişmedi)
+// ============================================================
+async function xmlDosyasiniYukle(dosya) {
+  if (!dosya) return;
+  document.getElementById('xml-metin').value = await dosya.text();
+}
+
+document.getElementById('xml-dosya').addEventListener('change', (e) => {
+  xmlDosyasiniYukle(e.target.files[0]);
+});
+
+const surukleBirakAlani = document.getElementById('surukle-birak-alani');
+['dragenter', 'dragover'].forEach(olayAdi => {
+  surukleBirakAlani.addEventListener(olayAdi, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    surukleBirakAlani.classList.add('surukle-uzerinde');
+  });
+});
+['dragleave', 'drop'].forEach(olayAdi => {
+  surukleBirakAlani.addEventListener(olayAdi, (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    surukleBirakAlani.classList.remove('surukle-uzerinde');
+  });
+});
+surukleBirakAlani.addEventListener('drop', (e) => {
+  const dosya = e.dataTransfer.files[0];
+  xmlDosyasiniYukle(dosya);
+});
+
+function naceListesiAyristir(metin) {
+  return metin.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+async function faturaGonder(onay) {
+  const btn = document.getElementById('gonder-btn');
+  btn.disabled = true;
+  const sonucAlani = document.getElementById('sonuc-alani');
+  sonucAlani.innerHTML = '<div class="sonuc-kutusu sonuc-beklemede">İşleniyor...</div>';
+
+  const istek = {
+    fatura_xml: document.getElementById('xml-metin').value,
+    satici_vkn: document.getElementById('satici-vkn').value.trim(),
+    satici_nace_kodlari: naceListesiAyristir(document.getElementById('nace-kodlari').value),
+    onay: onay,
+    kur_secimi: sonGonderilenIstek ? sonGonderilenIstek.kur_secimi : null,
+  };
+  sonGonderilenIstek = istek;
+
+  try {
+    const r = await fetch('/fatura/isle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(istek),
+    });
+    if (!r.ok) {
+      const hata = await r.json();
+      sonucAlani.innerHTML = `<div class="sonuc-kutusu sonuc-hata"><strong>Hata (${r.status}):</strong> ${hata.detail || r.statusText}</div>`;
+      return;
+    }
+    const cevap = await r.json();
+    render(cevap);
+  } catch (e) {
+    sonucAlani.innerHTML = `<div class="sonuc-kutusu sonuc-hata"><strong>İstek başarısız:</strong> ${e}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function onayVerVeDevamEt() {
+  faturaGonder(true);
+}
+
+function kurSecVeDevamEt(secim) {
+  sonGonderilenIstek.kur_secimi = secim;
+  faturaGonder(sonGonderilenIstek.onay);
+}
+
+function render(cevap) {
+  const sonucAlani = document.getElementById('sonuc-alani');
+  let html = '';
+
+  const onFiltre = cevap.on_filtre_sonucu;  // inbox'ta null olabilir — ön filtre hiç çalışmaz
+  const karar = onFiltre ? onFiltre.genel_karar : null;
+  const yonEtiketi = cevap.yon ? `<p class="kucuk-not">Tespit edilen yön: <strong>${cevap.yon === 'outbox' ? 'bizim kestiğimiz (outbox)' : 'bize kesilmiş (inbox)'}</strong></p>` : '';
+
+  if (cevap.asama === 'kur_onayi_bekliyor') {
+    const kur = cevap.kur_bilgisi;
+    html += `<div class="sonuc-kutusu sonuc-uyari">
+      <strong>💱 Bu fatura ${kur.currency} cinsinden düzenlenmiş</strong>
+      ${yonEtiketi}
+      <p>1 ${kur.currency} = ${Number(kur.exchange_rate).toLocaleString('tr-TR', {minimumFractionDigits: 4})} ${kur.exchange_target_currency}</p>
+      <p class="kucuk-not">TDHP tahminini hangi para biriminde üretmek istersiniz?</p>
+      <div id="onay-alani" style="display:block">
+        <button onclick="kurSecVeDevamEt('orijinal')">Orijinal para biriminde devam et (${kur.currency})</button>
+        <button class="ikincil" onclick="kurSecVeDevamEt('tl')">TL'ye çevir ve devam et</button>
+      </div>
+    </div>`;
+  } else if (cevap.asama === 'on_filtre_insan_incelemesi_bekliyor') {
+    html += `<div class="sonuc-kutusu sonuc-uyari">
+      <strong>⚠️ İnsan İncelemesi Gerekli</strong>
+      ${yonEtiketi}
+      <p>${cevap.mesaj}</p>
+      ${satirTablosu(onFiltre.satir_sonuclari)}
+      <div id="onay-alani" style="display:block">
+        <button onclick="onayVerVeDevamEt()">Yine de devam et (TDHP tahminine gönder)</button>
+        <button class="ikincil" onclick="location.reload()">İptal / faturayı düzelt</button>
+      </div>
+    </div>`;
+  } else if (cevap.asama === 'model_eval_hazir_degil') {
+    html += `<div class="sonuc-kutusu sonuc-uyari">
+      ${yonEtiketi}
+      ${onFiltre ? `<strong>Ön filtre sonucu:</strong> ${karar === 'uygun' ? '✅ uygun' : '⚠️ insan incelemesi gerekli (onaylandı)'}${satirTablosu(onFiltre.satir_sonuclari)}` : ''}
+      <p class="kucuk-not">${cevap.mesaj}</p>
+    </div>`;
+  } else if (cevap.asama === 'tdhp_tahmini_tamamlandi') {
+    if (onFiltre) {
+      html += `<div class="sonuc-kutusu sonuc-uygun">
+        <strong>✅ Ön filtreden geçti${karar !== 'uygun' ? ' (insan onayıyla)' : ''}</strong>
+        ${yonEtiketi}
+        ${satirTablosu(onFiltre.satir_sonuclari)}
+      </div>`;
+    } else {
+      html += `<div class="sonuc-kutusu sonuc-uygun">
+        <strong>ℹ️ Ön filtreleme atlandı</strong>
+        ${yonEtiketi}
+        <p class="kucuk-not">${cevap.mesaj}</p>
+      </div>`;
+    }
+    html += tdhpTablosu(cevap.tdhp_tahmini);
+  }
+
+  sonucAlani.innerHTML = html;
+  sonAlinanTdhpTahmini = cevap.tdhp_tahmini || null;
+
+  const onayAlani = document.getElementById('tdhp-onay-alani');
+  if (onayAlani && sonAlinanTdhpTahmini && !sonAlinanTdhpTahmini.error) {
+    onayAlani.innerHTML = `<button id="tdhp-onay-btn" onclick="faturaOnayla()">✓ Bu doğru, kaydet</button>`;
+  }
+}
+
+function satirTablosu(satirlar) {
+  if (!satirlar || !satirlar.length) return '';
+  let rows = satirlar.map(s => {
+    const uyumsuz = s.karar !== 'uygun';
+    return `<tr class="${uyumsuz ? 'satir-uyumsuz' : ''}">
+      <td>${s.kalem_adi || '-'}</td>
+      <td>${(s.beyan_edilen_oranlar || []).join(', ')}</td>
+      <td>${(s.izin_verilen_oranlar_havuzu || []).join(', ')}</td>
+      <td>${s.karar}</td>
+      <td class="kucuk-not">${s.gerekce || ''}</td>
+    </tr>`;
+  }).join('');
+  return `<table>
+    <tr><th>Kalem</th><th>Beyan Edilen Oran(lar)</th><th>İzin Verilen Havuz</th><th>Karar</th><th>Gerekçe</th></tr>
+    ${rows}
+  </table>`;
+}
+
+function tdhpTablosu(tahmin) {
+  if (!tahmin) return '';
+  if (tahmin.error) {
+    return `<div class="sonuc-kutusu sonuc-hata"><strong>TDHP tahmini hatası:</strong> ${tahmin.error}</div>`;
+  }
+  const entries = tahmin.entries || [];
+  const uyariliVar = entries.some(e => e.uyari);
+  let rows = entries.map(e => {
+    const uyariHucre = e.uyari ? `⚠️ ${e.uyari}` : '';
+    return `<tr class="${e.uyari ? 'satir-uyumsuz' : ''}"><td>${e.account_code}</td><td>${e.dc}</td><td>${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})}</td><td class="kucuk-not">${uyariHucre}</td></tr>`;
+  }).join('');
+  return `<div class="sonuc-kutusu sonuc-uygun">
+    <strong>Tek Düzen Hesap Planı Tahmini${tahmin.currency ? ' (' + tahmin.currency + ')' : ''}</strong>
+    <table>
+      <tr><th>Hesap Kodu</th><th>Borç/Alacak</th><th>Tutar</th><th>Uyarı</th></tr>
+      ${rows}
+    </table>
+    ${uyariliVar ? '<p class="kucuk-not">⚠️ İşaretli satırlar: karşı taraf mizanda bulunamadı — muhasebecinin yeni bir cari kart (alt kırılım) açması gerekebilir.</p>' : ''}
+    <p class="kucuk-not">
+      Borç toplam: ${tahmin.borc_toplam ?? '-'} | Alacak toplam: ${tahmin.alacak_toplam ?? '-'} |
+      Dengeli mi: ${tahmin.balanced === true ? 'evet' : tahmin.balanced === false ? 'HAYIR ⚠️' : '-'}
+      ${tahmin.self_corrected ? ' | Kendi kendini düzeltti (' + tahmin.self_correct_reason + ')' : ''}
+    </p>
+    <div id="tdhp-onay-alani"></div>
+  </div>`;
+}
+
+async function faturaOnayla() {
+  const btn = document.getElementById('tdhp-onay-btn');
+  const onayAlani = document.getElementById('tdhp-onay-alani');
+  if (btn) btn.disabled = true;
+
+  const istek = {
+    fatura_xml: sonGonderilenIstek.fatura_xml,
+    satici_vkn: sonGonderilenIstek.satici_vkn,
+    tdhp_tahmini: sonAlinanTdhpTahmini,
+  };
+
+  try {
+    const r = await fetch('/fatura/onayla', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(istek),
+    });
+    const cevap = await r.json();
+    if (!r.ok) {
+      onayAlani.innerHTML = `<p class="kucuk-not">⚠️ Kaydedilemedi: ${cevap.detail || r.statusText}</p>`;
+      if (btn) btn.disabled = false;
+      return;
+    }
+    onayAlani.innerHTML = `<p class="kucuk-not">✅ ${cevap.mesaj}</p>`;
+  } catch (e) {
+    onayAlani.innerHTML = `<p class="kucuk-not">⚠️ İstek başarısız: ${e}</p>`;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ============================================================
+// TOPLU İŞLEM
+// ============================================================
+// Seçilen dosyalar: [{ad, xml}]. Bekleyenler ayrı kuyrukta tutulur; kullanıcı
+// onaylayınca /fatura/isle tekrar (onay=true / kur_secimi ile) çağrılır ve
+// sonuç tablosunun BAŞINA eklenir.
+let topluDosyalar = [];
+let bekleyenSayac = 0;
+const bekleyenler = {};  // id -> {ad, xml, asama, kur_bilgisi, mesaj}
+
+const topluSurukleAlani = document.getElementById('toplu-surukle-birak-alani');
+['dragenter', 'dragover'].forEach(olayAdi => {
+  topluSurukleAlani.addEventListener(olayAdi, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    topluSurukleAlani.classList.add('surukle-uzerinde');
+  });
+});
+['dragleave', 'drop'].forEach(olayAdi => {
+  topluSurukleAlani.addEventListener(olayAdi, (e) => {
+    e.preventDefault(); e.stopPropagation();
+    topluSurukleAlani.classList.remove('surukle-uzerinde');
+  });
+});
+topluSurukleAlani.addEventListener('drop', (e) => {
+  topluDosyalariAl(e.dataTransfer.files);
+});
+document.getElementById('toplu-xml-dosya').addEventListener('change', (e) => {
+  topluDosyalariAl(e.target.files);
+});
+
+async function topluDosyalariAl(fileList) {
+  const dosyalar = Array.from(fileList).filter(f => f.name.toLowerCase().endsWith('.xml'));
+  topluDosyalar = [];
+  for (const f of dosyalar) {
+    topluDosyalar.push({ ad: f.name, xml: await f.text() });
+  }
+  const liste = document.getElementById('toplu-dosya-listesi');
+  liste.innerHTML = topluDosyalar.length
+    ? '<strong>' + topluDosyalar.length + ' dosya seçildi:</strong><br>' +
+      topluDosyalar.map(d => '• ' + d.ad).join('<br>')
+    : '';
+}
+
+function topluIstekYap(dosya, onay, kur_secimi) {
+  return {
+    fatura_xml: dosya.xml,
+    satici_vkn: document.getElementById('toplu-satici-vkn').value.trim(),
+    satici_nace_kodlari: naceListesiAyristir(document.getElementById('toplu-nace-kodlari').value),
+    onay: onay,
+    kur_secimi: kur_secimi || null,
+  };
+}
+
+async function topluBaslat() {
+  if (!topluDosyalar.length) {
+    alert('Önce en az bir XML dosyası seçin.');
+    return;
+  }
+  const btn = document.getElementById('toplu-gonder-btn');
+  btn.disabled = true;
+  document.getElementById('toplu-sonuc-alani').innerHTML = '';
+  document.getElementById('toplu-bekleyenler-alani').innerHTML = '';
+  document.getElementById('toplu-sonuc-baslik').style.display = 'none';
+  document.getElementById('toplu-bitti-banner').style.display = 'none';
+  document.title = BASLIK;  // önceki "✅ Bitti" başlığını sıfırla
+  bekleyenSayac = 0;
+  for (const k in bekleyenler) delete bekleyenler[k];
+
+  const ilerleme = document.getElementById('toplu-ilerleme');
+  const toplam = topluDosyalar.length;
+
+  for (let i = 0; i < topluDosyalar.length; i++) {
+    const dosya = topluDosyalar[i];
+    ilerleme.textContent = `İşleniyor: ${i + 1} / ${toplam} — ${dosya.ad}`;
+    await birFaturaIsle(dosya, false, null);
+  }
+
+  ilerleme.textContent = '';
+  bittiBannerGoster(toplam);
+  btn.disabled = false;
+}
+
+// Toplu işlem bitince ekranın üstünde büyük, dikkat çekici bir "BİTTİ"
+// bildirimi gösterir + sekme başlığına ✓ koyar + kısa bir bip sesi çalar.
+// (2026-07-27, kullanıcı isteği: "ne zaman bittiğini anlayamıyorum")
+function bittiBannerGoster(toplam) {
+  // Sonuç tablosundaki satırları başarılı/hatalı diye say.
+  const tablo = document.getElementById('toplu-sonuc-tablo');
+  let basarili = 0, hatali = 0;
+  if (tablo) {
+    for (const tr of tablo.querySelectorAll('tbody tr')) {
+      const t = tr.textContent;
+      if (t.includes('hata') || t.includes('hazır değil')) hatali++;
+      else basarili++;
+    }
+  }
+  const bekleyen = Object.keys(bekleyenler).length;
+
+  const banner = document.getElementById('toplu-bitti-banner');
+  banner.className = 'bitti-banner' + (bekleyen || hatali ? ' bitti-uyari' : '');
+  banner.innerHTML =
+    `<span class="bitti-baslik">✅ Faturalar işlendi — işlem bitti</span>` +
+    `<span class="bitti-sayim">Toplam <b>${toplam}</b> fatura • ` +
+    `<b>${basarili}</b> tamamlandı` +
+    (hatali ? ` • <b>${hatali}</b> hata` : '') +
+    (bekleyen
+      ? ` • <b>${bekleyen}</b> onay bekliyor (aşağıdaki "⏳ Onay Bekleyenler" bölümünden onaylayın)`
+      : ' • onay bekleyen yok') +
+    `</span>`;
+  banner.style.display = 'block';
+  banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  document.title = '✅ Bitti — ' + BASLIK;
+  bipCal();
+}
+
+// Kısa bir bildirim sesi (harici dosya yok — WebAudio ile üretilir; ses
+// açılamazsa sessizce yutulur, işlevi etkilemez).
+function bipCal() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.frequency.value = 880;
+    gain.gain.setValueAtTime(0.15, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.35);
+    osc.start(); osc.stop(ac.currentTime + 0.35);
+  } catch (e) { /* ses yoksa sorun değil */ }
+}
+
+// Bir faturayı /fatura/isle'ye gönderir. Onay/kur gerekiyorsa bekleyenler
+// kuyruğuna alır (sistem durmaz); aksi halde sonucu tabloya yazar.
+async function birFaturaIsle(dosya, onay, kur_secimi) {
+  const istek = topluIstekYap(dosya, onay, kur_secimi);
+  let cevap;
+  try {
+    const r = await fetch('/fatura/isle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(istek),
+    });
+    if (!r.ok) {
+      const hata = await r.json().catch(() => ({}));
+      sonucSatiriEkle(dosya.ad, {
+        asama: 'hata', yon: null,
+        mesaj: `Hata (${r.status}): ${hata.detail || r.statusText}`,
+      });
+      return;
+    }
+    cevap = await r.json();
+  } catch (e) {
+    sonucSatiriEkle(dosya.ad, { asama: 'hata', yon: null, mesaj: 'İstek başarısız: ' + e });
+    return;
+  }
+
+  if (cevap.asama === 'on_filtre_insan_incelemesi_bekliyor' || cevap.asama === 'kur_onayi_bekliyor') {
+    bekleyeneEkle(dosya, cevap);
+  } else {
+    sonucSatiriEkle(dosya.ad, cevap);
+  }
+}
+
+// ---- bekleyenler kuyruğu ----
+function bekleyeneEkle(dosya, cevap) {
+  bekleyenSayac++;
+  const id = 'bekleyen-' + bekleyenSayac;
+  bekleyenler[id] = { dosya, cevap };
+  bekleyenleriCiz();
+}
+
+function bekleyenleriCiz() {
+  const alan = document.getElementById('toplu-bekleyenler-alani');
+  const idler = Object.keys(bekleyenler);
+  if (!idler.length) { alan.innerHTML = ''; return; }
+
+  let html = '<h2>⏳ Onay Bekleyenler (' + idler.length + ')</h2>';
+  for (const id of idler) {
+    const { dosya, cevap } = bekleyenler[id];
+    if (cevap.asama === 'kur_onayi_bekliyor') {
+      const kur = cevap.kur_bilgisi;
+      html += `<div class="sonuc-kutusu sonuc-uyari">
+        <strong>💱 ${dosya.ad}</strong> — ${kur.currency} cinsinden düzenlenmiş
+        (1 ${kur.currency} = ${Number(kur.exchange_rate).toLocaleString('tr-TR', {minimumFractionDigits: 4})} ${kur.exchange_target_currency})
+        <div>
+          <button class="kucuk" onclick="bekleyeniOnayla('${id}', false, 'orijinal')">Orijinal (${kur.currency}) ile hesapla</button>
+          <button class="kucuk ikincil" onclick="bekleyeniOnayla('${id}', false, 'tl')">TL'ye çevir ve hesapla</button>
+        </div>
+      </div>`;
+    } else {  // on_filtre_insan_incelemesi_bekliyor
+      const onFiltre = cevap.on_filtre_sonucu;
+      html += `<div class="sonuc-kutusu sonuc-uyari">
+        <strong>⚠️ ${dosya.ad}</strong> — İnsan incelemesi gerekli
+        <p class="kucuk-not">${cevap.mesaj || ''}</p>
+        ${onFiltre ? satirTablosu(onFiltre.satir_sonuclari) : ''}
+        <div>
+          <button class="kucuk" onclick="bekleyeniOnayla('${id}', true, null)">Yine de devam et (hesapla)</button>
+        </div>
+      </div>`;
+    }
+  }
+  alan.innerHTML = html;
+}
+
+// Kullanıcı bekleyeni onayladı → tekrar işle, sonucu tablonun BAŞINA ekle.
+async function bekleyeniOnayla(id, onay, kur_secimi) {
+  const kayit = bekleyenler[id];
+  if (!kayit) return;
+  delete bekleyenler[id];
+  bekleyenleriCiz();
+
+  const ilerleme = document.getElementById('toplu-ilerleme');
+  const eskiMetin = ilerleme.textContent;
+  ilerleme.textContent = `Onaylanan fatura hesaplanıyor: ${kayit.dosya.ad} ...`;
+
+  const istek = topluIstekYap(kayit.dosya, onay, kur_secimi);
+  try {
+    const r = await fetch('/fatura/isle', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(istek),
+    });
+    const cevap = r.ok ? await r.json() : { asama: 'hata', mesaj: `Hata (${r.status})` };
+    // Onay sonrası tekrar bekleme durumuna düşerse (ör. önce insan incelemesi
+    // onaylandı ama şimdi kur soruyor) → tekrar kuyruğa al.
+    if (cevap.asama === 'on_filtre_insan_incelemesi_bekliyor' || cevap.asama === 'kur_onayi_bekliyor') {
+      bekleyeneEkle(kayit.dosya, cevap);
+    } else {
+      sonucSatiriEkle(kayit.dosya.ad, cevap, /*basaEkle=*/true);
+    }
+  } catch (e) {
+    sonucSatiriEkle(kayit.dosya.ad, { asama: 'hata', mesaj: 'İstek başarısız: ' + e }, true);
+  }
+  ilerleme.textContent = eskiMetin;
+}
+
+// ---- sonuç tablosu ----
+function sonucSatiriEkle(dosyaAdi, cevap, basaEkle) {
+  document.getElementById('toplu-sonuc-baslik').style.display = 'block';
+  const alan = document.getElementById('toplu-sonuc-alani');
+
+  // Tablo yoksa oluştur.
+  let tablo = document.getElementById('toplu-sonuc-tablo');
+  if (!tablo) {
+    alan.innerHTML = `<table id="toplu-sonuc-tablo">
+      <thead><tr>
+        <th>Dosya</th><th>Yön</th><th>Ön Filtre</th><th>Durum</th><th>TDHP Tahmini</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>`;
+    tablo = document.getElementById('toplu-sonuc-tablo');
+  }
+  const tbody = tablo.querySelector('tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = sonucSatirIci(dosyaAdi, cevap);
+  if (basaEkle && tbody.firstChild) {
+    tbody.insertBefore(tr, tbody.firstChild);
+    tr.style.background = '#fffbe6';  // yeni eklenen (onaylanan) satırı hafif vurgula
+  } else {
+    tbody.appendChild(tr);
+  }
+}
+
+function sonucSatirIci(dosyaAdi, cevap) {
+  const yon = cevap.yon === 'outbox' ? 'outbox' : cevap.yon === 'inbox' ? 'inbox' : '-';
+
+  // Ön filtre kararı rozeti
+  let onFiltreHtml = '-';
+  if (cevap.on_filtre_sonucu) {
+    const k = cevap.on_filtre_sonucu.genel_karar;
+    onFiltreHtml = k === 'uygun'
+      ? '<span class="rozet rozet-uygun">uygun</span>'
+      : `<span class="rozet rozet-uyari">${k}</span>`;
+  } else if (yon === 'inbox') {
+    onFiltreHtml = '<span class="kucuk-not">atlandı (inbox)</span>';
+  }
+
+  // Durum rozeti
+  let durumHtml;
+  if (cevap.asama === 'hata') {
+    durumHtml = `<span class="rozet rozet-hata">hata</span><br><span class="kucuk-not">${cevap.mesaj || ''}</span>`;
+  } else if (cevap.asama === 'model_eval_hazir_degil') {
+    durumHtml = `<span class="rozet rozet-hata">model_eval hazır değil</span>`;
+  } else if (cevap.asama === 'tdhp_tahmini_tamamlandi') {
+    durumHtml = '<span class="rozet rozet-uygun">tamamlandı</span>';
+  } else {
+    durumHtml = `<span class="rozet rozet-bekliyor">${cevap.asama}</span>`;
+  }
+
+  // TDHP özeti
+  let tdhpHtml = '-';
+  const t = cevap.tdhp_tahmini;
+  if (t) {
+    if (t.error) {
+      tdhpHtml = `<span class="rozet rozet-hata">tahmin hatası</span><br><span class="kucuk-not">${t.error}</span>`;
+    } else {
+      const entries = t.entries || [];
+      const uyariliVar = entries.some(e => e.uyari);
+      const satirlar = entries.map(e =>
+        `${e.account_code} <span class="kucuk-not">(${e.dc}, ${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})})</span>${e.uyari ? ' ⚠️' : ''}`
+      ).join('<br>');
+      const dengeNotu = t.balanced === false ? ' <strong style="color:#a00">DENGESİZ ⚠️</strong>' : '';
+      tdhpHtml = `${satirlar}${dengeNotu}` + (uyariliVar ? '<br><span class="kucuk-not">⚠️ cari mizanda bulunamadı</span>' : '');
+    }
+  }
+
+  return `<td>${dosyaAdi}</td><td>${yon}</td><td>${onFiltreHtml}</td><td>${durumHtml}</td><td>${tdhpHtml}</td>`;
+}
+</script>
+</body>
+</html>

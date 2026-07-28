@@ -1,0 +1,22 @@
+# Python sanal ortamlar
+entegrasyon/.venv/
+.calistirma/mcp_venv/
+**/__pycache__/
+*.pyc
+
+# Servis durum/log dosyaları (baslat.sh tarafından üretilir)
+.calistirma/*.log
+.calistirma/*.pid
+
+# Üretilmiş veri (RAG vektör veritabanı)
+model_eval/vector_db/
+
+# Sırlar — sunucuda gerçek parola/env dosyası commit'lenmemeli
+.env
+.env.*
+
+# İşletim sistemi
+.DS_Store
+
+# Muhtemelen hassas/kişisel veri — içeriği doğrulanmadan commit'lenmiyor
+Archive2/

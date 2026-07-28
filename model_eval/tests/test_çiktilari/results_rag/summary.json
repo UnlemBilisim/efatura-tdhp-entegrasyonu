@@ -1,0 +1,146 @@
+[
+  {
+    "model": "glm-5.2:cloud+rag",
+    "n_total": 100,
+    "n_scored": 100,
+    "n_hard_errors": 0,
+    "code_mistake_count": 25,
+    "invoices_with_mistake": 13,
+    "pair_precision": 0.9623,
+    "pair_recall": 0.9592,
+    "pair_f1": 0.9608,
+    "code_precision": 0.9623,
+    "code_recall": 0.9623,
+    "code_f1": 0.9623,
+    "exact_pair_match_rate": 0.87,
+    "exact_code_match_rate": 0.87,
+    "balanced_entry_rate": 0.98,
+    "avg_latency_s": 12.012,
+    "most_missed_codes": [
+      [
+        "730",
+        5
+      ],
+      [
+        "770",
+        2
+      ],
+      [
+        "150",
+        1
+      ],
+      [
+        "656",
+        1
+      ],
+      [
+        "309",
+        1
+      ],
+      [
+        "689",
+        1
+      ],
+      [
+        "391",
+        1
+      ]
+    ],
+    "most_hallucinated_codes": [
+      [
+        "770",
+        3
+      ],
+      [
+        "150",
+        3
+      ],
+      [
+        "253",
+        2
+      ],
+      [
+        "730",
+        1
+      ],
+      [
+        "333",
+        1
+      ],
+      [
+        "255",
+        1
+      ],
+      [
+        "191",
+        1
+      ]
+    ]
+  },
+  {
+    "model": "minimax-m2.1:cloud+rag",
+    "n_total": 100,
+    "n_scored": 100,
+    "n_hard_errors": 0,
+    "code_mistake_count": 18,
+    "invoices_with_mistake": 10,
+    "pair_precision": 0.9778,
+    "pair_recall": 0.9655,
+    "pair_f1": 0.9716,
+    "code_precision": 0.9778,
+    "code_recall": 0.9686,
+    "code_f1": 0.9731,
+    "exact_pair_match_rate": 0.9,
+    "exact_code_match_rate": 0.91,
+    "balanced_entry_rate": 0.93,
+    "avg_latency_s": 13.046,
+    "most_missed_codes": [
+      [
+        "770",
+        3
+      ],
+      [
+        "730",
+        2
+      ],
+      [
+        "656",
+        1
+      ],
+      [
+        "360",
+        1
+      ],
+      [
+        "192",
+        1
+      ],
+      [
+        "600",
+        1
+      ],
+      [
+        "391",
+        1
+      ]
+    ],
+    "most_hallucinated_codes": [
+      [
+        "150",
+        4
+      ],
+      [
+        "730",
+        1
+      ],
+      [
+        "770",
+        1
+      ],
+      [
+        "191",
+        1
+      ]
+    ]
+  }
+]

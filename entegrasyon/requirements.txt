@@ -1,0 +1,18 @@
+fastapi
+uvicorn
+httpx
+python-multipart
+
+# model_eval/core/single.py'yi import edip çağırdığımız için onun kendi
+# bağımlılıkları da bu venv'de kurulu olmalı (bkz. ../model_eval/requirements.txt).
+# psycopg2-binary fiilen KULLANILMIYOR (predict_single_invoice DB'ye yazmaz)
+# ama `core/__init__.py` paket olarak import edildiğinde core.reporting/core.runner'ı
+# da yüklüyor (transitive) — bu yüzden kurulu olması import hatasını önlemek için gerekli.
+requests>=2.31.0
+psycopg2-binary>=2.9.0
+chromadb>=1.5.0
+ollama>=0.4.0
+
+# Alt kirilim ozelligi icin (core/mizan.py, 2026-07-24 eklendi) - mizan.xlsx'i
+# okumak icin gerekli.
+openpyxl>=3.1.0
