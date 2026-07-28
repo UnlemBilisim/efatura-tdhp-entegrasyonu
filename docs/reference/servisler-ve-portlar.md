@@ -18,7 +18,11 @@
 | **11435** | SSH tüneli → uzak GPU'daki Ollama | **Kullanıcı elle açar** | LLM için evet |
 
 > ⚠️ **11435 tünelini ajan açamaz** — SSH parola/anahtar istiyor. Komut
-> [`../../çalıştırma.txt`](../../çalıştırma.txt) içinde.
+> kullanıcının kendi notlarında saklanıyor (`System/` dışına taşındı,
+> 2026-07-28). Docker ile çalıştırırken bu tünelin host'ta (container
+> dışında) systemd servisi olarak kalıcı çalışması planlanıyor — bkz.
+> [`../../mimari.md`](../../mimari.md) §"Sunucuya taşıma" ve
+> [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
 Her iki FastAPI servisi de `--host 0.0.0.0` ile başlatılır
 (`baslat.sh:65`, `baslat.sh:94`) — yani tüm ağ arayüzlerinden erişilebilir.
@@ -44,7 +48,15 @@ Bilinçli bir ayrım (`model_eval_koprusu.py:80-88` yorumunda gerekçesi var):
   "Connection reset by peer" hatasına yol açtı.
 
 `baslat.sh` `DATABASE_URL`'i **koşulsuz ezer** (`baslat.sh:15`) — ortamda güçlü
-bir parola tanımlasanız bile her başlatmada gömülü değer geçerli olur.
+bir parola tanımlasanız bile her başlatmada gömülü değer geçerli olur. **Bu,
+`./baslat.sh` ile yerel çalıştırma için hâlâ geçerlidir** (henüz
+düzeltilmedi — sunucuya taşıma planının bir sonraki adımı).
+
+> ✅ **Uygulandı** (2026-07-28): Docker ile çalıştırıldığında
+> (`docker-compose.yml`) bu sorun **yoktur** — `POSTGRES_PASSWORD` env
+> var'ı zorunlu kılınmıştır (`docker-compose.yml:21`, `:47`), tanımlı
+> değilse `docker compose up` açıkça hata verip durur, gömülü/varsayılan
+> bir parolaya düşmez. Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
 ## PostgreSQL tabloları
 
@@ -57,6 +69,12 @@ tablosuna dokunmazlar:
 | `gecmis_fatura_kalemleri` | Mcp_mimarisi | Geçmiş outbox kalemleri (emsal kontrolü) |
 | `islenmis_faturalar` | Mcp_mimarisi | Claim tablosu (aynı fatura iki kez işlenmesin) |
 | `model_eval_sonuclar` | model_eval | Tahmin sonuçları + onay kayıtları |
+
+> ✅ **Uygulandı** (2026-07-28): Bu tabloların tam yedeği `pg_dump -F c` ile
+> alınıp `db-yedek/efatura_kdv_yedek.dump`'a kaydedildi (2138 + 1120 + 1
+> satır doğrulandı). Bu klasör `.gitignore`'dadır (gerçek fatura verisi
+> içerir) — sunucuya ayrı, güvenli bir kanaldan taşınmalı, `pg_restore`
+> ile geri yüklenir. Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
 ## HTTP endpoint envanteri
 

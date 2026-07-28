@@ -12,7 +12,7 @@ bileşenin içine ait belgeler o bileşenin kendi `docs/` klasöründedir:
 | Klasör | Ne için | Buradaki içerik |
 |---|---|---|
 | `tutorials/` | Öğrenme odaklı, adım adım | *(henüz yok)* |
-| `how-to/` | Görev odaklı tarifler | [Sistemi test etme](how-to/sistemi-test-etme.md) |
+| `how-to/` | Görev odaklı tarifler | [Sistemi test etme](how-to/sistemi-test-etme.md), [Docker ile çalıştırma](how-to/docker-ile-calistirma.md) |
 | `reference/` | Kesin teknik başvuru | [Servis ve port envanteri](reference/servisler-ve-portlar.md) |
 | `explanation/` | Bir kararın NEDEN öyle verildiği | [Güvenlik durumu](explanation/guvenlik-durumu-2026-07-27.md) |
 
@@ -22,11 +22,15 @@ Bunlar tarihsel olarak `System/` üstünde/kökünde duruyor, buraya taşınmad�
 
 | Belge | Tür | İçerik |
 |---|---|---|
-| [`../../mimari.md`](../../mimari.md) | explanation | Sistem mimarisi — bileşenler, akış, kararların gerekçesi |
+| [`../mimari.md`](../mimari.md) | explanation | Sistem mimarisi — bileşenler, akış, kararların gerekçesi |
 | [`../proje-calistirma.md`](../proje-calistirma.md) | how-to | Çalıştırma kılavuzu, sık sorunlar |
 | [`../CLAUDE.md`](../CLAUDE.md) | — | AI ajanları için rehber (Diátaxis dışı) |
-| [`../../OKU-YAPI.md`](../../OKU-YAPI.md) | reference | Klasör yapısı haritası |
 
 > ℹ️ `mimari.md` zaten kapsamlı bir explanation belgesidir; buradaki
 > `explanation/` onu tekrar etmez, yalnızca ona sığmayan (tarihli, denetim
 > niteliğinde) içeriği tutar.
+>
+> ✅ **Düzeltildi** (2026-07-28): `OKU-YAPI.md` referansı kaldırıldı — bu
+> dosya `System/` temizliği sırasında silindi (bayat kök düzeyi planlama
+> notuydu, kod/ürün belgesi değildi). `mimari.md` yolu da düzeltildi
+> (`System/mimari.md`'dir, `../../` değil `../` ile erişilir).

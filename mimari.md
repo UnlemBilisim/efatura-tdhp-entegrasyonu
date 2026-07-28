@@ -250,6 +250,27 @@ düşebiliyordu; bu, `fastapi`/`psycopg2` bulunamama hatalarına yol açtı.
 
 ---
 
+## 5.1 Sunucuya taşıma (2026-07-28) — Docker kararları
+
+> ✅ **Uygulandı** (2026-07-28): `Dockerfile` + `docker-compose.yml`
+> eklendi, gerçek bir faturayla uçtan uca test edildi. Detaylı çalıştırma
+> adımları: [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md).
+
+| Karar | Gerekçe |
+|---|---|
+| Tek `Dockerfile`, üç bileşen bir arada (ayrı image değil) | `entegrasyon/model_eval_yolu.py` model_eval'i kardeş dizin olarak `sys.path`'e ekliyor — ayrı image'lara bölünürse bu dosya sistemi ilişkisi kurulamaz |
+| PostgreSQL ve Ollama ayrı Docker Compose servisleri | Resmi image'lar, bağımsız ölçeklenebilir/yeniden başlatılabilir, named volume ile veri kalıcı |
+| SSH tünel (LLM erişimi) container'a alınmadı | Uzak GPU sunucusuna (`10.34.10.112`) gidiyor — bu container'ın "içinde" değil, host'un "dışına" giden bir bağlantı; container'a almak host'un ağ kimliğini container'a taşımayı gerektirirdi, bunun yerine host'ta systemd servisi olarak kalıp container'dan `host.docker.internal` ile erişilmesi seçildi |
+| `POSTGRES_PASSWORD` env var zorunlu kılındı | `baslat.sh`'teki gömülü parola sorununun (§ güvenlik durumu) Docker tarafında tekrarlanmaması için — tanımsızsa `docker compose up` açıkça hata verip durur |
+
+**Doğrulanan davranış:** SSH tüneli olmadan `docker compose up` ile ayağa
+kalkan sistemde KDV ön filtreleme ve RAG embedding sorunsuz çalıştı; LLM
+adımı host'a ulaşamadığında **sessizce başarısız olmadı** —
+`tdhp_tahmini.error` alanında `"Network is unreachable"` gibi açık bir mesaj
+döndü, `success: false` oldu. Bu, mevcut hata yönetiminin (bkz. §3, "LLM
+erişimi yoksa hata fırlatmaz, `error` alanı dolu döner" davranışı) Docker
+ortamında da korunduğunu doğrular.
+
 ## 6. Bu belgenin kapsamı dışında kalanlar
 
 - **`preprocessing/`** — KDV sistemiyle ilgisiz ayrı alt proje (ham HTML →
