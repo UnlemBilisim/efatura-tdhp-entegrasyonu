@@ -119,6 +119,6 @@ bir asimetri — detaylı gerekçe [`mimari.md`](mimari.md) §2.1'de.
 ## 4. Nereden başlamalı?
 
 - **Sadece API'yi çağıracaksanız:** [`teslim/API-ENTEGRASYON-KILAVUZU.md`](teslim/API-ENTEGRASYON-KILAVUZU.md) yeterli, koda bakmanıza gerek yok.
-- **Sistemi çalıştıracaksanız:** [`proje-calistirma.md`](proje-calistirma.md) (yerel) veya [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md) (Docker).
+- **Sistemi çalıştıracaksanız:** [`proje-calistirma.md`](proje-calistirma.md) (yerel) veya [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md) (Docker). Sunucuda SSH tünelini kalıcı kurmak için: [`docs/how-to/ssh-tunel-kurulumu.md`](docs/how-to/ssh-tunel-kurulumu.md).
 - **Mimariyi/tasarım kararlarını anlayacaksanız:** [`mimari.md`](mimari.md).
 - **Koda katkı verecekseniz:** Her bileşenin kendi `CLAUDE.md`'si daha ayrıntılıdır — [`Mcp_mimarisi/CLAUDE.md`](Mcp_mimarisi/CLAUDE.md), [`model_eval/CLAUDE.md`](model_eval/CLAUDE.md).

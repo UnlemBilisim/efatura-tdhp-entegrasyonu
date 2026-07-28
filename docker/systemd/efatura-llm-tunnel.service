@@ -1,0 +1,26 @@
+[Unit]
+Description=e-Fatura sistemi - uzak GPU'daki Ollama'ya (LLM) SSH tuneli
+Documentation=file:///opt/efatura/System/docs/how-to/ssh-tunel-kurulumu.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=efatura-tunnel
+ExecStart=/usr/bin/autossh -M 0 -N \
+    -o ServerAliveInterval=15 \
+    -o ServerAliveCountMax=3 \
+    -o ExitOnForwardFailure=yes \
+    -o StrictHostKeyChecking=accept-new \
+    -L 11435:localhost:11434 \
+    unlem-gx10-01@10.34.10.112
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=0
+
+# autossh'in kendi durum takibi icin (gerekmez ama zararsiz, -M 0 ile devre disi
+# birakildi; SSH ServerAlive* secenekleri kopma tespiti icin yeterli)
+Environment=AUTOSSH_GATETIME=0
+
+[Install]
+WantedBy=multi-user.target

@@ -66,6 +66,9 @@ kurulmalı. Tünel kapalıyken LLM adımı **sessizce başarısız olmaz** —
 `tdhp_tahmini.error` alanında `"Network is unreachable"` gibi açık bir mesaj
 döner, `success: false` olur.
 
+**Sunucuda kalıcı kurulum için:** [`ssh-tunel-kurulumu.md`](ssh-tunel-kurulumu.md)
+— `autossh` + `systemd` ile insan müdahalesi olmadan açık kalması sağlanır.
+
 ## 4. Sağlık kontrolü
 
 ```bash

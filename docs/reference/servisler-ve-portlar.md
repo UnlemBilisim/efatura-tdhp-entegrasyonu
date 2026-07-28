@@ -17,12 +17,14 @@
 | **11434** | Ollama (yerel, embedding) | `baslat.sh` → `ollama serve` | RAG için evet |
 | **11435** | SSH tüneli → uzak GPU'daki Ollama | **Kullanıcı elle açar** | LLM için evet |
 
-> ⚠️ **11435 tünelini ajan açamaz** — SSH parola/anahtar istiyor. Komut
-> kullanıcının kendi notlarında saklanıyor (`System/` dışına taşındı,
-> 2026-07-28). Docker ile çalıştırırken bu tünelin host'ta (container
-> dışında) systemd servisi olarak kalıcı çalışması planlanıyor — bkz.
-> [`../../mimari.md`](../../mimari.md) §"Sunucuya taşıma" ve
-> [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
+> ⚠️ **11435 tünelini ajan açamaz** — SSH parola/anahtar istiyor. Yerelde
+> komut kullanıcının kendi notlarında saklanıyor (`System/` dışına taşındı,
+> 2026-07-28).
+>
+> ✅ **Uygulandı** (2026-07-28): Sunucuda bu tünel artık elle değil,
+> `autossh` + `systemd` ile kalıcı bir servis olarak çalışır — kurulum
+> adımları: [`ssh-tunel-kurulumu.md`](../how-to/ssh-tunel-kurulumu.md).
+> Servis dosyası: [`docker/systemd/efatura-llm-tunnel.service`](../../docker/systemd/efatura-llm-tunnel.service).
 
 Her iki FastAPI servisi de `--host 0.0.0.0` ile başlatılır
 (`baslat.sh:65`, `baslat.sh:94`) — yani tüm ağ arayüzlerinden erişilebilir.
