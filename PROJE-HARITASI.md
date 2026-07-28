@@ -96,9 +96,14 @@ bir asimetri — detaylı gerekçe [`mimari.md`](mimari.md) §2.1'de.
 | `mcp_mimarisi_istemcisi.py` | Mcp_mimarisi'nin HTTP uçlarına istek atan istemci |
 | `model_eval_koprusu.py` | model_eval'ın kodunu import edip TDHP tahmini işlevini entegrasyon katmanına açan köprü |
 | `model_eval_yolu.py` | model_eval'i kardeş dizin olarak `sys.path`'e ekleyen ortak yardımcı |
-| `v2_api.py` / `v2_semalar.py` | Asenkron (job_id tabanlı) v2 API ve dış şema dönüştürücüleri — v1'i bozmadan ayrı router |
-| `is_deposu.py` | v2 API için PostgreSQL tabanlı kalıcı iş (job) deposu |
 | `static/index.html` | Kendi test arayüzümüz — **teslim kapsamında değil**, dış ekip referans almamalı |
+
+> ❌ **`v2_api.py` / `v2_semalar.py` / `is_deposu.py` — iptal edildi
+> (2026-07-28).** Asenkron (job_id tabanlı) bir v2 API tasarlanıp kodlanmıştı,
+> ama sunucuya taşıma öncesi son kontrolde kullanıcı kararıyla **iptal
+> edildi** — dış ekibe teslim v1 (`/fatura/isle`) ile devam ediyor. Kod
+> repoda duruyor ama `app.py`'ye **bağlı değil**, sunucuda çalışmıyor/erişilebilir
+> değil. Gerekçe: [`docs/explanation/v2-api-tasarim-karari.md`](docs/explanation/v2-api-tasarim-karari.md).
 
 ### 3.4 `model_eval/` — TDHP tahmini (LLM + RAG)
 

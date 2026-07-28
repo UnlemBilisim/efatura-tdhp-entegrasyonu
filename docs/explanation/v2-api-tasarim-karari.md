@@ -1,8 +1,19 @@
 # v2 API Tasarımı — Gerekçe ve Plan
 
 > **Tür:** explanation — v2 sözleşmesinin NEDEN böyle tasarlandığı.
-> **Durum:** ✅ **Uygulandı** (2026-07-28). Kod yazıldı ve canlı sistemde
-> uçtan uca doğrulandı.
+>
+> ❌ **İptal edildi** (2026-07-28, kullanıcı kararı — sunucuya taşıma öncesi
+> son kontrol). Dış ekibe teslim, kararlaştırıldığı gibi v1 (`/fatura/isle`,
+> bkz. `teslim/API-ENTEGRASYON-KILAVUZU.md`) ile devam ediyor;
+> `teslim/API-ENTEGRASYON-KILAVUZU-v2.md` hiç yazılmadı ve yazılmayacak. Kod
+> (`entegrasyon/v2_api.py`, `v2_semalar.py`, `is_deposu.py`) repoda kalıyor
+> ama `entegrasyon/app.py`'ye artık **bağlanmıyor** — kimlik doğrulamasız,
+> Postgres'e yazan endpoint'leri sunucuda gereksiz yere açık bırakmamak için
+> (bkz. `docs/explanation/guvenlik-durumu-2026-07-27.md`). Aşağıdaki
+> "Uygulandı" notu bu kararla geçersiz — tarihsel kayıt olarak bırakıldı.
+>
+> **Durum (tarihsel, 2026-07-28):** ✅ **Uygulandı**. Kod yazıldı ve canlı
+> sistemde uçtan uca doğrulandı.
 >
 > ✅ **Uygulandı** (2026-07-28): `entegrasyon/is_deposu.py` (PostgreSQL
 > `api_jobs` tablosu), `entegrasyon/v2_semalar.py` (şema dönüşümü),

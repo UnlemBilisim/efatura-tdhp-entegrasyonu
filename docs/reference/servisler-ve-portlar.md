@@ -101,6 +101,12 @@ tablosuna dokunmazlar:
 Dış ekibin kullanacağı tek endpoint `POST /fatura/isle` —
 sözleşme: [`../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`](../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md).
 
+> ❌ **İptal edildi** (2026-07-28): `entegrasyon/v2_api.py` altında asenkron
+> bir v2 API (`/api/v1/*`, 4 endpoint) tasarlanmıştı — bu kod repoda duruyor
+> ama `app.py`'ye **bağlı değil**, yukarıdaki tabloya dahil değil çünkü
+> sunucuda çalışmıyor/erişilebilir değil. Gerekçe:
+> [`../explanation/v2-api-tasarim-karari.md`](../explanation/v2-api-tasarim-karari.md).
+
 ## Durum dosyaları (`.calistirma/`)
 
 `baslat.sh` tarafından yönetilir, elle düzenlenmemeli:

@@ -72,13 +72,11 @@ app = FastAPI(
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# v2 API (2026-07-27) — dış ekibe teslim edilen sözleşme. v1 endpoint'leri
-# (/fatura/isle, /fatura/onayla) BOZULMADAN kalır; kendi test arayüzümüz ve
-# 205 test onları kullanıyor. Tasarım gerekçesi:
-# docs/explanation/v2-api-tasarim-karari.md
-from v2_api import router as v2_router  # noqa: E402
-
-app.include_router(v2_router)
+# v2 API (2026-07-27) tasarlandı, kullanıcı kararıyla iptal edildi
+# (2026-07-28) — dış ekibe v1 (/fatura/isle) teslim edilmeye devam ediyor.
+# v2_api.py kodu repoda kalıyor ama BAĞLANMIYOR — kimlik doğrulamasız,
+# Postgres'e yazan endpoint'leri sunucuda gereksiz yere açık bırakmamak için.
+# Gerekçe: docs/explanation/v2-api-tasarim-karari.md
 
 
 class FaturaIsleIstegi(BaseModel):
