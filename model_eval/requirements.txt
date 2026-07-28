@@ -2,7 +2,7 @@
 requests>=2.31.0
 
 # Sonuc deposu (core/db.py, core/reporting.py) - PostgreSQL'e yazar.
-# Mcp_mimarisi ile ayni Postgres sunucusunu paylasir, bkz. ENTEGRASYON.md.
+# Mcp_mimarisi ile ayni Postgres sunucusunu paylasir, bkz. entegrasyon.md.
 psycopg2-binary>=2.9.0
 
 # RAG / vektor veritabani ozelligi icin (build_vector_db.py, evaluate_models.py --rag).

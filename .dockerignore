@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.dockerignore
+Archive2/
+db-yedek/
+.calistirma/
+entegrasyon/.venv/
+model_eval/vector_db/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+.DS_Store
+teslim/
+docs/
+Mcp_mimarisi/docs/
+model_eval/docs/
+entegrasyon/docs/
