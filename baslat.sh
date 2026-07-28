@@ -12,7 +12,17 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 STATE_DIR=".calistirma"
 mkdir -p "$STATE_DIR"
 
-: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD env var tanımlı olmalı — örn. POSTGRES_PASSWORD=<güçlü-parola> ./baslat.sh}"
+# .env varsa oradan yükle (POSTGRES_PASSWORD gibi sırlar için) — .env
+# .gitignore'dadır, repoya gitmez. Elle env var vermeyi tercih ederseniz
+# .env dosyasına gerek yok, POSTGRES_PASSWORD=... ./baslat.sh yeterli.
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD env var tanımlı olmalı — örn. POSTGRES_PASSWORD=<güçlü-parola> ./baslat.sh, ya da System/.env dosyasına POSTGRES_PASSWORD=... yazın}"
 DATABASE_URL="postgresql://efatura:${POSTGRES_PASSWORD}@localhost:5434/efatura_kdv"
 export DATABASE_URL
 
