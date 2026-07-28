@@ -1,7 +1,7 @@
 """Tek bir fatura icin senkron, DB'ye dokunmayan TDHP tahmin fonksiyonu.
 
 `entegrasyon/` klasorunun (Mcp_mimarisi'nin HTTP API'sinden "uygun" karari
-alinan faturalari bu pipeline'a verecek ayri bir proje - bkz. ENTEGRASYON.md)
+alinan faturalari bu pipeline'a verecek ayri bir proje - bkz. entegrasyon.md)
 import edecegi ince bir katman. `core/runner.py::run_model()`'in aksine:
 - Toplu degil, TEK fatura isler.
 - Es zamanlilik/ThreadPoolExecutor yok.
@@ -246,7 +246,7 @@ def predict_single_invoice(
     # hicbir zaman None degil - parse_model_spec() ollama_host=None aldiginda
     # base_url=None ureterek call_ollama_messages()'ta host.rstrip("/") ile
     # AttributeError'a yol aciyordu (entegrasyon/ ile uctan uca testte bulundu,
-    # bkz. model_eval/PROJECT.md SS4.1). ollama_host verilmezse ayni varsayilana dus.
+    # bkz. model_eval/project.md SS4.1). ollama_host verilmezse ayni varsayilana dus.
     effective_ollama_host = ollama_host or DEFAULT_OLLAMA_HOST
     spec = model if isinstance(model, dict) else parse_model_spec(model, effective_ollama_host)
     system_prompt = build_glossary_system_prompt() if with_glossary else SYSTEM_PROMPT

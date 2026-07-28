@@ -17,7 +17,7 @@ Akış — YÖNE (inbox/outbox) göre ikiye ayrılır (kullanıcı kararı, 2026
     inbox (DIŞARIDAN GELEN fatura — kendi VKN'miz ALICI tarafında):
         [Ham UBL-TR XML] ---------------------------------------------------> model_eval TDHP tahmini
         (Mcp_mimarisi HİÇ ÇAĞRILMAZ — ön filtreleme sadece bizim kestiğimiz
-        faturalar için tasarlandı, bkz. Mcp_mimarisi/PROJECT.md §3.9 "sadece
+        faturalar için tasarlandı, bkz. Mcp_mimarisi/project.md §3.9 "sadece
         outbox" kapsam kararı. İnbox faturalarda doğrudan TDHP tahminine gidilir.)
 
 Yön, faturanın kendi XML'inden tespit edilir (AccountingSupplierParty VKN'si
@@ -277,7 +277,7 @@ def fatura_isle(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
         # Kullanıcı kararı (2026-07-22): dışarıdan gelen faturalarda
         # Mcp_mimarisi'nin KDV/NACE ön filtrelemesi HİÇ ÇALIŞMAZ — sistem
         # sadece bizim kestiğimiz (outbox) faturalar için tasarlandı (bkz.
-        # Mcp_mimarisi/PROJECT.md §3.9). İnbox'ta doğrudan TDHP tahminine geçilir.
+        # Mcp_mimarisi/project.md §3.9). İnbox'ta doğrudan TDHP tahminine geçilir.
         _logger.info("[3/5] ÖN FİLTRE ATLANDI — inbox fatura, Mcp_mimarisi hiç çağrılmıyor")
 
         hazir, hazir_mesaji = model_eval_hazir_mi()

@@ -1,7 +1,7 @@
 """model_eval'a bağlanan ince köprü modülü.
 
 Bu modül model_eval'ın kod tabanını İMPORT EDER (ayrı süreç değil, ayrı
-proje ama aynı Python içinden çağrılır — model_eval/ENTEGRASYON.md'deki
+proje ama aynı Python içinden çağrılır — model_eval/entegrasyon.md'deki
 "iki proje kod olarak birleştirilmez" kuralı Mcp_mimarisi ↔ model_eval
 arasındaki HTTP ayrımı için geçerli; bu köprü ise zaten model_eval'ın
 kendi çalışma alanının bir parçası, entegrasyon/ sadece iki tarafı bir
@@ -88,7 +88,7 @@ def tdhp_tahmini_yap(
     # ollama_host (LLM tahmini icin, gemma4:31b-cloud gibi bulut modeller)
     # tunele gitmeli - bu modeller yerelde yok. rag_ollama_host (embedding,
     # embeddinggemma) ise BILEREK tunele YONLENDIRILMEZ - embeddinggemma
-    # yerelde zaten kurulu (bkz. MIMARI.md SS4, "veri gizliligi gerekcesiyle
+    # yerelde zaten kurulu (bkz. mimari.md SS4, "veri gizliligi gerekcesiyle
     # yerelde calisir"), tunel uzerinden gondermek gereksiz network riski
     # (baglanti kopmasi/gecikme) ekliyordu, gercek testte "Connection reset
     # by peer" hatasina yol acti - rag_ollama_host=None birakilarak

@@ -102,7 +102,7 @@ faturalarla (kod 701, kod 235 → uygun) test edildi.
 > satırları) da dahil hiçbir `_logger.info(...)` çağrısı hiçbir yere
 > yazdırılmıyordu (sessizce yutuluyordu). `entegrasyon/` ile uçtan uca
 > testte "loglar yetersiz, her adımı terminalde göremiyorum" geri
-> bildirimi üzerine eklendi. Kullanım: `PROJE_CALISTIRMA.md` "Her adımı
+> bildirimi üzerine eklendi. Kullanım: `proje-calistirma.md` "Her adımı
 > canlı terminalde izlemek" bölümü.
 
 > ⚠️ Bu bölüm en hızlı bayatlayan bölümdür. Kodla çelişen bir cümle görürsen
@@ -222,7 +222,7 @@ faturalarla (kod 701, kod 235 → uygun) test edildi.
 
 ## Proje kapsamı ve çalışma düzeni
 
-- **Ne inşa ediyoruz** (kapsam, mimari kararlar, riskler, faz planı): [`PROJECT.md`](PROJECT.md)
+- **Ne inşa ediyoruz** (kapsam, mimari kararlar, riskler, faz planı): [`project.md`](project.md)
 - **Her commit'e tek satır:** [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 
 ## Çalışma tarzı

@@ -22,11 +22,11 @@ Bunlar tarihsel olarak `System/` üstünde/kökünde duruyor, buraya taşınmad�
 
 | Belge | Tür | İçerik |
 |---|---|---|
-| [`../../MIMARI.md`](../../MIMARI.md) | explanation | Sistem mimarisi — bileşenler, akış, kararların gerekçesi |
-| [`../PROJE_CALISTIRMA.md`](../PROJE_CALISTIRMA.md) | how-to | Çalıştırma kılavuzu, sık sorunlar |
+| [`../../mimari.md`](../../mimari.md) | explanation | Sistem mimarisi — bileşenler, akış, kararların gerekçesi |
+| [`../proje-calistirma.md`](../proje-calistirma.md) | how-to | Çalıştırma kılavuzu, sık sorunlar |
 | [`../CLAUDE.md`](../CLAUDE.md) | — | AI ajanları için rehber (Diátaxis dışı) |
 | [`../../OKU-YAPI.md`](../../OKU-YAPI.md) | reference | Klasör yapısı haritası |
 
-> ℹ️ `MIMARI.md` zaten kapsamlı bir explanation belgesidir; buradaki
+> ℹ️ `mimari.md` zaten kapsamlı bir explanation belgesidir; buradaki
 > `explanation/` onu tekrar etmez, yalnızca ona sığmayan (tarihli, denetim
 > niteliğinde) içeriği tutar.

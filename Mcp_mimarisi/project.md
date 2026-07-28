@@ -629,7 +629,7 @@ birleştirilmez, monorepo yapılmaz).
 > şirket VKN'sini (`0460351893`, Akyüzlü Dövme ve Kaldırma Ekipmanları)
 > ve aynı `ubls/`/`Archive2` fatura verisini kullanması. `AIData/` içine
 > yanlışlıkla eklenen notlar geri alındı (silindi); doğru entegrasyon
-> kararı `~/Desktop/AıData2/model_eval/ENTEGRASYON.md`'ye yazıldı.
+> kararı `~/Desktop/AıData2/model_eval/entegrasyon.md`'ye yazıldı.
 
 **Neden ayrık (monorepo değil):** CLAUDE.md'deki "Hesap Planı Eşleme
 Modülüne dokunulmuyor" kuralıyla tutarlı — Mcp_mimarisi, model_eval'ın
@@ -679,7 +679,7 @@ eşlemesinden ÖNCE çalışır" kararının somut, sistemler-arası karşılı�
   VKN→NACE lookup yapmaz (bkz. §0.2 alt-adım 3).
 
 Karşı taraftaki (model_eval) entegrasyon dokümanı:
-`~/Desktop/AıData2/model_eval/ENTEGRASYON.md`.
+`~/Desktop/AıData2/model_eval/entegrasyon.md`.
 
 **Kapsam dışı (bu kararla birlikte netleşmedi, ayrıca ele alınmalı):**
 production ortamında model_eval'ın hangi ağ adresinden Mcp_mimarisi

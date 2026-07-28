@@ -20,7 +20,7 @@ MCP_MIMARISI_BASE_URL = os.environ.get("MCP_MIMARISI_BASE_URL", "http://localhos
 class McpMimarisiErisilemezHatasi(Exception):
     """Mcp_mimarisi API'sine ağ/timeout hatasıyla ulaşılamadığında fırlatılır.
 
-    model_eval/ENTEGRASYON.md'nin "kapsam dışı" bölümünde bu durumun
+    model_eval/entegrasyon.md'nin "kapsam dışı" bölümünde bu durumun
     davranışı tanımsız bırakılmıştı — bu entegrasyon bunu belirsiz
     bırakmak yerine açıkça hata olarak işaretler ve kullanıcıya gösterir
     (sessizce "uygun" veya "insan incelemesi gerekli" varsaymaz)."""

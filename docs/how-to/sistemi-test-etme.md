@@ -1,7 +1,7 @@
 # Sistemi Test Etme
 
 > **Tür:** how-to — görev odaklı tarif.
-> Kurulum/başlatma adımları için: [`../../PROJE_CALISTIRMA.md`](../../PROJE_CALISTIRMA.md).
+> Kurulum/başlatma adımları için: [`../../proje-calistirma.md`](../../proje-calistirma.md).
 > Bu belge "çalıştığını nasıl doğrularım" sorusuna cevap verir.
 
 ## Önce: dört bağımlılık ayakta mı?
@@ -87,7 +87,7 @@ print(json.dumps(d["tdhp_tahmini"]["dis_sema"], ensure_ascii=False, indent=2))'
 
 **`onay: true` göndermezseniz** outbox faturalarda akış ön filtrede durur ve
 `dis_sema` gelmez (`asama: on_filtre_insan_incelemesi_bekliyor`). Bu doğru
-davranıştır — bkz. [`../../../MIMARI.md`](../../../MIMARI.md) §3.2.
+davranıştır — bkz. [`../../../mimari.md`](../../../mimari.md) §3.2.
 
 ## 4. Sadece TDHP tahminini test etme (Docker'sız)
 

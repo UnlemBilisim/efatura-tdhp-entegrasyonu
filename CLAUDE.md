@@ -22,8 +22,8 @@ denetlenir, sonra muhasebe kaydı (TDHP kodu + Borç/Alacak + tutar) üretilir.
 | `model_eval/` | — | TDHP tahmini (LLM + RAG), **import ile** çağrılır |
 | `entegrasyon/` | 8100 | Orkestrasyon + web arayüzü |
 
-Mimarinin **neden** böyle kurulduğu: [`../MIMARI.md`](../MIMARI.md).
-Çalıştırma adımları: [`PROJE_CALISTIRMA.md`](PROJE_CALISTIRMA.md).
+Mimarinin **neden** böyle kurulduğu: [`../mimari.md`](../mimari.md).
+Çalıştırma adımları: [`proje-calistirma.md`](proje-calistirma.md).
 
 ## Dokümantasyon (Diátaxis)
 
@@ -45,7 +45,7 @@ indeksini de güncelle.
    `entegrasyon/model_eval_yolu.py` bunu varsayarak `sys.path`'e ekleme yapar.
    Klasörleri ayırmak sistemi bozar.
 2. **`Mcp_mimarisi` HTTP ile, `model_eval` import ile çağrılır.** Bu asimetri
-   kasıtlıdır (gerekçe: MIMARI.md §2.1). `entegrasyon/` bu ikisinin koduna
+   kasıtlıdır (gerekçe: mimari.md §2.1). `entegrasyon/` bu ikisinin koduna
    dokunmaz — onlara dışarıdan bağlanan üçüncü bir bileşendir.
 3. **Ön filtreleme yalnızca outbox faturalara uygulanır.** inbox'ta
    `Mcp_mimarisi` HİÇ çağrılmaz (gerekçe: başkasının kestiği faturanın mevzuat
@@ -147,6 +147,6 @@ verdiği 3 haneli kodu `TDHP_GLOSSARY`'ye karşı doğrulamıyor ve tutarı fatu
 - **Kök `CLAUDE.MD` ham bir prompt metnidir** (başlığı "Yeni Claude sohbetine
   yapıştırılacak prompt"). İçeriği geçerli, formatı düzensiz — yeniden
   yazılması gerekirse kullanıcıya sor.
-- Belgeler arasında **`PROJE_CALISTIRMA.md` güncel olan**; `Mcp_mimarisi`
+- Belgeler arasında **`proje-calistirma.md` güncel olan**; `Mcp_mimarisi`
   altındaki eski kopyalar `arsiv/eski-dokuman/`'a taşındı (bayat yollar
   içeriyordu).

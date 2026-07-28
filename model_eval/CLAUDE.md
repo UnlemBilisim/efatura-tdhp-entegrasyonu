@@ -391,9 +391,9 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 ## Proje kapsamı ve çalışma düzeni
 
 - **Ne inşa ediyoruz** (mimari kararlar, deney sonuçları, faz durumu):
-  [`PROJECT.md`](PROJECT.md)
+  [`project.md`](project.md)
 - **Mcp_mimarisi ile entegrasyon sözleşmesi** (ayrı proje, HTTP üzerinden,
-  henüz kod yazılmadı): [`ENTEGRASYON.md`](ENTEGRASYON.md)
+  henüz kod yazılmadı): [`entegrasyon.md`](entegrasyon.md)
 - **Son mimari denetim/PostgreSQL geçişi gerekçesi:**
   [`docs/mimari-denetim-2026-07-22.md`](docs/mimari-denetim-2026-07-22.md)
 

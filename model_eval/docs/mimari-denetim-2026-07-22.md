@@ -9,7 +9,7 @@ Bu belge, `model_eval` ve `Mcp_mimarisi` projelerinin "çok kullanıcılı MVP'y
 ## Neden bu değişiklik gerekti
 
 Denetimde bu pipeline'ın CLI/batch aracı olarak tasarlandığı ama gelecekte
-(ENTEGRASYON.md'deki Adım 1-4) bir HTTP servisinin parçası olacağı
+(entegrasyon.md'deki Adım 1-4) bir HTTP servisinin parçası olacağı
 belirlendi. Servis çok kullanıcılı/çok process (worker) altında
 çalıştığında iki kritik sorun tespit edildi:
 
@@ -32,7 +32,7 @@ belirlendi. Servis çok kullanıcılı/çok process (worker) altında
 - **Yeni:** `core/db.py` — process ömrü boyunca tek bir
   `psycopg2.pool.ThreadedConnectionPool` (`get_pool()`/`get_conn()`).
   `DATABASE_URL` env var'dan okunur, Mcp_mimarisi ile **aynı Postgres
-  sunucusu** paylaşılır (bkz. ENTEGRASYON.md) ama tablo isim alanı
+  sunucusu** paylaşılır (bkz. entegrasyon.md) ama tablo isim alanı
   çakışmasın diye tüm tablolar `model_eval_` önekini taşır.
 - **Yeni şema:** `model_eval_sonuclar (id, file_label, invoice_id, record
   JSONB, is_error, created_at)`. Eski jsonl satırının karşılığı `record`
@@ -74,7 +74,7 @@ belirlendi. Servis çok kullanıcılı/çok process (worker) altında
 
 - Auth/rate-limiting (bilinçli olarak dışarıda bırakıldı, ayrı bir karar).
 - `evaluate_models.py`/`core/parsing.py` akışına Adım 0 (Mcp_mimarisi)
-  HTTP çağrısının eklenmesi — hâlâ ENTEGRASYON.md'de tanımlı ama kodu
+  HTTP çağrısının eklenmesi — hâlâ entegrasyon.md'de tanımlı ama kodu
   yazılmamış bir sözleşme.
 - ChromaDB'nin kendisinin (SQLite tabanlı) çok-process (farklı OS
   process'leri, tek process içindeki thread'ler değil) senaryosunda

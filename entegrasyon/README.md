@@ -2,7 +2,7 @@
 
 > **Amaç:** `Mcp_mimarisi`'nin KDV/vergi oranı mevzuat ön filtresi ile
 > `model_eval`'ın TDHP hesap kodu tahmin pipeline'ı arasında, `model_eval/
-> ENTEGRASYON.md`'de sözleşmesi tanımlanmış "Adım 0" akışını gerçekten
+> entegrasyon.md`'de sözleşmesi tanımlanmış "Adım 0" akışını gerçekten
 > çalıştıran bağımsız orkestrasyon servisi + test arayüzü.
 
 Bu klasör **hem Mcp_mimarisi hem model_eval'dan bağımsız üçüncü bir
@@ -15,7 +15,7 @@ bileşendir** — ikisine de dışarıdan bağlanır, ikisinin de koduna dokunma
   `core.single.predict_single_invoice` fonksiyonunu çağırır). Bu, iki
   proje arasındaki "HTTP üzerinden ayrık" kuralını ihlal etmez — o kural
   Mcp_mimarisi ↔ model_eval arasındaki ayrımı korumak içindi
-  (`Mcp_mimarisi/PROJECT.md` §3.10); bu entegrasyon katmanı model_eval'ın
+  (`Mcp_mimarisi/project.md` §3.10); bu entegrasyon katmanı model_eval'ın
   kendi çalışma alanının bir parçası olarak model_eval'ı import eder.
 
 ## Akış
@@ -57,7 +57,7 @@ Mcp_mimarisi POST /fatura/kontrol-et
 Mcp_mimarisi'nin KDV/NACE ön filtrelemesi inbox faturalarda **hiç
 çağrılmaz** — sistem bilinçli olarak sadece bizim kestiğimiz faturaları
 mevzuata uygunluk açısından doğrulamak üzere tasarlandı (bkz.
-`Mcp_mimarisi/PROJECT.md` §3.9, "bu proje şuan sadece bizim kestiğimiz
+`Mcp_mimarisi/project.md` §3.9, "bu proje şuan sadece bizim kestiğimiz
 faturaları incelemeli" kapsam kararı). Dışarıdan gelen faturalarda bu
 doğrulama sorumluluğu bu sisteme ait değil — doğrudan TDHP tahminine
 geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabilir.
@@ -105,7 +105,7 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 > arayüzü (`static/index.html`) yazıldı. Mcp_mimarisi bağlantısı
 > (`mcp_mimarisi_istemcisi.py`) gerçek HTTP çağrısı yapar, ayrı onay
 > gerektiren kod eklenmedi (Mcp_mimarisi'nin auth'u yok, bu servis de
-> eklemedi — bkz. `Mcp_mimarisi/PROJECT.md` §3.8).
+> eklemedi — bkz. `Mcp_mimarisi/project.md` §3.8).
 >
 > ✅ **model_eval bağlantısı tamamlandı (2026-07-22, aynı gün):**
 > `model_eval/core/single.py::predict_single_invoice` eklendi (kod+yön+tutar
@@ -124,7 +124,7 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 >    `parse_model_spec()`'e sızıp `base_url=None` üretiyordu — bu, gerçek
 >    bir modelle (`gemma4:31b-cloud`) ilk uçtan uca denemede `AttributeError`
 >    (`'NoneType' object has no attribute 'rstrip'`) ile 500 hatasına yol
->    açtı. `model_eval` tarafında düzeltildi (bkz. `model_eval/PROJECT.md`
+>    açtı. `model_eval` tarafında düzeltildi (bkz. `model_eval/project.md`
 >    §4.1) — artık `ollama_host=None` verilirse `DEFAULT_OLLAMA_HOST`'a
 >    düşüyor.
 > 2. Düzeltme sonrası ikinci denemede **401 Kimlik doğrulama hatası** alındı
@@ -160,7 +160,7 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 > girdi/çıktısını terminalde görmek istiyorum". Aynı loglama
 > `Mcp_mimarisi/src/efatura_kdv/api.py`'ye de eklendi (`[MCP 1/3]`-
 > `[MCP 3/3]`) — bkz. `Mcp_mimarisi/CLAUDE.md`. Canlı izleme:
-> `PROJE_CALISTIRMA.md` "Her adımı canlı terminalde izlemek" bölümü.
+> `proje-calistirma.md` "Her adımı canlı terminalde izlemek" bölümü.
 
 ## Çalıştırma
 
@@ -184,8 +184,8 @@ var'ı ile belirt (varsayılan `http://localhost:8000`).
 
 - Mcp_mimarisi tarafı: `Mcp_mimarisi/docs/reference/api-semasi.md`
   (`POST /fatura/kontrol-et` şeması, bu servis onu birebir kullanır).
-- model_eval tarafı: `model_eval/ENTEGRASYON.md` + (eklenince)
-  `model_eval/PROJECT.md`'deki `predict_single_invoice` bölümü.
+- model_eval tarafı: `model_eval/entegrasyon.md` + (eklenince)
+  `model_eval/project.md`'deki `predict_single_invoice` bölümü.
 - Bu servisin kendi endpoint'i: `POST /fatura/isle` — girdi
   `{fatura_xml, satici_vkn, satici_nace_kodlari, onay, kur_secimi}`, çıktı
   `{asama, on_filtre_sonucu, kur_bilgisi, tdhp_tahmini, mesaj}` (tam alanlar
@@ -219,7 +219,7 @@ var'ı ile belirt (varsayılan `http://localhost:8000`).
 >    o zaman bu fonksiyon güncellenmeli.
 >
 > **Önkoşul:** Bu endpoint `DATABASE_URL` env var'ının entegrasyon servisine
-> de verilmiş olmasını gerektirir (bkz. `PROJE_CALISTIRMA.md` §3) —
+> de verilmiş olmasını gerektirir (bkz. `proje-calistirma.md` §3) —
 > `/fatura/isle` (tahmin) bu olmadan da çalışır, ama `/fatura/onayla`
 > (kayıt) `DATABASE_URL` yoksa 500 döner. Gerçek bir faturayla
 > (`AKL2025000000003`, tevkifatlı) uçtan uca test edildi: hem PostgreSQL

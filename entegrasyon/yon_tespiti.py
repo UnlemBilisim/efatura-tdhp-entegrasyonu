@@ -2,7 +2,7 @@
 
 Kullanıcı kararı (2026-07-22): dışarıdan gelen (inbox) faturalarda
 Mcp_mimarisi'nin KDV/NACE ön filtrelemesi hiç çalışmaz (bkz.
-Mcp_mimarisi/PROJECT.md §3.9 — sistem "sadece bizim kestiğimiz faturaları
+Mcp_mimarisi/project.md §3.9 — sistem "sadece bizim kestiğimiz faturaları
 incelemeli" kapsam kararı), fatura doğrudan model_eval'a gider. Bu modül,
 `app.py`'nin Mcp_mimarisi'ni çağırıp çağırmayacağına karar vermeden önce
 yönü öğrenmesini sağlar.

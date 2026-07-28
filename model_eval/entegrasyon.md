@@ -11,7 +11,7 @@
 beyan ettiği KDV oranının, satıcının NACE kod(lar)ının izin verdiği
 oranlarla uyumlu olup olmadığını kontrol eder. Kendi PostgreSQL veritabanı,
 kendi HTTP API'si (FastAPI) ve kendi test/dokümantasyon seti var —
-`Mcp_mimarisi/PROJECT.md`, `Mcp_mimarisi/CLAUDE.md`.
+`Mcp_mimarisi/project.md`, `Mcp_mimarisi/CLAUDE.md`.
 
 İki proje kod olarak birleştirilmez (import edilmez, aynı süreçte
 çalıştırılmaz) — sadece HTTP üzerinden konuşur. Gerekçe: bu pipeline'ın
@@ -78,7 +78,7 @@ Adım 0: Mcp_mimarisi POST /fatura/kontrol-et
 - Mcp_mimarisi API'si erişilemezse (network hatası, timeout) bu
   pipeline'ın davranışı — şimdilik tanımsız, ayrıca ele alınmalı.
 - Auth — Mcp_mimarisi tarafında da kapsam dışı bırakıldı (bkz.
-  `Mcp_mimarisi/PROJECT.md` §3.8), iki servis arası çağrıda da yok.
+  `Mcp_mimarisi/project.md` §3.8), iki servis arası çağrıda da yok.
 
 ## Durum
 
@@ -86,7 +86,7 @@ Adım 0: Mcp_mimarisi POST /fatura/kontrol-et
 > netleşti ve belgelendi. **Henüz kod yazılmadı** — bu pipeline'ın
 > `core/parsing.py`/`evaluate_models.py` akışına Adım 0 HTTP çağrısının
 > eklenmesi ayrı bir görevdir. Karşı taraf (Mcp_mimarisi) referansı:
-> `Mcp_mimarisi/PROJECT.md` §3.10.
+> `Mcp_mimarisi/project.md` §3.10.
 
 > ✅ **Uygulandı (2026-07-22):** Çok kullanıcılı MVP mimari denetiminin
 > sonucunda bu pipeline'ın sonuç deposu (`core/reporting.py`,

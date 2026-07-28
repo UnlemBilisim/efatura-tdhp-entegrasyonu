@@ -243,5 +243,5 @@ muhasebecinin kontrol etmesi gerekir.
 - Çıktı şemasının tam sözleşmesi ve `account_code_reason` üretim kuralları:
   [`model_eval/docs/reference/dis-ekip-kayit-semasi.md`](../../../model_eval/docs/reference/dis-ekip-kayit-semasi.md)
 - Sistem mimarisi (neden iki aşamalı):
-  [`../../../../MIMARI.md`](../../../../MIMARI.md)
+  [`../../../../mimari.md`](../../../../mimari.md)
 - Canlı OpenAPI şeması: `http://localhost:8100/openapi.json`

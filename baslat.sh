@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tüm sistemi (PostgreSQL + Mcp_mimarisi API + entegrasyon servisi) tek
 # komutla, arka planda başlatır. Adım adım manuel açıklama için
-# PROJE_CALISTIRMA.md'ye bakın — bu script sadece o adımları otomatikleştirir.
+# proje-calistirma.md'ye bakın — bu script sadece o adımları otomatikleştirir.
 #
 # Kullanım: ./baslat.sh
 # Durdurmak için: ./durdur.sh

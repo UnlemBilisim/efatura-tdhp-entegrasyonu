@@ -2,7 +2,7 @@
 
 Mcp_mimarisi ile ayni Postgres sunucusunu (ayni DATABASE_URL) paylasir ama
 tablo isim alani cakismasin diye tum tablolar `model_eval_` on ekini tasir -
-bkz. ENTEGRASYON.md. Havuz process omru boyunca tek seferlik olusturulur
+bkz. entegrasyon.md. Havuz process omru boyunca tek seferlik olusturulur
 (module-level singleton) - CLI'nin `--model-parallelism`/`--concurrency` ile
 ayni process icinde acilan cok sayida thread bu havuzu paylasir.
 """

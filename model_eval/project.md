@@ -19,7 +19,7 @@ değerlerini içerir. Günlük çalışma kuralları için ayrıca [`CLAUDE.md`]
 - **Ölçek (bugün):** Araştırma/deney aşamasında, CLI/batch aracı olarak
   çalışıyor. Sonuç deposu PostgreSQL'e taşındı (2026-07-22) çünkü gelecekte
   bir HTTP servisinin (Mcp_mimarisi'nin Adım 0'ından sonraki adımlar,
-  bkz. `ENTEGRASYON.md`) parçası olması planlanıyor — henüz o servis kodu
+  bkz. `entegrasyon.md`) parçası olması planlanıyor — henüz o servis kodu
   yazılmadı.
 - **Durum:** Deneysel bulgular olgun (RAG/self-correct/hint'ler test edildi,
   bkz. §2), mimari sağlamlık denetimi tamamlandı (§3).
@@ -102,7 +102,7 @@ CREATE INDEX idx_model_eval_sonuclar_label_invoice
   `DISTINCT ON (invoice_id) ... ORDER BY invoice_id, id DESC` ile her zaman
   **en son** kaydı esas alır (bkz. `core/reporting.py` `_latest_records`).
 - Tablo adı `model_eval_` önekini taşır çünkü **Mcp_mimarisi ile aynı
-  Postgres sunucusu** paylaşılıyor (bkz. `ENTEGRASYON.md`) — isim alanı
+  Postgres sunucusu** paylaşılıyor (bkz. `entegrasyon.md`) — isim alanı
   çakışması olmasın diye. `gecmis_fatura_kalemleri`/`islenmis_faturalar`
   (Mcp_mimarisi'nin tabloları) buradan hiç dokunulmaz.
 
@@ -121,7 +121,7 @@ pool'unu sıfırlar — testler birbirinden ve gerçek prod DB'sinden izole kal�
 
 Ayrı bir proje (`~/Desktop/AıData2/Mcp_mimarisi/`) — kod olarak birleştirilmez
 (import edilmez, aynı süreçte çalışmaz), sadece HTTP üzerinden konuşur. Tam
-sözleşme: [`ENTEGRASYON.md`](ENTEGRASYON.md). Özet: ham XML işlenmeden önce
+sözleşme: [`entegrasyon.md`](entegrasyon.md). Özet: ham XML işlenmeden önce
 "Adım 0" olarak `POST /fatura/kontrol-et` (satıcı VKN + NACE kodları + fatura
 XML) çağrılır; `genel_karar="uygun"` ise bu pipeline'ın Adım 1-4'ü
 (parse→RAG→LLM→borç=alacak doğrulaması) çalışır, `"insan_incelemesi_gerekli"`
@@ -217,7 +217,7 @@ def predict_single_invoice(
 ## 6. Kapsam Dışı / Sıradaki Adımlar
 
 - Mcp_mimarisi Adım 0 HTTP çağrısının `core/parsing.py`/`evaluate_models.py`
-  akışına eklenmesi (ENTEGRASYON.md'de sözleşme var, kod yok).
+  akışına eklenmesi (entegrasyon.md'de sözleşme var, kod yok).
 - Bu pipeline'ın kendisinin bir HTTP servisi haline getirilmesi (şu an CLI/
   batch aracı) — PostgreSQL geçişi bunun ön koşullarından biriydi ama servis
   katmanının kendisi (endpoint, request/response şeması) henüz tasarlanmadı.
