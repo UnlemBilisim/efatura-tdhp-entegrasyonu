@@ -22,6 +22,7 @@ Bunlar tarihsel olarak `System/` üstünde/kökünde duruyor, buraya taşınmad�
 
 | Belge | Tür | İçerik |
 |---|---|---|
+| [`../PROJE-HARITASI.md`](../PROJE-HARITASI.md) | — | **Projeye ilk bakan biri için giriş noktası** — ne yapar, dosya haritası, nereden başlanır |
 | [`../mimari.md`](../mimari.md) | explanation | Sistem mimarisi — bileşenler, akış, kararların gerekçesi |
 | [`../proje-calistirma.md`](../proje-calistirma.md) | how-to | Çalıştırma kılavuzu, sık sorunlar |
 | [`../CLAUDE.md`](../CLAUDE.md) | — | AI ajanları için rehber (Diátaxis dışı) |

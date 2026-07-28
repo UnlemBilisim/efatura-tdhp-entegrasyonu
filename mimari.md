@@ -4,10 +4,9 @@
 > ve tasarım kararlarının **neden** öyle verildiğini anlatır. Diátaxis
 > sınıflandırmasında bu bir **explanation** belgesidir.
 >
-> - **Ne çalıştırılır / nasıl başlatılır** → [`System/proje-calistirma.md`](System/proje-calistirma.md)
-> - **Klasör yapısı / nerede ne var** → [`OKU-YAPI.md`](OKU-YAPI.md)
-> - **Alt projelerin haritası ve durumu** → [`PROJECT.md`](PROJECT.md)
-> - **Bileşen içi teknik detay** → ilgili alt projenin kendi `PROJECT.md`/`docs/`'u
+> - **Ne çalıştırılır / nasıl başlatılır** → [`proje-calistirma.md`](proje-calistirma.md)
+> - **Dosya/klasör haritası, nereden başlamalı** → [`PROJE-HARITASI.md`](PROJE-HARITASI.md)
+> - **Bileşen içi teknik detay** → ilgili alt projenin kendi `project.md`/`docs/`'u
 >
 > Bu belge onları tekrar etmez.
 >
