@@ -7,7 +7,7 @@
 ## Hızlı yol — tek komut
 
 ```bash
-./baslat.sh
+POSTGRES_PASSWORD="<güçlü-parola>" ./baslat.sh
 ```
 
 Bu, aşağıdaki 3 adımı (PostgreSQL, Mcp_mimarisi API, entegrasyon servisi)
@@ -15,6 +15,12 @@ otomatik sırayla yapar: zaten çalışan servisleri atlar, eksik olanları
 arka planda başlatır, sağlık kontrolü yapar ve sana `http://localhost:8100`
 adresini verir. Loglar `.calistirma/` altında (`mcp_mimarisi_api.log`,
 `entegrasyon.log`) — bir şey beklediğin gibi çalışmazsa önce oraya bak.
+
+> ✅ **Uygulandı** (2026-07-28): `POSTGRES_PASSWORD` env var **zorunludur**
+> (`baslat.sh:15`) — tanımlı değilse script açıkça hata verip durur, gömülü
+> bir parolaya düşmez. **Container ilk kez oluşturulurken hangi parolayı
+> verdiyseniz, sonraki her çalıştırmada da aynısını vermelisiniz** — aksi
+> halde PostgreSQL bağlantıyı reddeder. Detay: [`docs/reference/servisler-ve-portlar.md`](docs/reference/servisler-ve-portlar.md).
 
 > ✅ **Uygulandı (2026-07-23):** Log dosyaları artık her `./baslat.sh`
 > çalıştırmasında **üzerine yazılmıyor** (`baslat.sh` — `>` yerine `>>` ile

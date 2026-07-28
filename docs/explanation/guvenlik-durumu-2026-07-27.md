@@ -82,14 +82,25 @@ iddiası, yeniden hesaplanmıyor.
 atlıyor. Yazılan kayıt RAG havuzuna girdiği için sonraki tahminleri kalıcı
 olarak yönlendirir.
 
-### 5. Gömülü DB parolası (ORTA)
+### 5. Gömülü DB parolası (ORTA) — ✅ Düzeltildi (2026-07-28)
 
-`baslat.sh:15` — `efatura:efatura` (parola = kullanıcı adı), env'den geleni
-koşulsuz eziyor. Postgres `-p 5434:5432` ile tüm arayüzlere açık.
+> ✅ **Uygulandı** (2026-07-28): `baslat.sh:15`'teki gömülü `efatura:efatura`
+> parolası kaldırıldı. `POSTGRES_PASSWORD` artık zorunlu env var
+> (`: "${POSTGRES_PASSWORD:?...}"`) — tanımlı değilse script açıkça hata
+> verip durur, gömülü/varsayılan bir parolaya düşmez. `docker-compose.yml`
+> tarafında bu disiplin zaten baştan uygulanmıştı. Gerçek testte doğrulandı:
+> env var olmadan `POSTGRES_PASSWORD env var tanımlı olmalı` hatasıyla
+> durdu, doğru parolayla servisler sağlıklı ayağa kalktı.
 
-**Uygulama kodu bu konuda doğru yazılmış** — üç modül de `DATABASE_URL`'i
-env'den okuyup yoksa `RuntimeError` veriyor, gömülü fallback yok. Zafiyet
-yalnızca başlatma scriptinde ve how-to belgelerinde.
+Aşağıdaki metin, düzeltme öncesi durumu tarihsel kayıt olarak korur:
+
+~~`baslat.sh:15` — `efatura:efatura` (parola = kullanıcı adı), env'den geleni
+koşulsuz eziyor. Postgres `-p 5434:5432` ile tüm arayüzlere açık.~~
+
+**Uygulama kodu bu konuda zaten doğru yazılmıştı** — üç modül de
+`DATABASE_URL`'i env'den okuyup yoksa `RuntimeError` veriyordu, gömülü
+fallback yoktu. Zafiyet yalnızca başlatma scriptindeydi, artık orası da
+düzeltildi.
 
 ## Prompt injection: yapısal açık var, sömürü gösterilemedi
 

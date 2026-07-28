@@ -26,9 +26,19 @@
 > adımları: [`ssh-tunel-kurulumu.md`](../how-to/ssh-tunel-kurulumu.md).
 > Servis dosyası: [`docker/systemd/efatura-llm-tunnel.service`](../../docker/systemd/efatura-llm-tunnel.service).
 
-Her iki FastAPI servisi de `--host 0.0.0.0` ile başlatılır
-(`baslat.sh:65`, `baslat.sh:94`) — yani tüm ağ arayüzlerinden erişilebilir.
+Her iki FastAPI servisi de `--host "$BIND_HOST"` ile başlatılır
+(`baslat.sh:73`, `baslat.sh:102`), varsayılan `0.0.0.0` (tüm ağ arayüzleri).
 Güvenlik etkisi: [`../explanation/guvenlik-durumu-2026-07-27.md`](../explanation/guvenlik-durumu-2026-07-27.md).
+
+> ✅ **Uygulandı** (2026-07-28): `BIND_HOST` env var eklendi (`baslat.sh:24`)
+> — auth henüz eklenmediği için sunucuda geçici bir azaltma önlemi olarak,
+> dış ekibin bilinen IP aralığına özel bir iç ağ adresi verilebilir:
+> `BIND_HOST=10.0.x.x POSTGRES_PASSWORD=... ./baslat.sh`. Varsayılan
+> davranış (env var verilmezse `0.0.0.0`) değişmedi. Gerçek testte
+> doğrulandı: `BIND_HOST=127.0.0.1` ile çalıştırıldığında servisler yalnızca
+> `localhost`'ta dinledi (`lsof` ile teyit edildi), env var verilmediğinde
+> yine `*:` (tüm arayüzler) oldu. Bu, kalıcı çözüm değildir — asıl çözüm
+> kimlik doğrulamadır (bkz. güvenlik durumu belgesi).
 
 ## Ortam değişkenleri
 
@@ -49,16 +59,22 @@ Bilinçli bir ayrım (`model_eval_koprusu.py:80-88` yorumunda gerekçesi var):
   yönlendirmek gereksiz ağ riski ekliyor ve gerçek testte
   "Connection reset by peer" hatasına yol açtı.
 
-`baslat.sh` `DATABASE_URL`'i **koşulsuz ezer** (`baslat.sh:15`) — ortamda güçlü
-bir parola tanımlasanız bile her başlatmada gömülü değer geçerli olur. **Bu,
-`./baslat.sh` ile yerel çalıştırma için hâlâ geçerlidir** (henüz
-düzeltilmedi — sunucuya taşıma planının bir sonraki adımı).
-
-> ✅ **Uygulandı** (2026-07-28): Docker ile çalıştırıldığında
-> (`docker-compose.yml`) bu sorun **yoktur** — `POSTGRES_PASSWORD` env
-> var'ı zorunlu kılınmıştır (`docker-compose.yml:21`, `:47`), tanımlı
-> değilse `docker compose up` açıkça hata verip durur, gömülü/varsayılan
-> bir parolaya düşmez. Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
+> ✅ **Uygulandı** (2026-07-28): `baslat.sh`'teki gömülü parola kaldırıldı.
+> `POSTGRES_PASSWORD` artık zorunlu env var (`baslat.sh:15`, `: "${POSTGRES_PASSWORD:?...}"`)
+> — tanımlı değilse script açıkça hata verip durur, sessizce eski
+> `efatura` parolasına düşmez. Kullanım: `POSTGRES_PASSWORD=<parola> ./baslat.sh`.
+> **Dikkat:** bu, yalnızca container **ilk kez oluşturulurken** geçerli
+> parolayı belirler (`docker run -e POSTGRES_PASSWORD=...`) — halihazırda
+> var olan bir container'ın parolasını değiştirmez; container'ı oluştururken
+> hangi parola kullanıldıysa sonraki her `./baslat.sh` çağrısında da **aynı**
+> `POSTGRES_PASSWORD` verilmelidir (aksi halde PostgreSQL bağlantı reddeder).
+> Gerçek testte doğrulandı: env var olmadan çalıştırıldığında script
+> `POSTGRES_PASSWORD env var tanımlı olmalı` hatasıyla durdu; doğru parolayla
+> her iki servis de sağlıklı ayağa kalktı.
+>
+> Docker Compose ile çalıştırıldığında (`docker-compose.yml`) aynı disiplin
+> zaten uygulanıyordu — `POSTGRES_PASSWORD` env var'ı orada da zorunlu
+> (`docker-compose.yml:21`, `:47`). Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
 ## PostgreSQL tabloları
 

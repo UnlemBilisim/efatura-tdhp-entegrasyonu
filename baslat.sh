@@ -12,8 +12,16 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 STATE_DIR=".calistirma"
 mkdir -p "$STATE_DIR"
 
-DATABASE_URL="postgresql://efatura:efatura@localhost:5434/efatura_kdv"
+: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD env var tanımlı olmalı — örn. POSTGRES_PASSWORD=<güçlü-parola> ./baslat.sh}"
+DATABASE_URL="postgresql://efatura:${POSTGRES_PASSWORD}@localhost:5434/efatura_kdv"
 export DATABASE_URL
+
+# Servislerin bağlanacağı ağ arayüzü — varsayılan 0.0.0.0 (tüm arayüzler,
+# yerel geliştirme için). Sunucuda dış ekibin bilinen IP aralığına
+# kısıtlamak isteyen bir iç ağ adresine ayarlayın (bkz.
+# docs/explanation/guvenlik-durumu-2026-07-27.md, auth eklenene kadarki
+# geçici azaltma önlemi).
+BIND_HOST="${BIND_HOST:-0.0.0.0}"
 
 echo "== 1/3: PostgreSQL =="
 if docker ps --filter "name=efatura-kdv-postgres" --format '{{.Names}}' | grep -q efatura-kdv-postgres; then
@@ -25,7 +33,7 @@ else
   echo "  container hiç yok, oluşturuluyor..."
   docker run --name efatura-kdv-postgres \
     -e POSTGRES_USER=efatura \
-    -e POSTGRES_PASSWORD=efatura \
+    -e POSTGRES_PASSWORD="$POSTGRES_PASSWORD" \
     -e POSTGRES_DB=efatura_kdv \
     -p 5434:5432 \
     -d postgres:16 >/dev/null
@@ -62,7 +70,7 @@ else
     cd Mcp_mimarisi
     echo "--- $(date '+%Y-%m-%d %H:%M:%S') yeni oturum başladı ---" >> "../$STATE_DIR/mcp_mimarisi_api.log"
     DATABASE_URL="$DATABASE_URL" nohup "../$MCP_VENV/bin/python3" -m uvicorn efatura_kdv.api:app \
-      --app-dir src --host 0.0.0.0 --port 8000 \
+      --app-dir src --host "$BIND_HOST" --port 8000 \
       >> "../$STATE_DIR/mcp_mimarisi_api.log" 2>&1 &
     echo $! > "../$STATE_DIR/mcp_mimarisi_api.pid"
   )
@@ -91,7 +99,7 @@ else
   (
     cd entegrasyon
     echo "--- $(date '+%Y-%m-%d %H:%M:%S') yeni oturum başladı ---" >> "../$STATE_DIR/entegrasyon.log"
-    DATABASE_URL="$DATABASE_URL" nohup ./.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8100 \
+    DATABASE_URL="$DATABASE_URL" nohup ./.venv/bin/uvicorn app:app --host "$BIND_HOST" --port 8100 \
       >> "../$STATE_DIR/entegrasyon.log" 2>&1 &
     echo $! > "../$STATE_DIR/entegrasyon.pid"
   )
