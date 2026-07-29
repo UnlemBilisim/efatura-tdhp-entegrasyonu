@@ -1,8 +1,15 @@
 # Python sanal ortamlar
 entegrasyon/.venv/
+Mcp_mimarisi/.venv/
+model_eval/.venv/
 .calistirma/mcp_venv/
 **/__pycache__/
 *.pyc
+
+# npm (paket dağıtımı için eklendi — kod bu depoda Python, node_modules olmaz
+# ama npm tooling bazı geçici dosyalar bırakabilir)
+node_modules/
+*.tgz
 
 # Servis durum/log dosyaları (baslat.sh tarafından üretilir)
 .calistirma/*.log

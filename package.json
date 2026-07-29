@@ -1,0 +1,68 @@
+{
+  "name": "@unlembilisim/efatura-kdv-tdhp-sistemi",
+  "version": "1.0.0",
+  "private": false,
+  "description": "e-Fatura KDV doğrulama (Mcp_mimarisi) + TDHP tahmini (model_eval) + orkestrasyon (entegrasyon) sistemi — Python tabanlıdır, bu paket yalnızca dağıtım amaçlıdır.",
+  "scripts": {
+    "postinstall": "node scripts/kur-python-bagimliliklari.js",
+    "baslat": "bash baslat.sh",
+    "durdur": "bash durdur.sh",
+    "test": "cd model_eval && /usr/bin/python3 -m pytest tests/ -q"
+  },
+  "files": [
+    "Mcp_mimarisi/src",
+    "Mcp_mimarisi/alembic",
+    "Mcp_mimarisi/alembic.ini",
+    "Mcp_mimarisi/requirements.txt",
+    "Mcp_mimarisi/scripts",
+    "Mcp_mimarisi/docs",
+    "Mcp_mimarisi/CLAUDE.md",
+    "Mcp_mimarisi/project.md",
+    "model_eval/core",
+    "model_eval/requirements.txt",
+    "model_eval/docs",
+    "model_eval/CLAUDE.md",
+    "model_eval/project.md",
+    "model_eval/entegrasyon.md",
+    "model_eval/build_vector_db.py",
+    "model_eval/evaluate_models.py",
+    "model_eval/generate_report.py",
+    "model_eval/rag_common.py",
+    "entegrasyon/app.py",
+    "entegrasyon/is_deposu.py",
+    "entegrasyon/mcp_mimarisi_istemcisi.py",
+    "entegrasyon/model_eval_koprusu.py",
+    "entegrasyon/model_eval_yolu.py",
+    "entegrasyon/yon_tespiti.py",
+    "entegrasyon/requirements.txt",
+    "entegrasyon/docs",
+    "entegrasyon/README.md",
+    "docs",
+    "scripts/kur-python-bagimliliklari.js",
+    "baslat.sh",
+    "durdur.sh",
+    "docker-compose.yml",
+    "Dockerfile",
+    "docker",
+    "CLAUDE.md",
+    "mimari.md",
+    "proje-calistirma.md",
+    "PROJE-HARITASI.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "publishConfig": {
+    "registry": "https://npm.unlemcloud.com/",
+    "access": "restricted"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UnlemBilisim/efatura-tdhp-entegrasyonu.git"
+  },
+  "license": "UNLICENSED"
+}
