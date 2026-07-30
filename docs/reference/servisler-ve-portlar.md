@@ -94,6 +94,22 @@ tablosuna dokunmazlar:
 > içerir) — sunucuya ayrı, güvenli bir kanaldan taşınmalı, `pg_restore`
 > ile geri yüklenir. Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
+## Vektör veritabanı ve Excel referans dosyaları (SQL dışı veri katmanları)
+
+PostgreSQL'in yanında sistemin bağımlı olduğu iki veri kaynağı daha var,
+ikisi de **git'e/Docker image'a farklı şekilde davranır**:
+
+| Kaynak | Nerede | Image'a gömülü mü | Taşıma yolu |
+|---|---|---|---|
+| ChromaDB vektör veritabanı | `model_eval/vector_db/` (container'da `/app/model_eval/vector_db`) | Hayır — `.gitignore`+`.dockerignore`'da hariç | `docker cp` + `efatura-vector-db` volume (bkz. `docker-ile-calistirma.md` §5.5) |
+| Excel referansları (NACE/KDV, mizan) | `Mcp_mimarisi/exceller/*.xlsx`, `model_eval/exceller/mizan.xlsx` | **Evet** — `Dockerfile` COPY ile | Image'ın yeniden build+push+pull edilmesi (dosyayı tek başına kopyalamak kalıcı değildir) |
+
+> ✅ **Uygulandı** (2026-07-29): `docker-compose.yml`'deki `app` servisine
+> `efatura-vector-db` named volume eklendi — daha önce ChromaDB verisi
+> hiçbir kalıcı volume'a bağlı değildi, container yeniden oluşturulduğunda
+> (`down`+`up`, image güncelleme) RAG'ın öğrendiği onaylı kayıtlar sessizce
+> sıfırlanıyordu.
+
 ## HTTP endpoint envanteri
 
 **Mcp_mimarisi (8000)** — `Mcp_mimarisi/src/efatura_kdv/api.py`
@@ -138,3 +154,21 @@ Log izleme (manuel test için):
 ```bash
 tail -f .calistirma/entegrasyon.log | grep -A 45 "DIŞ EKİP JSON"
 ```
+
+## Docker registry
+
+> ✅ **Uygulandı** (2026-07-29): Image `docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi`
+> adıyla kurumsal registry'ye push edildi (`1.0.0` ve `latest`). Kurulum ve
+> bilinen `413` tuzağı: [`../how-to/docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md) §0.
+
+| Alan | Değer |
+|---|---|
+| Registry | `docker.unlemcloud.com` |
+| Repository | `unlembilisim/efatura-kdv-tdhp-sistemi` |
+| Yayınlanan tag'ler | `1.0.0`, `latest` |
+
+> **Not:** `npm.unlemcloud.com` üzerinden npm paketi olarak yayınlama
+> denendi (`@unlembilisim/efatura-kdv-tdhp-sistemi`) ama servis yöneticisi
+> bu adresin yanlış olduğunu, kod dağıtımının Docker registry üzerinden
+> yapılması gerektiğini bildirdi (2026-07-29). `package.json`/`.npmrc`
+> dosyaları repoda kalıyor ama **kullanılan asıl dağıtım kanalı Docker'dır.**

@@ -31,3 +31,8 @@ Archive2/
 # PostgreSQL yedekleri — gerçek fatura verisi içerir, git'e gömülmez.
 # Sunucuya ayrı, güvenli bir kanaldan (scp/rsync) taşınmalı.
 db-yedek/
+
+# Makineye özel geçici Docker Compose override (ör. paylaşılan GPU
+# sunucusunda port çakışmasını önlemek için) — kalıcı/paylaşılan
+# yapılandırma değil, commit'lenmemeli.
+docker-compose.override.yml

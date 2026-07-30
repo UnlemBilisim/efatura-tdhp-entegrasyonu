@@ -53,7 +53,7 @@ from model_eval_koprusu import (
     model_eval_hazir_mi,
     tdhp_tahmini_yap,
 )
-from yon_tespiti import FaturaYonuBelirsizHatasi, fatura_yonunu_tespit_et
+from yon_tespiti import FaturaYonuBelirsizHatasi, faturayi_parse_et_ve_yonu_dogrula
 
 logging.basicConfig(
     level=logging.INFO,
@@ -256,7 +256,13 @@ def fatura_isle(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
 
     _logger.info("[2/5] YÖN TESPİTİ — fatura kendi VKN'imizin satıcı/alıcı tarafında olduğu tespit ediliyor")
     try:
-        yon = fatura_yonunu_tespit_et(istek.fatura_xml, istek.satici_vkn)
+        # Parse edilmiş invoice burada saklanır ve model_eval'e (tdhp_tahmini_yap)
+        # aynen geçirilir — aynı fatura_xml/own_vkn ile ayrıca tekrar parse
+        # ETTİRİLMEZ (2026-07-29, kod tekrarı temizliği: önceden aynı XML
+        # yön tespiti + core/single.py + dış şema üretimi olmak üzere üç
+        # kez parse ediliyordu).
+        parsed_invoice = faturayi_parse_et_ve_yonu_dogrula(istek.fatura_xml, istek.satici_vkn)
+        yon = parsed_invoice["direction"]
     except FaturaYonuBelirsizHatasi as exc:
         _logger.warning("[2/5] YÖN BELİRSİZ — %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -296,6 +302,7 @@ def fatura_isle(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
             tahmin = tdhp_tahmini_yap(
                 istek.fatura_xml, own_vkn=istek.satici_vkn,
                 convert_to_try=(istek.kur_secimi == "tl"),
+                parsed_invoice=parsed_invoice,
             )
         except NotImplementedError as exc:
             _logger.warning("[4/5] MODEL_EVAL HAZIR DEĞİL (%.2fs) — %s", time.monotonic() - t0, exc)
@@ -378,6 +385,7 @@ def fatura_isle(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
         tahmin = tdhp_tahmini_yap(
             istek.fatura_xml, own_vkn=istek.satici_vkn,
             convert_to_try=(istek.kur_secimi == "tl"),
+            parsed_invoice=parsed_invoice,
         )
     except NotImplementedError as exc:
         _logger.warning("[5/5] MODEL_EVAL HAZIR DEĞİL (%.2fs) — %s", time.monotonic() - t0, exc)

@@ -28,6 +28,78 @@
   seviyesinde ayrı bir servis (elle veya systemd, bkz. §3) olarak kalır.
   `app` container'ı buna `host.docker.internal:11435` üzerinden erişir.
 
+## 0. Kurumsal registry'ye push / oradan pull (sunucuya taşıma)
+
+> ✅ **Uygulandı** (2026-07-29): Image `docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi`
+> adıyla kurumsal Docker registry'ye push edildi (`1.0.0` ve `latest` tag'leri,
+> digest `sha256:b3476e79781b330c7e7ac097fafaa4275b8b18a0c3002d2fa7335ea537731238`).
+> Gerçek pushta doğrulandı.
+
+Bu, geliştirme makinesinde build edilen image'ı bir sunucuya taşımanın yolu —
+`docker compose up` ile yerel build'in yerini almaz, onu tamamlar (build burada,
+çalıştırma sunucuda).
+
+**Push (geliştirme makinesinde, image build edildikten sonra):**
+
+```bash
+docker login docker.unlemcloud.com
+docker build \
+  -t docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0 \
+  -t docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:latest .
+docker push docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
+docker push docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:latest
+```
+
+**Pull (sunucuda):**
+
+```bash
+docker login docker.unlemcloud.com
+docker pull docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
+```
+
+> ✅ **Uygulandı** (2026-07-29): `docker-compose.yml`'deki `app` servisine
+> `image: docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0`
+> eklendi (`build: .` de kalıyor). Sunucuda `docker compose up -d` çalıştığında
+> — image yerelde `docker pull` ile zaten çekildiyse — **yeniden build
+> almadan** doğrudan o image kullanılır. Geliştirme makinesinde `docker
+> compose build` çalıştırılırsa yerelden build edip aynı image adına
+> etiketler (iki kullanım da aynı dosyada bir arada durur).
+
+Sunucuda `docker-compose.yml` ile ayağa kaldırmak için, image'ın yanı sıra
+**image'a dahil olmayan** şu destek dosyalarının da sunucuda olması gerekir
+(scp/rsync ile taşınmalı — `Dockerfile`, `entegrasyon/`, `Mcp_mimarisi/`,
+`model_eval/` kaynak kodu image içinde zaten var, tekrar taşınmasına gerek
+yok):
+
+```bash
+scp docker-compose.yml <kullanıcı>@<sunucu>:/path/System/
+scp -r docker/ <kullanıcı>@<sunucu>:/path/System/
+```
+
+`docker/systemd/efatura-llm-tunnel.service` bu şekilde taşınan dosyaların
+içinde gelir — kurulumu için [`ssh-tunel-kurulumu.md`](ssh-tunel-kurulumu.md)'ye
+bakın.
+
+> ⚠️ **Bilinen tuzak — `413 Payload Too Large` push sırasında:** Registry
+> Cloudflare arkasında çalışıyor (`server: cloudflare` header'ı ile
+> doğrulandı) ve tek istek gövdesi için bir üst limit uyguluyor. Bu projenin
+> `entegrasyon/requirements.txt`'i `chromadb`+`ollama` içerdiği için (RAG
+> özelliği — bkz. `model_eval_koprusu.py::faturayi_onayla`) o katman tek
+> başına ~360 MB'a çıkıyor. Bunu azaltmak için `Dockerfile`'daki `pip
+> install` üç ayrı `RUN` satırına bölündü (satır bazında bkz. Dockerfile
+> yorumu) — böylece her bileşenin bağımlılığı ayrı bir katman/upload isteği
+> olur. **Bu bölme + yeniden build sonrası push başarılı oldu**; kesin
+> hangi faktörün (katman bölme mi, registry/Cloudflare tarafında geçici bir
+> durum mu) çözümü sağladığı net değil — eğer push yine 413 verirse,
+> registry yöneticisine Cloudflare'in bu subdomain için tek istek boyutu
+> limitini artırıp artıramayacağını sorun.
+>
+> `model_eval/requirements.txt`'ten `pytest` çıkarılıp ayrı
+> `model_eval/requirements-dev.txt`'e taşındı, `tests/` dizinleri
+> `.dockerignore`'a eklendi (production image'da hiç kullanılmıyorlardı) —
+> bu image boyutunu biraz küçültür ama asıl 413 sorununu tek başına çözmez
+> (chromadb'nin transitive bağımlılıkları asıl ağırlık kaynağı).
+
 ## 1. Gereksinimler
 
 - Docker + Docker Compose (bu ortamda test edildi: Docker 29.6.2, Compose v5.3.1)
@@ -109,6 +181,49 @@ UNION ALL SELECT 'gecmis_fatura_kalemleri', count(*) FROM gecmis_fatura_kalemler
 
 Beklenen (bu sistemdeki mevcut veri): `nace_oranlari` 2138 satır,
 `gecmis_fatura_kalemleri` 1120 satır.
+
+## 5.5. Vektör veritabanı (ChromaDB/RAG) ve Excel referans dosyaları
+
+> ✅ **Uygulandı** (2026-07-29): `app` servisine `efatura-vector-db` adlı
+> kalıcı bir volume eklendi (`/app/model_eval/vector_db`) — daha önce hiçbir
+> volume'a bağlı değildi, container her yeniden oluşturulduğunda (image
+> güncelleme, `down`+`up`) `/fatura/onayla` ile biriken RAG kayıtları
+> sessizce sıfırlanıyordu.
+
+**ChromaDB (vektör veritabanı) — image'a dahil DEĞİL, ayrıca taşınmalı:**
+
+Yerelde `model_eval/vector_db/` altında biriken embedding verisi (hem
+`build_vector_db.py`'nin indekslediği ground-truth hem kullanıcı onayıyla
+`/fatura/onayla` üzerinden eklenen kayıtlar) `.gitignore`/`.dockerignore`'da
+bilinçli olarak hariç tutulmuştur — image içine hiç girmez. Yeni sunucuda
+mevcut RAG verisini taşımak için:
+
+```bash
+# Kaynak makinede (app container'ı ayaktayken)
+docker cp <app-container>:/app/model_eval/vector_db ./vector_db_yedek
+
+# Hedef makinede (docker compose up -d sonrası, volume oluştuktan sonra)
+docker cp ./vector_db_yedek/. <yeni-app-container>:/app/model_eval/vector_db
+docker restart <yeni-app-container>
+```
+
+Bu adım atlanırsa sistem **çalışmaya devam eder** (RAG'sız degrade mod değil,
+sadece few-shot emsalsiz tahmin) — sessizce bozulmaz ama doğruluk oranı
+düşer (bkz. `model_eval/CLAUDE.md` "En büyük tekil iyileştirme: RAG").
+
+**Excel referans dosyaları (`Mcp_mimarisi/exceller/*.xlsx`,
+`model_eval/exceller/mizan.xlsx`) — image'a GÖMÜLÜ, ayrıca taşınmaz ama
+DONMUŞ:**
+
+Bu dosyalar (NACE/KDV oran referansı, şirkete özel mizan) SQL/vektör
+verisinin aksine `Dockerfile`'daki `COPY` ile image'ın içine gömülüdür —
+build anındaki hâlleriyle sabitlenirler, ayrı bir taşıma adımı gerekmez.
+**Ama bu aynı zamanda bir tuzaktır:** mizan güncellenirse (ör. yeni alt
+kırılım kodları eklenirse, geçmişte "mizan_5" güncellemesinde olduğu gibi)
+sunucudaki container bunu görmez — image'ın güncel Excel dosyasıyla
+**yeniden build edilip push/pull edilmesi** gerekir. Container'a dosyayı
+tek başına `docker cp` ile kopyalamak geçici bir çözümdür, container
+yeniden oluşturulduğunda (kalıcı volume'a bağlı olmadığı için) kaybolur.
 
 ## 6. `app` container'ı veri geldikten sonra ayağa kalkmıyorsa
 

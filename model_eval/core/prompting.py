@@ -91,13 +91,14 @@ def compute_ihrac_kayitli_hint(invoice):
     dogrudan onayladigi bir muhasebe kurali olarak eklendi. Ileride yanlis
     ciktigi gozlenirse (RESULTS.md'ye benzer bir bulgu ile) gozden gecirilmeli.
     """
+    # faturada bulunana istisna kodu yukarda belirlenen 701-704 kodlarindan biri degilse bu hint'i tetikleme
     exemption_codes = {
         (t.get("exemption") or {}).get("code")
         for t in invoice["taxes"]
     }
     if not (exemption_codes & IHRAC_KAYITLI_ISTISNA_KODLARI):
         return None
-
+    # kdv tutarını faturada bulduğmuz kısım
     kdv_entries = [t for t in invoice["taxes"] if t.get("code") == "0015"]
     kdv_tutar = sum(to_float(t.get("tax")) for t in kdv_entries)
     if kdv_tutar <= 0:
@@ -117,7 +118,7 @@ def compute_tevkifat_hint(invoice):
     Ana KDV (kod 0015) disindaki herhangi bir vergi satiri (627, 616, vb. -
     tevkifat kodu fatura tipine gore degisiyor) tevkifat tutari sayilir.
     Tum gerekli sayilar zaten faturanin kendi vergi verisinde mevcut - sadece
-    doğru sekilde toplanip/cikarilmasi gerekiyor, ki LLM'ler bunu sik sik
+    doğru sekilde toplanip/cikarilmasi gerekiyor, ki LLM'ler bunu sık sık
     yanlis yapiyor (bkz. tevkifat testinde balanced%=9.5).
 
     YON'E GORE FARKLI HESAP SETI (2026-07-23 duzeltmesi, kullanici tarafindan

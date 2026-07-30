@@ -11,6 +11,27 @@
 #
 # POSTGRES_PASSWORD env var'ı ZORUNLUDUR — varsayılan bırakılmadı (bkz.
 # docs/explanation/guvenlik-durumu-2026-07-27.md, gömülü parola düzeltmesi).
+#
+# --- SQL (PostgreSQL) ve vektör veritabanı (ChromaDB) verisi ---
+# Bu dosyadaki "postgres" ve "ollama" servisleri sadece BOŞ, taze bir
+# PostgreSQL/Ollama kurulumu sağlar — mevcut sistemin gerçek verisini
+# (NACE tablosu, geçmiş fatura kalemleri, RAG embedding'leri) TAŞIMAZ.
+# Bu veriler image içine hiç GİRMEZ (bilinçli — bkz. .gitignore/.dockerignore,
+# gerçek şirket/fatura verisi barındırdıkları için registry'ye/git'e
+# gömülmezler). Yeni bir sunucuda `docker compose up` sonrası mevcut veriyi
+# geri yüklemek için ayrıca (scp/rsync ile) taşınması gerekir:
+#   - PostgreSQL dump'ı → docs/how-to/docker-ile-calistirma.md §5
+#   - ChromaDB (model_eval/vector_db/, "ollama" container'ının DEĞİL, "app"
+#     container'ının kullandığı ayrı bir dizin) → aşağıdaki not
+#
+# --- Excel referans dosyaları (Mcp_mimarisi/exceller/, model_eval/exceller/mizan.xlsx) ---
+# Bunlar SQL/vektör verisinin aksine image'a GÖMÜLÜDÜR (Dockerfile'daki
+# COPY ile) — yani image build edildiği ANDAKİ hâlleriyle donarlar. Mizan
+# (şirkete özel hesap planı alt kırılımı, core/mizan.py) ileride
+# güncellenirse, güncellemenin sunucuya yansıması için image'ın YENİDEN
+# build edilip push/pull edilmesi gerekir — dosyayı tek başına container
+# içine kopyalamak, container yeniden başladığında/yeniden oluşturulduğunda
+# kaybolur (kalıcı volume'a bağlı değildir).
 
 services:
   postgres:
@@ -39,6 +60,11 @@ services:
     restart: unless-stopped
 
   app:
+    # image: registry'de varsa doğrudan pull edilir (sunucuda kullanılan yol).
+    # build: yerel değişiklik sonrası `docker compose build` ile bu image adına
+    # yeniden build almak için (geliştirme makinesinde kullanılan yol) — ikisi
+    # birlikte bulunabilir, Compose `up` sırasında build'i zorlamaz.
+    image: docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
     build: .
     environment:
       DATABASE_URL: postgresql://efatura:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD env var tanımlı olmalı}@postgres:5432/efatura_kdv
@@ -49,6 +75,12 @@ services:
     ports:
       - "8000:8000"
       - "8100:8100"
+    volumes:
+      # ChromaDB (RAG) verisi — rag_common.py::DEFAULT_PERSIST_DIR burayı
+      # kullanır. Volume olmadan container her yeniden oluşturulduğunda
+      # (image güncelleme, `down`+`up`) /fatura/onayla ile biriken RAG
+      # kayıtları sessizce sıfırlanırdı.
+      - efatura-vector-db:/app/model_eval/vector_db
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,3 +93,4 @@ services:
 volumes:
   efatura-kdv-pgdata:
   efatura-ollama-data:
+  efatura-vector-db:

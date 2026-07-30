@@ -28,9 +28,9 @@ def main():
         "--models",
         required=True,
         help=(
-            "Virgulle ayrilmis model listesi. Onek yoksa Ollama sayilir. "
-            "Bulut icin: openai:<model>, anthropic:<model>, google:<model>, "
-            "veya openai-compat:<base_url>|<model>|<API_KEY_ENV>"
+            "Virgulle ayrilmis Ollama model listesi (orn. gemma4:31b-cloud). "
+            "Onek yoksa ya da 'ollama:' onekliyse Ollama sayilir - sadece "
+            "Ollama destekleniyor (2026-07-29)."
         ),
     )
     ap.add_argument("--data-dir", default=str(DEFAULT_DATA_DIR), help="Archive2/jsons klasoru (ya da --data-format xml ise ham UBL XML klasoru)")

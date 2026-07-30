@@ -214,25 +214,6 @@ class TestPredictSingleInvoiceSelfCorrect:
         assert result["self_corrected"] is False
         assert result["self_correct_reason"] is None
 
-    def test_self_correct_skipped_for_non_ollama_provider(self):
-        """self_correct_ollama sadece Ollama icin calisir (core/runner.py'daki
-        ayni kisitlama) - baska bir provider'da dengesiz cevap duzeltilmeye
-        CALISILMAZ, oldugu gibi doner."""
-        spec = {"provider": "openai", "model": "gpt-4.1", "base_url": None, "api_key_env": None, "label": "openai:gpt-4.1"}
-        unbalanced = '{"entries": [{"account_code": "770", "amount": 500.00, "dc": "Borc"}]}'
-
-        with patch.object(single, "call_model", return_value=(unbalanced, 0.5, None)), \
-             patch.object(single, "self_correct_ollama") as mock_correct:
-            result = single.predict_single_invoice(
-                SAMPLE_XML, model=spec, own_vkn=OWN_VKN,
-                rag=False, self_correct=True, tevkifat_hint=False, iade_hint=False, alt_kirilim=False,
-            )
-
-        mock_correct.assert_not_called()
-        assert result["self_corrected"] is False
-        assert result["balanced"] is False
-
-
 class TestPredictSingleInvoiceRag:
     def _fake_rag_common(self, strong_precedent):
         return SimpleNamespace(

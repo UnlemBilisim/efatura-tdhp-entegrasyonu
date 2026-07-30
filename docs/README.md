@@ -13,7 +13,7 @@ bileşenin içine ait belgeler o bileşenin kendi `docs/` klasöründedir:
 |---|---|---|
 | `tutorials/` | Öğrenme odaklı, adım adım | *(henüz yok)* |
 | `how-to/` | Görev odaklı tarifler | [Sistemi test etme](how-to/sistemi-test-etme.md), [Docker ile çalıştırma](how-to/docker-ile-calistirma.md), [SSH tünel kurulumu](how-to/ssh-tunel-kurulumu.md) |
-| `reference/` | Kesin teknik başvuru | [Servis ve port envanteri](reference/servisler-ve-portlar.md) |
+| `reference/` | Kesin teknik başvuru | [Servis ve port envanteri](reference/servisler-ve-portlar.md), [Sistem mimarisi rehberi (dosya dosya)](reference/sistem-mimarisi-rehberi.md) |
 | `explanation/` | Bir kararın NEDEN öyle verildiği | [Güvenlik durumu](explanation/guvenlik-durumu-2026-07-27.md) |
 
 ## Klasör dışındaki üst düzey belgeler

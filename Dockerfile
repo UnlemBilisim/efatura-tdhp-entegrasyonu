@@ -26,10 +26,13 @@ COPY Mcp_mimarisi/requirements.txt /app/Mcp_mimarisi/requirements.txt
 COPY entegrasyon/requirements.txt /app/entegrasyon/requirements.txt
 COPY model_eval/requirements.txt /app/model_eval/requirements.txt
 
-RUN pip install --no-cache-dir \
-        -r /app/Mcp_mimarisi/requirements.txt \
-        -r /app/entegrasyon/requirements.txt \
-        -r /app/model_eval/requirements.txt
+# Ayrı RUN satırlarına bölünmüş hâlde kurulur — tek katmanda birleştirilirse
+# (chromadb'nin onnxruntime/numpy/sympy gibi ağır transitive bağımlılıkları
+# yüzünden) 400MB+ tek bir katman oluşuyor; bazı registry'lerin/proxy'lerin
+# (örn. Cloudflare) tek istek boyutu limitini aşıp push'ta 413 hatası veriyor.
+RUN pip install --no-cache-dir -r /app/Mcp_mimarisi/requirements.txt
+RUN pip install --no-cache-dir -r /app/entegrasyon/requirements.txt
+RUN pip install --no-cache-dir -r /app/model_eval/requirements.txt
 
 # --- Kaynak kodu kopyala (kardeş dizin yapısı korunur) ---
 COPY Mcp_mimarisi/ /app/Mcp_mimarisi/

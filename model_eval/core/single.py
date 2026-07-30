@@ -199,8 +199,21 @@ def predict_single_invoice(
     convert_to_try=False,
     alt_kirilim=True,
     mizan_path=None,
+    parsed_invoice=None,
 ):
     """Ham bir UBL-TR XML faturasi (string) icin TDHP tahmini uretir.
+
+    parsed_invoice (opsiyonel, 2026-07-29 eklendi): cagiran taraf ayni XML'i
+    zaten kendi amaci icin (orn. yon tespiti) parse_invoice_xml_string() ile
+    parse ettiyse, sonucu buraya vererek fonksiyonun XML'i TEKRAR parse
+    etmesini onler (entegrasyon/app.py -> yon_tespiti.py -> burada -> ve
+    dis_sema uretiminde ayni XML 3 kez parse ediliyordu). Verilmezse
+    (varsayilan) davranis DEGISMEZ: fonksiyon invoice_xml/own_vkn ile kendi
+    parse eder - mevcut tum cagiranlar (core/cli.py, tests/test_single.py)
+    etkilenmez. Verilirse invoice_xml/own_vkn SADECE convert_to_try=True
+    durumunda tutarlilik kontrolu icin kullanilir (own_vkn parsed_invoice
+    uretilirken kullanilanla ayni olmali - cagiran tarafin sorumlulugundadir,
+    burada ayrica dogrulanmaz).
 
     `model`, ya `parse_model_spec()` cikisiyla ayni sekilli bir dict (spec)
     ya da ham bir model string'i ("ollama:gemma4:31b-cloud" gibi,
@@ -251,7 +264,9 @@ def predict_single_invoice(
     spec = model if isinstance(model, dict) else parse_model_spec(model, effective_ollama_host)
     system_prompt = build_glossary_system_prompt() if with_glossary else SYSTEM_PROMPT
 
-    invoice = parse_invoice_xml_string(invoice_xml, own_vkn=own_vkn)
+    invoice = parsed_invoice if parsed_invoice is not None else parse_invoice_xml_string(
+        invoice_xml, own_vkn=own_vkn
+    )
     if convert_to_try:
         invoice = convert_invoice_to_try(invoice)
 

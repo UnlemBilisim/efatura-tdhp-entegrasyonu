@@ -8,8 +8,9 @@ Alt moduller:
                   olusturma
     scoring     - model ciktisini JSON'a cevirme ve ground-truth'a karsi
                   skorlama
-    providers   - 6 farkli model saglayicisi (Ollama/OpenAI/Anthropic/
-                  Google/OpenAI-uyumlu) icin API cagrilari
+    providers   - Ollama icin API cagrilari (2026-07-29: OpenAI/Anthropic/
+                  Google/OpenAI-uyumlu destegi kaldirildi, sadece Ollama
+                  kullanilir)
     reporting   - sonuc dosyasi yollari, resume, ozet/rapor tablosu
     runner      - tek bir model spec'i icin fatura kumesini isleyen
                   orkestrasyon fonksiyonu (run_model)
@@ -53,14 +54,9 @@ from .providers import (
     PERMANENT_HTTP_ERRORS,
     build_balance_correction_request,
     build_correction_messages,
-    call_anthropic,
-    call_google,
     call_model,
     call_ollama,
     call_ollama_messages,
-    call_openai,
-    call_openai_compat,
-    call_openai_style,
     parse_model_spec,
     self_correct_ollama,
 )
@@ -89,9 +85,8 @@ __all__ = [
     "build_user_prompt", "compute_iade_hint", "compute_tevkifat_hint",
     "KNOWN_PROVIDERS", "PERMANENT_HTTP_ERRORS",
     "build_balance_correction_request", "build_correction_messages",
-    "call_anthropic", "call_google", "call_model", "call_ollama",
-    "call_ollama_messages", "call_openai", "call_openai_compat",
-    "call_openai_style", "parse_model_spec", "self_correct_ollama",
+    "call_model", "call_ollama", "call_ollama_messages",
+    "parse_model_spec", "self_correct_ollama",
     "append_result", "count_results", "delete_results", "load_done_ids",
     "print_summary_table", "result_label", "safe_div", "sanitize_file_label",
     "summarize_model",

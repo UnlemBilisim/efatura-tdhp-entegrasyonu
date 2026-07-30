@@ -16,30 +16,20 @@ sadece bu istenir.
 
 Model belirtme sozdizimi (--models, virgulle ayrilmis liste)
 --------------------------------------------------------------
+2026-07-29: Sadece Ollama destekleniyor (kullanici karari - "biz sadece
+Ollama kullanacagiz"). OpenAI/Anthropic/Google/OpenAI-uyumlu destegi
+kaldirildi.
+
   qwen2.5:14b-instruct              -> onek yoksa Ollama modeli sayilir (host: --ollama-host)
   ollama:qwen2.5:14b-instruct       -> ayni sey, acik onekli
-  openai:gpt-4.1                    -> OpenAI API (env OPENAI_API_KEY)
-  anthropic:claude-sonnet-5         -> Anthropic API (env ANTHROPIC_API_KEY)
-  google:gemini-2.5-pro             -> Google Gemini API (env GOOGLE_API_KEY veya GEMINI_API_KEY)
-  openai-compat:<base_url>|<model>|<API_KEY_ENV>
-                                     -> OpenAI-uyumlu herhangi bir servis (Groq, DeepSeek,
-                                        Together, Fireworks, Mistral, vLLM OpenAI server, ...).
-                                        API_KEY_ENV opsiyoneldir (belirtilmezse Authorization
-                                        header'i gonderilmez, key gerektirmeyen yerel sunucular icin).
 
 Kullanim ornekleri
 -------------------
   # Tek local model, tum veri setinde (~1646 fatura)
   python evaluate_models.py --models qwen2.5:14b-instruct
 
-  # Local + bulut modellerini AYNI KOSUDA kiyasla
-  python evaluate_models.py --models qwen2.5:14b-instruct,openai:gpt-4.1,anthropic:claude-sonnet-5,google:gemini-2.5-pro
-
-  # Sadece bulut modelleri, hepsini GERCEKTEN AYNI ANDA (paralel) calistir
-  python evaluate_models.py --models openai:gpt-4.1,anthropic:claude-sonnet-5,google:gemini-2.5-pro --model-parallelism 3
-
-  # OpenAI-uyumlu 3. parti bir servis (orn. Groq)
-  python evaluate_models.py --models "openai-compat:https://api.groq.com/openai/v1|llama-3.3-70b-versatile|GROQ_API_KEY"
+  # Birden fazla Ollama modelini AYNI KOSUDA kiyasla
+  python evaluate_models.py --models qwen2.5:14b-instruct,gemma4:31b-cloud
 
   # Once kucuk bir ornekte dene
   python evaluate_models.py --models qwen2.5:14b-instruct --sample-size 100 --seed 42
@@ -56,12 +46,11 @@ Kullanim ornekleri
   # Prompt'un nasil goruntugunu gormek icin (API cagirmadan)
   python evaluate_models.py --models qwen2.5:14b-instruct --dry-run
 
-Onemli: --model-parallelism, modelleri ES ZAMANLI calistirir. Bulut modelleri icin
-sorun degil (her biri kendi API'sine gider). Ayni anda birden fazla BUYUK local
-Ollama modelini paralel calistirirsaniz, hepsinin VRAM'da AYNI ANDA yer kaplamasi
-gerekir (128GB'a sigmiyorsa Ollama modelleri surekli yukleyip bosaltir, bu da
-performansi dusurur/hata verebilir) - local modelleri paralel test ederken buna
-dikkat edin.
+Onemli: --model-parallelism, modelleri ES ZAMANLI calistirir. Ayni anda birden
+fazla BUYUK local Ollama modelini paralel calistirirsaniz, hepsinin VRAM'da
+AYNI ANDA yer kaplamasi gerekir (128GB'a sigmiyorsa Ollama modelleri surekli
+yukleyip bosaltir, bu da performansi dusurur/hata verebilir) - local modelleri
+paralel test ederken buna dikkat edin.
 
 Not: Bu dosyanin gercek uygulamasi core/ paketine bolunmustur (core/constants.py,
 core/parsing.py, core/prompting.py, core/scoring.py, core/providers.py,

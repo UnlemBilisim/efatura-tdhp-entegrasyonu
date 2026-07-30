@@ -58,6 +58,7 @@ def tdhp_tahmini_yap(
     own_vkn: str,
     convert_to_try: bool = False,
     file_path: str | None = None,
+    parsed_invoice: dict | None = None,
 ) -> dict:
     """Tek bir faturayı model_eval'a TDHP tahmini için gönderir.
 
@@ -71,11 +72,20 @@ def tdhp_tahmini_yap(
     tahmini TL üzerinden üretir. Faturada kur bilgisi yoksa ValueError
     fırlatır (bkz. core/parsing.py::convert_invoice_to_try).
 
+    parsed_invoice (opsiyonel, 2026-07-29 eklendi): çağıran taraf (app.py)
+    aynı XML'i zaten yön tespiti için parse_invoice_xml_string() ile parse
+    ettiyse, sonucu buraya vererek hem predict_single_invoice'ın hem dış
+    şema (dis_sema) üretiminin XML'i TEKRAR parse etmesini önler — aynı
+    fatura_xml/own_vkn ile üç kez (yon_tespiti, core/single.py, burada)
+    parse ediliyordu. Verilmezse (varsayılan) davranış DEĞİŞMEZ: bu
+    fonksiyon kendi parse eder. own_vkn'in parsed_invoice üretilirken
+    kullanılanla aynı olması çağıran tarafın sorumluluğundadır.
+
     Çıktı: core/single.py::predict_single_invoice'in döndürdüğü sözlük
     (kod+yön+tutar+para birimi üçlüsü, bkz. entegrasyon/README.md).
 
     predict_single_invoice henüz yoksa NotImplementedError fırlatır —
-    çağıran taraf (app.py) bunu HTTP 501'e çevirip kullanıcıya gösterir."""
+    çağıran taraf (app.py) bunu HTTP 501'e çevirir kullanıcıya gösterir."""
     hazir, mesaj = model_eval_hazir_mi()
     if not hazir:
         raise NotImplementedError(
@@ -98,22 +108,24 @@ def tdhp_tahmini_yap(
         own_vkn=own_vkn,
         ollama_host=DEFAULT_MODEL_EVAL_OLLAMA_HOST,
         convert_to_try=convert_to_try,
+        parsed_invoice=parsed_invoice,
     )
 
     # Dis ekip semasi (2026-07-27 sozlesmesi): ayni kayitlarin onlarin
     # bekledigi alan adlariyla yazilmis hali. IC sema (`entries`) aynen
     # kalir - `records` ve `dis_sema` ondan TURETILIR, celisemezler.
-    #
-    # Fatura ust bilgileri (customer/supplier/issue_date/payable_amount) icin
-    # invoice yeniden ayristirilir - predict_single_invoice onu donusunde
-    # tasimiyor. Ayristirma ucuz (LLM yok) ve core/parsing.py tek dogru
-    # kaynak oldugu icin ikinci bir parser YAZILMAZ (bkz. yon_tespiti.py).
     from core.disa_aktarim import faturayi_disa_aktar, kayitlari_disa_aktar
     from core.parsing import convert_invoice_to_try, parse_invoice_xml_string
 
     sonuc["records"] = kayitlari_disa_aktar(sonuc)
     try:
-        invoice = parse_invoice_xml_string(fatura_xml, own_vkn=own_vkn)
+        # Fatura ust bilgileri (customer/supplier/issue_date/payable_amount)
+        # icin: parsed_invoice verildiyse TEKRAR parse ETMEDEN onu kullan,
+        # verilmediyse (eski davranis) burada parse et - ayrica bir XML
+        # parser YAZILMAZ, tek dogru kaynak core/parsing.py'dir.
+        invoice = parsed_invoice if parsed_invoice is not None else parse_invoice_xml_string(
+            fatura_xml, own_vkn=own_vkn
+        )
         # convert_to_try=True ise ZARFI DA cevir (2026-07-27 duzeltmesi):
         # predict_single_invoice tutarlari TL'ye cevirip `entries`i TL uretiyor,
         # ama burada fatura SIFIRDAN ayristirildigi icin header hala orijinal

@@ -25,9 +25,13 @@ class FaturaYonuBelirsizHatasi(ValueError):
     belirleyen kritik bir dallanma noktası."""
 
 
-def fatura_yonunu_tespit_et(fatura_xml: str, own_vkn: str) -> str:
-    """Faturanın 'outbox' (biz kestik, satıcı=own_vkn) mi yoksa 'inbox'
-    (bize kesilmiş, alıcı=own_vkn) mi olduğunu döner."""
+def faturayi_parse_et_ve_yonu_dogrula(fatura_xml: str, own_vkn: str) -> dict:
+    """Faturayı BİR KEZ parse eder, yönünü doğrular ve parse edilmiş
+    invoice sözlüğünü döner (2026-07-29 eklendi — önceden app.py bu
+    fonksiyonun eski hâlini çağırıyor, sonra aynı XML'i model_eval_koprusu.py
+    içinde TEKRAR parse ediyordu; aynı fatura_xml/own_vkn ile parse üç kez
+    tekrarlanıyordu). `fatura_yonunu_tespit_et` bu fonksiyonun üzerine
+    kurulur — imzası/davranışı DEĞİŞMEDİ, mevcut çağıranlar etkilenmez."""
     model_eval_yolunu_ekle()
 
     from core.parsing import parse_invoice_xml_string
@@ -38,4 +42,10 @@ def fatura_yonunu_tespit_et(fatura_xml: str, own_vkn: str) -> str:
             f"own_vkn ({own_vkn!r}) faturanın ne satıcı ne alıcı tarafında "
             "bulunuyor — bu VKN'nin doğru olduğundan emin olun."
         )
-    return invoice["direction"]
+    return invoice
+
+
+def fatura_yonunu_tespit_et(fatura_xml: str, own_vkn: str) -> str:
+    """Faturanın 'outbox' (biz kestik, satıcı=own_vkn) mi yoksa 'inbox'
+    (bize kesilmiş, alıcı=own_vkn) mi olduğunu döner."""
+    return faturayi_parse_et_ve_yonu_dogrula(fatura_xml, own_vkn)["direction"]

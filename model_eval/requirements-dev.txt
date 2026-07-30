@@ -1,0 +1,4 @@
+# Yalnızca test/geliştirme ortamı için — production/Docker image kurulumuna dahil
+# EDİLMEZ (core/ hiçbir yerinde pytest import etmiyor, sadece tests/ kullanıyor).
+-r requirements.txt
+pytest>=7.0.0

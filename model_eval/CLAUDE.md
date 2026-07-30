@@ -314,6 +314,57 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > RAG'ın kaç emsal kullandığı `predict_single_invoice` çıktısında dönmüyor —
 > "N geçmiş benzer faturada…" gerekçesi bu yüzden henüz üretilmiyor.
 
+> ✅ **Uygulandı (2026-07-29) — tek fatura akışında tekrarlı XML parse
+> temizliği:** `predict_single_invoice()`'a opsiyonel `parsed_invoice`
+> parametresi eklendi (`core/single.py:180-201, 254-256`). Kök neden: bir
+> `/fatura/isle` isteğinde aynı `fatura_xml`/`own_vkn` **üç kez** ayrı ayrı
+> `parse_invoice_xml_string()` ile parse ediliyordu — `entegrasyon/
+> yon_tespiti.py` (yön tespiti için), `predict_single_invoice` (LLM prompt'u
+> için), ve `entegrasyon/model_eval_koprusu.py::tdhp_tahmini_yap` (dış şema/
+> `dis_sema` üretimi için). Parse ucuz olduğu için performans etkisi küçüktü
+> ama üç ayrı parse noktası kod tekrarıydı.
+>
+> `parsed_invoice=None` (varsayılan) verilirse davranış **DEĞİŞMEDİ** —
+> fonksiyon eskisi gibi kendi parse eder; `tests/test_single.py`'deki 29
+> çağrı hiçbiri güncellenmedi, hepsi eski imzayla geçmeye devam ediyor
+> (doğrulandı: `pytest tests/test_single.py` 29/29 yeşil). `entegrasyon/`
+> tarafında `app.py::fatura_isle()` artık XML'i `yon_tespiti.py::
+> faturayi_parse_et_ve_yonu_dogrula()` ile **bir kez** parse edip sonucu
+> hem `tdhp_tahmini_yap(parsed_invoice=...)`'a geçiriyor. `fatura_yonunu_
+> tespit_et()` (eski fonksiyon adı) imzası/davranışı değişmeden bu yeni
+> fonksiyonun üzerine kuruldu — geriye dönük uyumlu.
+>
+> `convert_to_try=True` durumunda `parsed_invoice` HAM (henüz TL'ye
+> çevrilmemiş) hâliyle geçirilir — hem `predict_single_invoice` hem dış şema
+> üretimi kendi içinde ayrı ayrı `convert_invoice_to_try()` çağırır
+> (fonksiyon girdiyi değiştirmeden yeni bir sözlük döndürüyor, bkz.
+> `core/parsing.py:294-298` docstring'i), bu yüzden iki taraf da doğru
+> (TL'ye çevrilmiş) invoice'ı kullanır, orijinal `parsed_invoice` bozulmaz.
+
+> ✅ **Uygulandı (2026-07-29) — OpenAI/Anthropic/Google/openai-compat
+> desteği kaldırıldı:** Kullanıcı kararı: "biz sadece Ollama kullanacağız".
+> `core/providers.py` yeniden yazıldı — `call_openai`, `call_openai_style`,
+> `call_openai_compat`, `call_anthropic`, `call_google` fonksiyonları ve
+> `parse_model_spec()`'in bulut-sağlayıcı/openai-compat ayrıştırma mantığı
+> tamamen kaldırıldı, `call_model()` artık sadece `provider == "ollama"`
+> dalını içeriyor (başka bir provider gelirse `ValueError`). `KNOWN_PROVIDERS`
+> artık `{"ollama"}`. Bu, gerçek üretim davranışını **değiştirmedi** —
+> `entegrasyon/model_eval_koprusu.py::tdhp_tahmini_yap()` zaten `model`
+> parametresini hiç override etmiyordu, varsayılan (`DEFAULT_MODEL_SPEC_STR
+> = "ollama:gemma4:31b-cloud"`) hep Ollama'ydı. Çoklu-sağlayıcı desteği
+> sadece `model_eval`'in kendi karşılaştırma/değerlendirme aracı
+> (`evaluate_models.py --models openai:...`) için vardı, o kullanım kalktı.
+>
+> `cli.py`'deki `--models` yardım metni ve `evaluate_models.py`'nin docstring
+> örnekleri güncellendi — artık sadece Ollama sözdizimini gösteriyor.
+> `tests/test_providers.py`'den 10 test (OpenAI/Anthropic/Google'a özel)
+> ve `tests/test_single.py`'den `test_self_correct_skipped_for_non_ollama_provider`
+> kaldırıldı — bunlar artık hiç gerçekleşemeyecek bir senaryoyu (`provider !=
+> "ollama"`) test ediyordu. `tests/test_reporting.py`'deki `"openai:gpt-4.1"`
+> gibi string'lere DOKUNULMADI — onlar `result_label()`'ın herhangi bir
+> metni etiket olarak kabul ettiğini test ediyor, gerçek provider çağrısı
+> yapmıyorlar. Doğrulandı: `pytest tests/` tüm suite yeşil (191 passed).
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),

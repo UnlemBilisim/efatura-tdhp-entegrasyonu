@@ -15,3 +15,8 @@ docs/
 Mcp_mimarisi/docs/
 model_eval/docs/
 entegrasyon/docs/
+
+# Testler ve şirkete özel referans dosyası (mizan.xlsx) production image'a
+# girmiyor — image sadece çalışma zamanı kodunu taşır (2026-07-29).
+model_eval/tests/
+Mcp_mimarisi/test/
