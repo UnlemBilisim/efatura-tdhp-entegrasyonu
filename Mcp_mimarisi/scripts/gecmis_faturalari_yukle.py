@@ -16,7 +16,6 @@ baştan doldurur). Bağlantı `DATABASE_URL` env var'ından okunur.
 from __future__ import annotations
 
 import os
-import re
 import sys
 
 import psycopg2
@@ -25,6 +24,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 
 from efatura_kdv.ubl_parser import parse_ubl_invoice
 from efatura_kdv.kalem_nace_esleme import kalem_istisna_kodlari
+from efatura_kdv.gecmis_kontrol import normalize_kalem_adi
 
 UBLS_KLASORU = "ubls"
 
@@ -47,10 +47,10 @@ CREATE INDEX IF NOT EXISTS idx_gecmis_eslesme
     ON gecmis_fatura_kalemleri (satici_vkn, kalem_adi_normalize);
 """
 
-
-def normalize_kalem_adi(kalem_adi: str) -> str:
-    """Eşleşme için kalem adını küçük harfe çevirir, fazla boşlukları temizler."""
-    return re.sub(r"\s+", " ", kalem_adi.strip().lower())
+# normalize_kalem_adi artık efatura_kdv.gecmis_kontrol'den import ediliyor
+# (2026-08-05, kod-tekrarı temizliği) - önceden burada birebir aynı mantık
+# ikinci kez tanımlıydı, biri değişip diğeri unutulursa normalize edilmiş
+# anahtarlar sessizce eşleşmeme riski taşıyordu.
 
 
 def _outbox_kalemlerini_topla(ubls_klasoru: str):

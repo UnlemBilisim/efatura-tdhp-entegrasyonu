@@ -350,5 +350,77 @@ def SAMPLE_INVOICE_WITH_VKN():
     return inv
 
 
+# ---------------------------------------------------------------------------
+# Bos koleksiyon regresyonu (2026-07-30, coklu sirket gecisi): gecmis fatura
+# verisi hic olmayan bir sirket icin RAG'in hata FIRLATMADAN "emsal yok"
+# davranisina dustugunu acikca dogrular.
+# ---------------------------------------------------------------------------
+
+class TestBosKoleksiyonEmsalYok:
+    def test_retrieve_similar_bos_koleksiyonda_bos_liste_doner(self):
+        collection = MagicMock()
+        collection.query.side_effect = [
+            _chroma_result([], [], []),
+            _chroma_result([], [], []),
+        ]
+        result = rc.retrieve_similar(collection, SAMPLE_INVOICE_WITH_VKN(), k=3)
+        assert result == []
+
+    def test_format_few_shot_block_bos_listede_bos_string(self):
+        assert rc.format_few_shot_block([]) == ""
+
+    def test_strongest_precedent_bos_listede_none(self):
+        assert rc.strongest_precedent([]) is None
+
+
+# ---------------------------------------------------------------------------
+# koleksiyon_adi_coz / get_collection parametrizasyonu (2026-07-30, coklu
+# sirket gecisi) - own_vkn'e gore koleksiyon adi turetme + cache anahtarina
+# collection_name'in dahil edilmesi.
+# ---------------------------------------------------------------------------
+
+class TestKoleksiyonAdiCoz:
+    def test_own_vkn_none_ise_sabit_ada_DUSMEZ(self):
+        """2026-07-31 duzeltmesi: own_vkn bos/None geldiginde ARTIK
+        Akuzulu'nun (COLLECTION_NAME) koleksiyonuna dusulmez - "hangi sirket
+        oldugu bilinmiyor" ile "Akuzulu" karistirilip baska bir sirketin
+        faturasi islenirken Akuzulu'nun gecmisinin emsal olarak sizmasi
+        (mizan.py::mizan_yolu_coz ile ayni bug'in RAG karsiligi) engellenir."""
+        assert rc.koleksiyon_adi_coz(None) != rc.COLLECTION_NAME
+
+    def test_own_vkn_bos_string_ise_sabit_ada_DUSMEZ(self):
+        assert rc.koleksiyon_adi_coz("") != rc.COLLECTION_NAME
+
+    def test_own_vkn_default_ise_sabit_ad(self):
+        from core.constants import DEFAULT_OWN_VKN
+        assert rc.koleksiyon_adi_coz(DEFAULT_OWN_VKN) == rc.COLLECTION_NAME
+
+    def test_baska_vkn_icin_turetilmis_ad(self):
+        assert rc.koleksiyon_adi_coz("1111111111") == "tdhp_invoices_1111111111"
+
+
+class TestGetCollectionCacheKey:
+    def test_farkli_collection_name_farkli_cache_girdisi_uretir(self, monkeypatch, tmp_path):
+        rc.reset_collection_cache_for_tests()
+        olusturulan = []
+
+        class _FakeClient:
+            def __init__(self, path):
+                pass
+
+            def get_or_create_collection(self, name, embedding_function=None):
+                olusturulan.append(name)
+                return MagicMock()
+
+        monkeypatch.setattr(rc.chromadb, "PersistentClient", _FakeClient)
+        monkeypatch.setattr(rc, "OllamaEmbeddingFunction", MagicMock())
+
+        rc.get_collection(persist_dir=tmp_path, collection_name="tdhp_invoices_1111111111")
+        rc.get_collection(persist_dir=tmp_path, collection_name="tdhp_invoices_2222222222")
+
+        assert olusturulan == ["tdhp_invoices_1111111111", "tdhp_invoices_2222222222"]
+        rc.reset_collection_cache_for_tests()
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

@@ -12,6 +12,15 @@
 > container içinde doğru çalıştı; LLM adımı SSH tüneli bu makinede açık
 > olmadığı için beklendiği gibi açık bir hatayla durdu (sessiz başarısızlık
 > yok).
+>
+> ✅ **Uygulandı** (2026-08-04): `Dockerfile`, `docker-compose.yml` ve
+> `docker-compose.override.yml` kökten `docker/` klasörüne taşındı (tüm
+> Docker dosyaları tek yerde toplansın diye). Build context kökte kalıyor
+> (`Dockerfile`'daki `COPY Mcp_mimarisi/ ...` gibi yollar değişmedi) —
+> `docker/docker-compose.yml`'deki `app.build` artık `context: ..` +
+> `dockerfile: docker/Dockerfile` olarak ayarlı. Aşağıdaki tüm komutlar bu
+> yeni konuma göre güncellendi ve `docker build -f docker/Dockerfile .`
+> ile gerçek build'e karşı doğrulandı.
 
 ## Neden bu yapı
 
@@ -21,7 +30,7 @@
   bölmek bu ilişkiyi bozar.
 - **`supervisord`** iki uvicorn sürecini (Mcp_mimarisi:8000, entegrasyon:8100)
   tek container içinde yönetir (`docker/supervisord.conf`).
-- **PostgreSQL ve Ollama ayrı servisler** (`docker-compose.yml`) — resmi
+- **PostgreSQL ve Ollama ayrı servisler** (`docker/docker-compose.yml`) — resmi
   image'lar, named volume ile veri kalıcı.
 - **SSH tünel (uzak GPU'daki LLM için) container'da DEĞİL.** Uzak makineye
   (`10.34.10.112`) gittiği için container içine alınamaz; host/sunucu
@@ -43,7 +52,7 @@ Bu, geliştirme makinesinde build edilen image'ı bir sunucuya taşımanın yolu
 
 ```bash
 docker login docker.unlemcloud.com
-docker build \
+docker build -f docker/Dockerfile \
   -t docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0 \
   -t docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:latest .
 docker push docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
@@ -57,7 +66,7 @@ docker login docker.unlemcloud.com
 docker pull docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
 ```
 
-> ✅ **Uygulandı** (2026-07-29): `docker-compose.yml`'deki `app` servisine
+> ✅ **Uygulandı** (2026-07-29): `docker/docker-compose.yml`'deki `app` servisine
 > `image: docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0`
 > eklendi (`build: .` de kalıyor). Sunucuda `docker compose up -d` çalıştığında
 > — image yerelde `docker pull` ile zaten çekildiyse — **yeniden build
@@ -65,14 +74,14 @@ docker pull docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
 > compose build` çalıştırılırsa yerelden build edip aynı image adına
 > etiketler (iki kullanım da aynı dosyada bir arada durur).
 
-Sunucuda `docker-compose.yml` ile ayağa kaldırmak için, image'ın yanı sıra
-**image'a dahil olmayan** şu destek dosyalarının da sunucuda olması gerekir
-(scp/rsync ile taşınmalı — `Dockerfile`, `entegrasyon/`, `Mcp_mimarisi/`,
+Sunucuda `docker/docker-compose.yml` ile ayağa kaldırmak için, image'ın yanı
+sıra **image'a dahil olmayan** `docker/` klasörünün tamamının sunucuda olması
+gerekir (scp/rsync ile taşınmalı — `entegrasyon/`, `Mcp_mimarisi/`,
 `model_eval/` kaynak kodu image içinde zaten var, tekrar taşınmasına gerek
-yok):
+yok, `Dockerfile`'ın kendisi de sadece `docker compose build` çalıştıracaksanız
+gerekir):
 
 ```bash
-scp docker-compose.yml <kullanıcı>@<sunucu>:/path/System/
 scp -r docker/ <kullanıcı>@<sunucu>:/path/System/
 ```
 
@@ -85,7 +94,7 @@ bakın.
 > doğrulandı) ve tek istek gövdesi için bir üst limit uyguluyor. Bu projenin
 > `entegrasyon/requirements.txt`'i `chromadb`+`ollama` içerdiği için (RAG
 > özelliği — bkz. `model_eval_koprusu.py::faturayi_onayla`) o katman tek
-> başına ~360 MB'a çıkıyor. Bunu azaltmak için `Dockerfile`'daki `pip
+> başına ~360 MB'a çıkıyor. Bunu azaltmak için `docker/Dockerfile`'daki `pip
 > install` üç ayrı `RUN` satırına bölündü (satır bazında bkz. Dockerfile
 > yorumu) — böylece her bileşenin bağımlılığı ayrı bir katman/upload isteği
 > olur. **Bu bölme + yeniden build sonrası push başarılı oldu**; kesin
@@ -108,7 +117,7 @@ bakın.
 ## 2. Başlatma
 
 ```bash
-cd System/
+cd System/docker/
 POSTGRES_PASSWORD="<güçlü-parola>" docker compose up -d
 ```
 
@@ -124,7 +133,7 @@ docker exec <ollama-container-adı> ollama pull embeddinggemma
 
 ## 3. SSH tünel (LLM erişimi — host'ta, container dışında)
 
-`docker-compose.yml`'deki `app` servisi, LLM çağrıları için
+`docker/docker-compose.yml`'deki `app` servisi, LLM çağrıları için
 `http://host.docker.internal:11435`'e bağlanmayı bekler. Bu adres, host
 makinedeki bir SSH tüneline karşılık gelir:
 
@@ -216,7 +225,7 @@ düşer (bkz. `model_eval/CLAUDE.md` "En büyük tekil iyileştirme: RAG").
 DONMUŞ:**
 
 Bu dosyalar (NACE/KDV oran referansı, şirkete özel mizan) SQL/vektör
-verisinin aksine `Dockerfile`'daki `COPY` ile image'ın içine gömülüdür —
+verisinin aksine `docker/Dockerfile`'daki `COPY` ile image'ın içine gömülüdür —
 build anındaki hâlleriyle sabitlenirler, ayrı bir taşıma adımı gerekmez.
 **Ama bu aynı zamanda bir tuzaktır:** mizan güncellenirse (ör. yeni alt
 kırılım kodları eklenirse, geçmişte "mizan_5" güncellemesinde olduğu gibi)
@@ -239,6 +248,7 @@ docker restart <app-container-adı>
 ## 7. Durdurma
 
 ```bash
+cd System/docker/
 POSTGRES_PASSWORD="<aynı-parola>" docker compose down
 ```
 

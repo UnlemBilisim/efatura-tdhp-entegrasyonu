@@ -198,7 +198,6 @@ def predict_single_invoice(
     timeout=180.0,
     convert_to_try=False,
     alt_kirilim=True,
-    mizan_path=None,
     parsed_invoice=None,
 ):
     """Ham bir UBL-TR XML faturasi (string) icin TDHP tahmini uretir.
@@ -244,8 +243,10 @@ def predict_single_invoice(
 
     alt_kirilim=True (varsayilan, 2026-07-24 eklendi): ana model 3 haneli
     kodu urettikten SONRA, her benzersiz kod icin core/mizan.py::
-    get_alt_kirilimlar() ile SIRKETE OZEL mizan'daki (model_eval/exceller/
-    mizan.xlsx) alt kirilim secenekleri cikarilir, TEK bir ek LLM cagrisiyla
+    get_alt_kirilimlar() ile SIRKETE OZEL mizan'daki (own_vkn'in tenant
+    semasindaki mizan_alt_kirilim tablosu, 2026-08-05'ten itibaren PostgreSQL'de
+    - eskiden model_eval/exceller/mizan.xlsx) alt kirilim secenekleri
+    cikarilir, TEK bir ek LLM cagrisiyla
     (ayni model spec, ana cagriyla AYNI) hangi alt kirilimin uygun oldugu
     sectirilir - kullanici karari (2026-07-24): "alt kirilimlar her
     muhasebeci icin farkli olabilir, model butun alt kirilimlari bilebilmeli".
@@ -362,7 +363,7 @@ def predict_single_invoice(
 
     if alt_kirilim and entry_dicts:
         entry_dicts = _alt_kirilim_uygula(
-            invoice, entry_dicts, spec, system_prompt, temperature, timeout, mizan_path,
+            invoice, entry_dicts, spec, system_prompt, temperature, timeout, own_vkn,
         )
 
     return {
@@ -380,7 +381,7 @@ def predict_single_invoice(
     }
 
 
-def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, timeout, mizan_path):
+def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, timeout, own_vkn):
     """entry_dicts'teki her benzersiz 3 haneli account_code icin, mizan'daki
     alt kirilim secenekleri varsa (kod mizanda hic yoksa o kod atlanir) TEK
     bir ek LLM cagrisiyla dogru alt kirilimi sectirir ve entry_dicts'i GUNCEL
@@ -401,7 +402,7 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
     ile denenir; o da basarisiz olursa (kalici bir sorun oldugu varsayilir)
     sessizce 3 haneli koda donulur - sonsuz retry YAPILMAZ, kullaniciyi
     gereksiz beklemez."""
-    alt_kirilimlar_tumu = get_alt_kirilimlar(mizan_path)
+    alt_kirilimlar_tumu = get_alt_kirilimlar(own_vkn)
     benzersiz_kodlar = {e["account_code"] for e in entry_dicts}
     ilgili_alt_kirilimlar = {
         kod: alt_kirilimlar_tumu[kod] for kod in benzersiz_kodlar if kod in alt_kirilimlar_tumu

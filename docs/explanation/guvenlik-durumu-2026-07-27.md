@@ -87,7 +87,7 @@ olarak yönlendirir.
 > ✅ **Uygulandı** (2026-07-28): `baslat.sh:15`'teki gömülü `efatura:efatura`
 > parolası kaldırıldı. `POSTGRES_PASSWORD` artık zorunlu env var
 > (`: "${POSTGRES_PASSWORD:?...}"`) — tanımlı değilse script açıkça hata
-> verip durur, gömülü/varsayılan bir parolaya düşmez. `docker-compose.yml`
+> verip durur, gömülü/varsayılan bir parolaya düşmez. `docker/docker-compose.yml`
 > tarafında bu disiplin zaten baştan uygulanmıştı. Gerçek testte doğrulandı:
 > env var olmadan `POSTGRES_PASSWORD env var tanımlı olmalı` hatasıyla
 > durdu, doğru parolayla servisler sağlıklı ayağa kalktı.

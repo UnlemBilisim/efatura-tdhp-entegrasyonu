@@ -293,7 +293,7 @@ class TestPredictSingleInvoiceAltKirilim:
 
     def test_alt_kirilim_replaces_3_digit_codes(self, monkeypatch):
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         secim_response = (
             '{"secimler": ['
@@ -320,7 +320,7 @@ class TestPredictSingleInvoiceAltKirilim:
         """LLM bir kod icin secim yapmazsa (ya da uygun secenek bulamadigini
         belirtirse) o kod 3 haneli halinde KALIR, uydurulmaz."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         # Sadece 191 icin secim var, 770 ve 320 icin yok.
         secim_response = '{"secimler": [{"ana_kod": "191", "alt_kod": "191.05.00005"}]}'
@@ -340,7 +340,7 @@ class TestPredictSingleInvoiceAltKirilim:
         """LLM, mizan'da OLMAYAN bir alt kod uydurursa bu secim YOK SAYILIR -
         3 haneli kodda kalinir."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         secim_response = '{"secimler": [{"ana_kod": "191", "alt_kod": "191.99.99999"}]}'
         # 1 kez otomatik yeniden deneme oldugu icin (bkz. _alt_kirilim_uygula)
@@ -363,7 +363,7 @@ class TestPredictSingleInvoiceAltKirilim:
         ana tahmin ETKILENMEZ - entries 3 haneli halinde doner, result["error"]
         None kalir (bu adimin basarisizligi ana tahmini basarisiz SAYMAZ)."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         # 1 kez otomatik yeniden deneme oldugu icin (bkz. _alt_kirilim_uygula)
         # HER IKI denemede de hata donmesi gerekir ki kalici basarisizlik test edilsin.
@@ -391,7 +391,7 @@ class TestPredictSingleInvoiceAltKirilim:
         50 gercek fatura testinde gecici hatalarin sessizce 3 haneliye
         dusmesi gozlemlendi, LLM'in kendisi tutarliydi)."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         secim_response = '{"secimler": [{"ana_kod": "191", "alt_kod": "191.05.00005"}]}'
         responses = [
@@ -413,7 +413,7 @@ class TestPredictSingleInvoiceAltKirilim:
 
     def test_alt_kirilim_disabled_skips_second_call(self, monkeypatch):
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         with patch.object(single, "call_model", return_value=_balanced_response()) as mock_call:
             result = single.predict_single_invoice(
@@ -432,7 +432,7 @@ class TestPredictSingleInvoiceAltKirilim:
         sekilde cozulemese bile UYARI ALMAZ (2026-07-24 kullanici karari,
         CARI_HESAP_KODLARI)."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
-        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda mizan_path=None: self._fake_alt_kirilimlar())
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
         # LLM sadece 191'i cozer, 320 (cari) ve 770 (gider) cozulmez
         secim_response = '{"secimler": [{"ana_kod": "191", "alt_kod": "191.05.00005"}]}'

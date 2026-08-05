@@ -1113,8 +1113,9 @@ aynı).
 
 ### 6.2 Dış ekip sözleşmesi
 
-Kaynak: `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` +
-`model_eval/docs/reference/dis-ekip-kayit-semasi.md`.
+Kaynak: `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` (2026-08-05'ten
+itibaren `records[]` şema detayını da §3.1'de içeriyor — dış ekibe teslim
+edilen tek dosya).
 
 Tek gerçek ihtiyaç `tdhp_tahmini.dis_sema`. `records[]`'in her öğesi **tam 6
 alan** taşır:
@@ -1170,14 +1171,14 @@ belirtiyor.
 
 ### 6.5 Docker/supervisord birlikte çalışma
 
-`Dockerfile:4-7` açıkça gerekçelendiriyor — `entegrasyon/model_eval_yolu.py`
+`docker/Dockerfile:4-7` açıkça gerekçelendiriyor — `entegrasyon/model_eval_yolu.py`
 `model_eval`'i `../model_eval` kardeş dizini olarak `sys.path`'e eklediği
 için iki servis ayrı image'lara bölünemez; üç bileşen (`Mcp_mimarisi`,
 `entegrasyon`, `model_eval`) tek image'a kopyalanıp kardeş dizin ilişkisi
 korunur, `supervisord` iki HTTP servisini (8000, 8100) aynı container
 içinde ayrı process olarak yönetir.
 
-PostgreSQL ve Ollama ise **ayrı servis** olarak `docker-compose.yml`'de
+PostgreSQL ve Ollama ise **ayrı servis** olarak `docker/docker-compose.yml`'de
 kalır çünkü:
 1. Kendi veri kalıcılığı/volume yaşam döngüleri var
    (`efatura-kdv-pgdata`, `efatura-ollama-data`).
@@ -1188,13 +1189,12 @@ kalır çünkü:
 
 SSH tüneli (uzak GPU LLM'e) container'a hiç girmiyor — host seviyesinde
 systemd servisi, `host.docker.internal` üzerinden `MODEL_EVAL_OLLAMA_HOST`
-env var'ıyla erişiliyor (`docker-compose.yml:1-13,70-90`).
+env var'ıyla erişiliyor (`docker/docker-compose.yml:1-13,70-90`).
 
 **Kaynak belgeler:** `../../mimari.md`, `entegrasyon/docs/reference/
-dis-ekip-api-kullanimi.md`, `model_eval/docs/reference/
-dis-ekip-kayit-semasi.md`, `entegrasyon/app.py:311-390`,
-`entegrasyon/model_eval_koprusu.py:1-19`, `../../docker-compose.yml`,
-`../../Dockerfile`.
+dis-ekip-api-kullanimi.md`, `entegrasyon/app.py:311-390`,
+`entegrasyon/model_eval_koprusu.py:1-19`, `../../docker/docker-compose.yml`,
+`../../docker/Dockerfile`.
 
 ---
 

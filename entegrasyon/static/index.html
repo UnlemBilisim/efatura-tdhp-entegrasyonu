@@ -77,7 +77,7 @@
   <textarea id="xml-metin" placeholder="<Invoice>...</Invoice>"></textarea>
 
   <label for="satici-vkn">Sizin şirketinizin VKN'si</label>
-  <input type="text" id="satici-vkn" placeholder="0460351893">
+  <input type="text" id="satici-vkn" placeholder="0460351893" list="kayitli-vknler">
   <p class="kucuk-not">Sistem bu VKN'yi faturanın satıcı/alıcı tarafıyla karşılaştırıp
   faturanın bize mi kesilmiş (inbox) yoksa bizim mi kestiğimiz (outbox) olduğunu otomatik
   tespit eder.</p>
@@ -106,7 +106,7 @@
   <div id="toplu-dosya-listesi" class="dosya-listesi"></div>
 
   <label for="toplu-satici-vkn">Sizin şirketinizin VKN'si (tüm faturalar için ortak)</label>
-  <input type="text" id="toplu-satici-vkn" placeholder="0460351893">
+  <input type="text" id="toplu-satici-vkn" placeholder="0460351893" list="kayitli-vknler">
 
   <label for="toplu-nace-kodlari">NACE kod(ları) (virgülle ayrılmış, tüm faturalara uygulanır) — sadece outbox'ta kullanılır</label>
   <input type="text" id="toplu-nace-kodlari" placeholder="251100, 252900">
@@ -127,6 +127,8 @@
 <h2 id="toplu-sonuc-baslik" style="display:none">Sonuçlar</h2>
 <div id="toplu-sonuc-alani"></div>
 </div>
+
+<datalist id="kayitli-vknler"></datalist>
 
 <script>
 let sonGonderilenIstek = null;
@@ -160,12 +162,35 @@ async function durumGetir() {
 }
 durumGetir();
 
+// ---- kayıtlı şirket VKN'leri (2026-07-30, çoklu şirket geçişi) ----
+// VKN input'larına yazarken öneri göstermek için - sessizce başarısız olur
+// (ana akışı bloklamaz), zaten var olan durumGetir() ile aynı desen.
+async function kayitliVknleriYukle() {
+  try {
+    const r = await fetch('/kayitli-sirketler');
+    const d = await r.json();
+    const datalist = document.getElementById('kayitli-vknler');
+    datalist.innerHTML = '';
+    for (const vkn of (d.vkn_listesi || [])) {
+      const opt = document.createElement('option');
+      opt.value = vkn;
+      datalist.appendChild(opt);
+    }
+  } catch (e) {
+    // sessizce vazgeç - öneri listesi olmadan da form normal çalışır
+  }
+}
+kayitliVknleriYukle();
+
 // ============================================================
 // TEK FATURA (mevcut davranış — değişmedi)
 // ============================================================
+let secilenDosyaAdi = null;  // test kayıtlarında Excel'e yazılacak (2026-07-31)
+
 async function xmlDosyasiniYukle(dosya) {
   if (!dosya) return;
   document.getElementById('xml-metin').value = await dosya.text();
+  secilenDosyaAdi = dosya.name;
 }
 
 document.getElementById('xml-dosya').addEventListener('change', (e) => {
@@ -208,6 +233,7 @@ async function faturaGonder(onay) {
     satici_nace_kodlari: naceListesiAyristir(document.getElementById('nace-kodlari').value),
     onay: onay,
     kur_secimi: sonGonderilenIstek ? sonGonderilenIstek.kur_secimi : null,
+    dosya_adi: secilenDosyaAdi,
   };
   sonGonderilenIstek = istek;
 
@@ -428,6 +454,7 @@ function topluIstekYap(dosya, onay, kur_secimi) {
     satici_nace_kodlari: naceListesiAyristir(document.getElementById('toplu-nace-kodlari').value),
     onay: onay,
     kur_secimi: kur_secimi || null,
+    dosya_adi: dosya.ad,
   };
 }
 

@@ -13,11 +13,19 @@ oranlarla uyumlu olup olmadığını kontrol eder. Kendi PostgreSQL veritabanı,
 kendi HTTP API'si (FastAPI) ve kendi test/dokümantasyon seti var —
 `Mcp_mimarisi/project.md`, `Mcp_mimarisi/CLAUDE.md`.
 
-İki proje kod olarak birleştirilmez (import edilmez, aynı süreçte
-çalıştırılmaz) — sadece HTTP üzerinden konuşur. Gerekçe: bu pipeline'ın
-(model_eval) kendi geliştirme hızı/deploy'u, Mcp_mimarisi'nin PostgreSQL/
-API bağımlılıklarından etkilenmemeli; benzer şekilde Mcp_mimarisi de bu
-pipeline'ın ChromaDB/Ollama bağımlılıklarını taşımaz.
+İki proje kendi geliştirme hızı/deploy'unu bağımsız tutmak için ayrı
+kalıyor ve production akışında sadece HTTP üzerinden konuşuyor — model_eval,
+Mcp_mimarisi'nin PostgreSQL/API bağımlılıklarını taşımaz; Mcp_mimarisi de
+bu pipeline'ın ChromaDB/Ollama bağımlılıklarını taşımaz.
+
+> ⚠️ **2026-08-05 kullanıcı kararıyla gevşetildi:** "hiçbir koşulda import
+> edilmez" ilkesi kalktı — `Mcp_mimarisi/scripts/tenant_onboarding.py`
+> artık `model_eval/core/db.py::_SCHEMA`'yı doğrudan import ediyor (elle
+> kopyalanan bir SQL şemasının iki projede senkronsuz kalma riskini
+> gidermek için, bkz. kök `CLAUDE.md` Değişmez Kural 2). Bu tek yönlü bir
+> istisna (Mcp_mimarisi → model_eval, tek bir sabit) — production akışının
+> HTTP sınırı (yukarıdaki "Adım 0") değişmedi, iki servis hâlâ ayrı ayrı
+> deploy ediliyor.
 
 ## Akış noktası — "Adım 0"
 

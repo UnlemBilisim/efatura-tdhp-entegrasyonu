@@ -47,6 +47,15 @@ indeksini de güncelle.
 2. **`Mcp_mimarisi` HTTP ile, `model_eval` import ile çağrılır.** Bu asimetri
    kasıtlıdır (gerekçe: mimari.md §2.1). `entegrasyon/` bu ikisinin koduna
    dokunmaz — onlara dışarıdan bağlanan üçüncü bir bileşendir.
+   > ⚠️ **2026-08-05 kullanıcı kararıyla gevşetildi:** "İki bileşen birbirinin
+   > koduna dokunmaz" ilkesi genel olarak KALKTI — `Mcp_mimarisi` artık
+   > `model_eval`'ı doğrudan import edebilir (bkz.
+   > `Mcp_mimarisi/scripts/tenant_onboarding.py`, `model_eval_yolu.py`
+   > deseniyle `model_eval/core/db.py::_SCHEMA`'yı import ediyor — elle
+   > kopyalanan bir SQL şemasının iki projede senkronsuz kalma riskini
+   > gidermek için). Yukarıdaki HTTP/import asimetrisi hâlâ **entegrasyon/**
+   > katmanı için geçerlidir (o hâlâ ikisine dışarıdan bağlanır) — değişen,
+   > `Mcp_mimarisi`↔`model_eval` arasındaki "birbirine dokunmaz" sınırıdır.
 3. **Ön filtreleme yalnızca outbox faturalara uygulanır.** inbox'ta
    `Mcp_mimarisi` HİÇ çağrılmaz (gerekçe: başkasının kestiği faturanın mevzuat
    sorumluluğu bizde değil). Yön, XML'den tespit edilir — kullanıcıya sorulmaz.
@@ -57,12 +66,11 @@ indeksini de güncelle.
    LLM yalnızca muhasebe kaydı için kullanılır.
 6. **`records[]`/`dis_sema` dış sözleşmesi, iç şemadan TÜRETİLİR.** İç tarafta
    `entries[]` + `dc="Borc"/"Alacak"` kalır (205 test + DB + RAG buna bağlı);
-   dönüşüm yalnızca `model_eval/core/disa_aktarim.py`'de yapılır. Şema
-   sözleşmesi:
-   [`model_eval/docs/reference/dis-ekip-kayit-semasi.md`](model_eval/docs/reference/dis-ekip-kayit-semasi.md).
-   Dış ekibin API kullanımı (istek/cevap, onay akışı):
+   dönüşüm yalnızca `model_eval/core/disa_aktarim.py`'de yapılır. Dış ekibin
+   tek kaynağı (API sözleşmesi + `records[]` şema detayı, 2026-08-05'te
+   birleştirildi):
    [`entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`](entegrasyon/docs/reference/dis-ekip-api-kullanimi.md).
-   Bu iki belge dış sözleşmedir — değiştirirsen karşı taraf kırılır, önce sor.
+   Bu belge dış sözleşmedir — değiştirirsen karşı taraf kırılır, önce sor.
 
 ## Çalıştırmak için gerekenler (sık atlanan)
 

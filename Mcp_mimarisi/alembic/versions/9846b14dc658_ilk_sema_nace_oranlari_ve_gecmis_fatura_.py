@@ -10,11 +10,20 @@ aksi halde CREATE TABLE mevcut tabloyla çakışıp hata verir (IF NOT EXISTS
 burada bilinçli olarak KULLANILMADI: Alembic'in "bu migration çalıştı mı"
 takibiyle "tablo zaten var mı" durumu birbirine karıştırılmamalı).
 
+2026-07-30 (çoklu şirket geçişi): `nace_oranlari` mevzuat referans tablosudur,
+TÜM şirketler için aynıdır — tenant şemasına özel değildir, sadece `public`'te
+yaşar. Bu migration bir tenant şemasında (`ALEMBIC_TENANT_SCHEMA` env var'ı
+set edilmiş, bkz. alembic/env.py) çalıştırıldığında `nace_oranlari` CREATE'i
+ATLANIR — aksi halde her tenant onboarding'inde mevzuat verisi çoğalır/
+tutarsızlaşır. Mevcut `public` şema akışı (ALEMBIC_TENANT_SCHEMA verilmediğinde)
+DEĞİŞMEDEN aynen çalışır — bu koşul SADECE tenant şeması akışında devreye girer.
+
 Revision ID: 9846b14dc658
 Revises:
 Create Date: 2026-07-22 11:37:03.793697
 
 """
+import os
 from typing import Sequence, Union
 
 from alembic import op
@@ -30,15 +39,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "nace_oranlari",
-        sa.Column("nace_kodu", sa.Text(), primary_key=True),
-        sa.Column("kdv_0", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("kdv_1", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("kdv_10", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("kdv_20", sa.Boolean(), nullable=False, server_default=sa.false()),
-        sa.Column("kaynak_satir", postgresql.JSONB(), nullable=True),
-    )
+    if not os.environ.get("ALEMBIC_TENANT_SCHEMA"):
+        op.create_table(
+            "nace_oranlari",
+            sa.Column("nace_kodu", sa.Text(), primary_key=True),
+            sa.Column("kdv_0", sa.Boolean(), nullable=False, server_default=sa.false()),
+            sa.Column("kdv_1", sa.Boolean(), nullable=False, server_default=sa.false()),
+            sa.Column("kdv_10", sa.Boolean(), nullable=False, server_default=sa.false()),
+            sa.Column("kdv_20", sa.Boolean(), nullable=False, server_default=sa.false()),
+            sa.Column("kaynak_satir", postgresql.JSONB(), nullable=True),
+        )
 
     op.create_table(
         "gecmis_fatura_kalemleri",
@@ -62,4 +72,5 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_index("idx_gecmis_eslesme", table_name="gecmis_fatura_kalemleri")
     op.drop_table("gecmis_fatura_kalemleri")
-    op.drop_table("nace_oranlari")
+    if not os.environ.get("ALEMBIC_TENANT_SCHEMA"):
+        op.drop_table("nace_oranlari")

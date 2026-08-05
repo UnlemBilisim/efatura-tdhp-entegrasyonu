@@ -27,21 +27,34 @@ from __future__ import annotations
 
 import os
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 import psycopg2
+from psycopg2 import sql
 from psycopg2.pool import ThreadedConnectionPool
 
 from .kalem_nace_esleme import kalem_istisna_kodlari
 from .ubl_parser import Fatura
 
 
+def _tenant_semasi(satici_vkn: str) -> str:
+    """satici_vkn'den tenant şema adını türetir (2026-07-30, çoklu şirket
+    geçişi). Şema adı SQL identifier'dır, %s ile parametrize EDİLEMEZ —
+    burada sıkı doğrulanır (sadece rakam, VKN 10 hanelidir) ki SQL injection
+    riski (şema adı üzerinden) oluşmasın."""
+    if not satici_vkn or not satici_vkn.isdigit():
+        raise ValueError(f"Geçersiz VKN formatı, şema adı türetilemez: {satici_vkn!r}")
+    return f"tenant_{satici_vkn}"
+
+
 def normalize_kalem_adi(kalem_adi: str) -> str:
     """Eşleşme için kalem adını küçük harfe çevirir, fazla boşlukları temizler.
 
-    scripts/gecmis_faturalari_yukle.py'deki aynı isimli fonksiyonla BİREBİR
-    aynı mantık — biri veri yazarken, diğeri sorgu atarken kullanılıyor;
-    ikisi farklılaşırsa normalize edilmiş anahtarlar sessizce eşleşmez."""
+    Tek gerçek kaynak burasıdır — scripts/gecmis_faturalari_yukle.py bu
+    fonksiyonu import eder (2026-08-05, önceden birebir aynı mantığın ikinci
+    bir kopyası vardı; biri değişip diğeri unutulursa normalize edilmiş
+    anahtarların sessizce eşleşmeme riski taşıdığı için import'a çevrildi)."""
     return re.sub(r"\s+", " ", kalem_adi.strip().lower())
 
 
@@ -136,13 +149,35 @@ class GecmisFaturaDeposu:
         (bkz. api.py _lifespan)."""
         self._pool.closeall()
 
+    @contextmanager
+    def _tenant_baglantisi(self, satici_vkn: str):
+        """Havuzdan bir bağlantı alır, search_path'i bu şirketin tenant
+        şemasına çevirir (2026-07-30, çoklu şirket geçişi). Havuz TEK ve
+        bağlantılar şirketler arası yeniden kullanıldığı için search_path
+        DSN'e gömülemez — her ödünç almada yeniden set edilmeli.
+
+        Şema henüz yoksa (yeni şirket onboard edilmemiş) burada
+        OLUŞTURULMAZ — bu, scripts/tenant_onboarding.py'nin sorumluluğu;
+        burada sessizce şema oluşturmak, yanlış yazılmış bir VKN'nin fark
+        edilmeden yeni bir boş şema açmasına yol açar."""
+        conn = self._pool.getconn()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    sql.SQL("SET search_path TO {}, public").format(
+                        sql.Identifier(_tenant_semasi(satici_vkn))
+                    )
+                )
+            yield conn
+        finally:
+            self._pool.putconn(conn)
+
     def gecmis_oranlari_getir(self, satici_vkn: str, kalem_adi: str) -> list[GecmisOranOzeti]:
         """Verilen satıcı+kalem adı için geçmişte görülen oranları, kaç kez
         görüldüğü ve son görülme tarihiyle birlikte döner."""
         kalem_adi_normalize = normalize_kalem_adi(kalem_adi)
 
-        conn = self._pool.getconn()
-        try:
+        with self._tenant_baglantisi(satici_vkn) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -155,8 +190,6 @@ class GecmisFaturaDeposu:
                     (satici_vkn, kalem_adi_normalize),
                 )
                 rows = cur.fetchall()
-        finally:
-            self._pool.putconn(conn)
 
         return [
             GecmisOranOzeti(
@@ -221,48 +254,46 @@ def faturayi_gecmise_kaydet(
     istisna_kodu (2026-07-22 eklendi) — oran %0/istisna kaynaklıysa hangi
     istisna koduyla kesildiği (bkz. GecmisOranOzeti.istisna_kodu, PROJECT.md
     §3.9). Çağıran taraf bu bilgiyi bilmiyorsa None geçebilir."""
-    conn = depo._pool.getconn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO islenmis_faturalar (fatura_no)
-                VALUES (%s)
-                ON CONFLICT (fatura_no) DO NOTHING
-                RETURNING fatura_no
-                """,
-                (fatura_no,),
-            )
-            if cur.fetchone() is None:
-                conn.rollback()
-                return False  # zaten işlenmiş (bu istek ya da eşzamanlı bir başkası)
-
-            for kalem_adi, oran, istisna_kodu in kalemler:
+    with depo._tenant_baglantisi(satici_vkn) as conn:
+        try:
+            with conn.cursor() as cur:
                 cur.execute(
                     """
-                    INSERT INTO gecmis_fatura_kalemleri
-                        (satici_vkn, kalem_adi_normalize, kalem_adi_orijinal,
-                         oran, istisna_kodu, fatura_no, fatura_tarihi, kaynak_dosya)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO islenmis_faturalar (fatura_no)
+                    VALUES (%s)
+                    ON CONFLICT (fatura_no) DO NOTHING
+                    RETURNING fatura_no
                     """,
-                    (
-                        satici_vkn,
-                        normalize_kalem_adi(kalem_adi),
-                        kalem_adi,
-                        oran,
-                        istisna_kodu,
-                        fatura_no,
-                        fatura_tarihi,
-                        kaynak,
-                    ),
+                    (fatura_no,),
                 )
-        conn.commit()
-        return True
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        depo._pool.putconn(conn)
+                if cur.fetchone() is None:
+                    conn.rollback()
+                    return False  # zaten işlenmiş (bu istek ya da eşzamanlı bir başkası)
+
+                for kalem_adi, oran, istisna_kodu in kalemler:
+                    cur.execute(
+                        """
+                        INSERT INTO gecmis_fatura_kalemleri
+                            (satici_vkn, kalem_adi_normalize, kalem_adi_orijinal,
+                             oran, istisna_kodu, fatura_no, fatura_tarihi, kaynak_dosya)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            satici_vkn,
+                            normalize_kalem_adi(kalem_adi),
+                            kalem_adi,
+                            oran,
+                            istisna_kodu,
+                            fatura_no,
+                            fatura_tarihi,
+                            kaynak,
+                        ),
+                    )
+            conn.commit()
+            return True
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def fatura_kalemlerini_kayit_icin_hazirla(fatura: Fatura) -> list[tuple[str, float, "str | None"]]:

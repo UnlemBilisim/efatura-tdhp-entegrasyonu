@@ -18,6 +18,39 @@ import core.prompting as prompting
 from conftest import SAMPLE_INVOICE_JSON
 
 
+class TestBuildAltKirilimUserPromptParaBirimi:
+    """2026-07-31 duzeltmesi: EUR faturada 601.01.00001 ("Yurt Disi TL
+    Satislari") yanlislikla secildi cunku alt kirilim LLM cagrisi para
+    birimini hic gormuyordu - artik FATURA BAGLAMI'nda gosteriliyor."""
+
+    def _sahte_invoice(self, currency):
+        return {
+            "header": {
+                "currency": currency,
+                "account_title": "Test Musteri",
+                "account_tax_number": "1234567890",
+                "invoice_type": "SATIS",
+            }
+        }
+
+    def test_para_birimi_prompta_yaziliyor(self):
+        inv = self._sahte_invoice("EUR")
+        prompt = prompting.build_alt_kirilim_user_prompt(
+            inv, [{"account_code": "601", "dc": "Alacak"}],
+            {"601": [("601.01.00001", "Yurt Disi TL Satislari"), ("601.01.00002", "Yurt Disi Euro Satislari")]},
+        )
+        assert "Para Birimi: EUR" in prompt
+
+    def test_currency_eksikse_soru_isareti_yazilir(self):
+        inv = {"header": {}}
+        prompt = prompting.build_alt_kirilim_user_prompt(inv, [], {})
+        assert "Para Birimi: ?" in prompt
+
+    def test_sistem_prompt_doviz_uyum_kurali_iceriyor(self):
+        assert "PARA BIRIMI" in prompting.ALT_KIRILIM_SYSTEM_PROMPT
+        assert "Euro" in prompting.ALT_KIRILIM_SYSTEM_PROMPT
+
+
 class TestBuildUserPromptNoLeak:
     def test_ground_truth_account_codes_not_in_prompt(self, invoice_file):
         p = invoice_file("X-abc-inbox.json", SAMPLE_INVOICE_JSON)

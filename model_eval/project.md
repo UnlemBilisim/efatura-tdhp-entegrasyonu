@@ -119,8 +119,9 @@ pool'unu sıfırlar — testler birbirinden ve gerçek prod DB'sinden izole kal�
 
 ## 4. Mcp_mimarisi ile İlişki
 
-Ayrı bir proje (`~/Desktop/AıData2/Mcp_mimarisi/`) — kod olarak birleştirilmez
-(import edilmez, aynı süreçte çalışmaz), sadece HTTP üzerinden konuşur. Tam
+Ayrı bir proje (`~/Desktop/AıData2/Mcp_mimarisi/`) — production akışında
+sadece HTTP üzerinden konuşur; kod tekrarını önlemek için tek yönlü bir
+import istisnası vardır (bkz. `entegrasyon.md`, 2026-08-05 kararı). Tam
 sözleşme: [`entegrasyon.md`](entegrasyon.md). Özet: ham XML işlenmeden önce
 "Adım 0" olarak `POST /fatura/kontrol-et` (satıcı VKN + NACE kodları + fatura
 XML) çağrılır; `genel_karar="uygun"` ise bu pipeline'ın Adım 1-4'ü

@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
@@ -90,6 +91,11 @@ class FaturaIsleIstegi(BaseModel):
     """Sadece outbox faturalarda (Mcp_mimarisi çağrılırken) kullanılır.
     İnbox faturalarda Mcp_mimarisi hiç çağrılmadığı için gerekmez, boş
     liste bırakılabilir."""
+    dosya_adi: Optional[str] = None
+    """Arayüzden yüklenen XML dosyasının adı (2026-07-31, kullanıcı isteği:
+    test kayıtları Excel'e dosya adıyla birlikte düşsün). Sadece izleme/
+    raporlama amaçlıdır, işleme mantığını etkilemez — verilmezse (örn.
+    doğrudan API çağrılarında) test kaydında boş görünür."""
     onay: Optional[bool] = None
     """Kullanıcı 'insan_incelemesi_gerekli' uyarısını görüp yine de devam
     etmek isterse True gönderir. İlk çağrıda (henüz uyarı gösterilmeden)
@@ -215,6 +221,23 @@ def durum():
     return {"model_eval_hazir": hazir, "model_eval_mesaj": mesaj}
 
 
+@app.get("/kayitli-sirketler")
+def kayitli_sirketler():
+    """Arayüzdeki VKN input'una (own_vkn — kullanıcının KENDİ şirketi) yazı
+    yazılırken öneri göstermek için (2026-07-30, çoklu şirket geçişi).
+    Sadece VKN listesi döner — şirket adı ayrıca tutulmuyor (kullanıcı
+    kararı). model_eval hazır değilse boş liste döner (arayüz sessizce
+    öneri göstermez, hata da fırlatmaz — bu, ana akışı bloklamayan bir
+    yardımcı özellik)."""
+    hazir, _mesaj = model_eval_hazir_mi()
+    if not hazir:
+        return {"vkn_listesi": []}
+
+    from model_eval_koprusu import kayitli_vknleri_getir
+
+    return {"vkn_listesi": kayitli_vknleri_getir()}
+
+
 @app.post("/fatura/onayla", response_model=FaturaOnaylaCevabi)
 def fatura_onayla(istek: FaturaOnaylaIstegi) -> FaturaOnaylaCevabi:
     """Kullanıcı arayüzde TDHP tahminini görüp 'bu doğru, kaydet' butonuna
@@ -239,6 +262,7 @@ def fatura_onayla(istek: FaturaOnaylaIstegi) -> FaturaOnaylaCevabi:
         raise HTTPException(status_code=501, detail=str(exc)) from exc
 
     _logger.info("[ONAY] KAYDEDİLDİ — invoice_id=%s", istek.tdhp_tahmini.invoice_id)
+    _test_kaydini_onaylandi_isaretle(istek.tdhp_tahmini.invoice_id)
     return FaturaOnaylaCevabi(
         kaydedildi=True,
         mesaj="Fatura onaylandı — PostgreSQL'e kaydedildi ve RAG vektör veritabanına eklendi.",
@@ -247,6 +271,18 @@ def fatura_onayla(istek: FaturaOnaylaIstegi) -> FaturaOnaylaCevabi:
 
 @app.post("/fatura/isle", response_model=FaturaIsleCevabi)
 def fatura_isle(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
+    """Gerçek işleme mantığı `_fatura_isle_ic()`'te — bu dış katman SADECE
+    sonucu (onaylansın/onaylanmasın, her çağrı) test-kayıtları dosyasına
+    loglar (2026-07-31, kullanıcı isteği: arayüzden test edilen her fatura
+    izlenebilir olsun). `_fatura_isle_ic()` HTTPException fırlatırsa (400/
+    502 gibi) o da aynen yukarı geçer, loglama sadece BAŞARILI dönüşlerde
+    (asama ne olursa olsun) çalışır."""
+    cevap = _fatura_isle_ic(istek)
+    _test_kaydini_logla(istek, cevap)
+    return cevap
+
+
+def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
     istek_basi = time.monotonic()
     fatura_boyutu = len(istek.fatura_xml)
     _logger.info(
@@ -440,6 +476,97 @@ def _kur_onayi_gerekiyor_mu(
             "seçip tekrar gönderin."
         ),
     )
+
+
+TEST_KAYITLARI_DOSYASI = "../.calistirma/arayuz_test_kayitlari.xlsx"
+"""Arayüzden test edilen HER faturanın (onaylansın/onaylanmasın) kaydedildiği
+Excel dosyası (2026-07-31, kullanıcı isteği). PostgreSQL'deki
+model_eval_sonuclar'dan FARKLI — o sadece kullanıcının 'onayla' butonuna
+bastığı kayıtları tutar (bkz. faturayi_onayla), bu dosya ise HER denemeyi
+(henüz onaylanmamış, insan incelemesi bekleyen, hatalı olanlar dahil) satır
+satır tutar. Her fatura = 1 satır (kullanıcı kararı); o faturanın ürettiği
+hesap kayıtları (account_code + borç/alacak) tek bir hücrede özetlenir,
+ayrı satırlara BÖLÜNMEZ."""
+
+TEST_KAYITLARI_BASLIKLARI = [
+    "zaman", "dosya_adi", "invoice_id", "own_vkn", "yon", "asama",
+    "on_filtre_karari", "onaylandi", "hesap_kayitlari", "mesaj",
+]
+
+
+def _hesap_kayitlari_ozet(tdhp_tahmini: Optional["TdhpTahminiCevabi"]) -> str:
+    """entries[]'i 'kod (yön) tutar' formatında tek bir metne birleştirir —
+    her kayıt ayrı satır değil, aynı hücrede satır sonuyla ayrılmış liste
+    (kullanıcı kararı: her fatura=1 satır, kayıtlar özetlenir)."""
+    if not tdhp_tahmini or not tdhp_tahmini.entries:
+        return ""
+    return "\n".join(
+        f"{e.account_code} ({e.dc}) {e.amount:.2f}" for e in tdhp_tahmini.entries
+    )
+
+
+def _test_kayitlari_workbook_ac():
+    """TEST_KAYITLARI_DOSYASI varsa açar, yoksa başlık satırıyla YENİ bir
+    workbook oluşturur. openpyxl'in mizan.py'deki kullanımıyla aynı kütüphane
+    (proje zaten bağımlılık olarak taşıyor, ek paket gerekmiyor)."""
+    import openpyxl
+
+    if os.path.exists(TEST_KAYITLARI_DOSYASI):
+        return openpyxl.load_workbook(TEST_KAYITLARI_DOSYASI)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Test Kayıtları"
+    ws.append(TEST_KAYITLARI_BASLIKLARI)
+    return wb
+
+
+def _test_kaydini_logla(istek: "FaturaIsleIstegi", cevap: "FaturaIsleCevabi") -> None:
+    """Her /fatura/isle çağrısını TEST_KAYITLARI_DOSYASI'na yeni bir satır
+    olarak ekler. Loglama başarısız olursa (disk dolu, dosya başka bir
+    programda açık vb.) ana akışı ETKİLEMEZ — sadece uyarı loglanır,
+    kullanıcıya hata dönülmez (yardımcı bir izleme özelliği)."""
+    invoice_id = cevap.tdhp_tahmini.invoice_id if cevap.tdhp_tahmini else None
+    on_filtre_karari = cevap.on_filtre_sonucu.get("genel_karar") if cevap.on_filtre_sonucu else None
+    satir = [
+        datetime.now(timezone.utc).isoformat(),
+        istek.dosya_adi,
+        invoice_id,
+        istek.satici_vkn,
+        cevap.yon,
+        cevap.asama,
+        on_filtre_karari,
+        "hayır",  # /fatura/isle aşamasında henüz onaylanmamıştır
+        _hesap_kayitlari_ozet(cevap.tdhp_tahmini),
+        cevap.mesaj,
+    ]
+    try:
+        wb = _test_kayitlari_workbook_ac()
+        wb.active.append(satir)
+        wb.save(TEST_KAYITLARI_DOSYASI)
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("[TEST-KAYDI] Excel'e yazılamadı: %s", exc)
+
+
+def _test_kaydini_onaylandi_isaretle(invoice_id: Optional[str]) -> None:
+    """Kullanıcı /fatura/onayla çağırdığında, TEST_KAYITLARI_DOSYASI'ndaki
+    aynı invoice_id'ye ait EN SON satırın 'onaylandi' hücresini 'evet' yapar.
+    invoice_id eşleşmezse (dosya henüz yoksa, ya da bu fatura hiç
+    /fatura/isle'dan geçmediyse) sessizce hiçbir şey yapmaz — onay akışını
+    ETKİLEMEZ, bu sadece bir izleme güncellemesidir."""
+    if not invoice_id or not os.path.exists(TEST_KAYITLARI_DOSYASI):
+        return
+    try:
+        wb = _test_kayitlari_workbook_ac()
+        ws = wb.active
+        onaylandi_kolonu = TEST_KAYITLARI_BASLIKLARI.index("onaylandi") + 1
+        invoice_id_kolonu = TEST_KAYITLARI_BASLIKLARI.index("invoice_id") + 1
+        for row in range(ws.max_row, 1, -1):  # en son eklenen satırdan geriye
+            if ws.cell(row=row, column=invoice_id_kolonu).value == invoice_id:
+                ws.cell(row=row, column=onaylandi_kolonu).value = "evet"
+                break
+        wb.save(TEST_KAYITLARI_DOSYASI)
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("[TEST-KAYDI] onay işareti yazılamadı: %s", exc)
 
 
 def _log_model_eval_cevabi(tahmin: dict, sure_s: float, adim: str) -> None:

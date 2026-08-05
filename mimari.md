@@ -254,6 +254,10 @@ düşebiliyordu; bu, `fastapi`/`psycopg2` bulunamama hatalarına yol açtı.
 > ✅ **Uygulandı** (2026-07-28): `Dockerfile` + `docker-compose.yml`
 > eklendi, gerçek bir faturayla uçtan uca test edildi. Detaylı çalıştırma
 > adımları: [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md).
+>
+> ✅ **Uygulandı** (2026-08-04): Bu dosyalar `docker/` klasörüne taşındı
+> (`docker/Dockerfile`, `docker/docker-compose.yml`) — tüm Docker dosyaları
+> tek yerde toplandı, build context kökte kaldı (yollar/davranış değişmedi).
 
 | Karar | Gerekçe |
 |---|---|

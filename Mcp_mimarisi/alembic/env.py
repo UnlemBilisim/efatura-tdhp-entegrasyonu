@@ -1,6 +1,7 @@
 import os
 from logging.config import fileConfig
 
+import sqlalchemy as sa
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
@@ -16,6 +17,18 @@ config = context.config
 _database_url = os.environ.get("DATABASE_URL")
 if _database_url:
     config.set_main_option("sqlalchemy.url", _database_url)
+
+# ALEMBIC_TENANT_SCHEMA (2026-07-30, çoklu şirket geçişi): verilirse
+# migration'lar public'e değil bu şemaya uygulanır — şema önce oluşturulur,
+# search_path bu şemaya çevrilir, alembic_version da bu şema içinde tutulur
+# (her tenant kendi migration geçmişini ayrı takip eder). Verilmezse
+# (varsayılan, boş) davranış DEĞİŞMEZ: migration'lar hep public'e gider.
+#
+# Şema adı SQL identifier'dır, parametrize edilemez (f-string ile gömülüyor,
+# aşağıda) — bu yüzden burada sıkı doğrulanır (sadece harf/rakam/altçizgi).
+_tenant_schema = os.environ.get("ALEMBIC_TENANT_SCHEMA")
+if _tenant_schema and not all(c.isalnum() or c == "_" for c in _tenant_schema):
+    raise ValueError(f"ALEMBIC_TENANT_SCHEMA geçersiz karakter içeriyor: {_tenant_schema!r}")
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -72,8 +85,15 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        if _tenant_schema:
+            connection.execute(sa.text(f'CREATE SCHEMA IF NOT EXISTS "{_tenant_schema}"'))
+            connection.execute(sa.text(f'SET search_path TO "{_tenant_schema}", public'))
+            connection.commit()
+
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table_schema=_tenant_schema,
         )
 
         with context.begin_transaction():

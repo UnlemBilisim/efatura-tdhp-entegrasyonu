@@ -307,8 +307,9 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > `_entry_dicts_uygula` imzası genişledi (`alt_kirilimlar_tumu`, `kod_kaynagi`
 > — ikisi de opsiyonel, verilmezse eski davranış). Test:
 > `tests/test_disa_aktarim.py` (14 yeni test — tür türetme, dc çevrimi, her
-> gerekçe dalı, şema uyumu). Tam sözleşme:
-> [`docs/reference/dis-ekip-kayit-semasi.md`](docs/reference/dis-ekip-kayit-semasi.md).
+> gerekçe dalı, şema uyumu). Tam sözleşme (2026-08-05'te dış ekip API
+> belgesiyle birleştirildi):
+> [`../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`](../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md) §3.1.
 >
 > **Açık sınır:** `emsal_sayisi` köprüden geçirilmiyor (varsayılan 0), çünkü
 > RAG'ın kaç emsal kullandığı `predict_single_invoice` çıktısında dönmüyor —
@@ -464,10 +465,11 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 
 ## Dökümantasyon (Diátaxis)
 
-- 📖 `docs/` — `explanation` (mimari denetim notu) ve `reference`
-  (`docs/reference/dis-ekip-kayit-semasi.md` — dış ekip `records[]`
-  sözleşmesi, 2026-07-27) türünde belgeler var. Yeni bir "nasıl yapılır"
-  ihtiyacı doğarsa `docs/how-to/` oluşturulabilir.
+- 📖 `docs/` — `explanation` (mimari denetim notu) türünde belgeler var.
+  Dış ekip `records[]` sözleşmesi artık burada değil, 2026-08-05'te
+  `../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` (§3.1) ile
+  birleştirildi — dış ekibe teslim edilen tek dosya orası. Yeni bir
+  "nasıl yapılır" ihtiyacı doğarsa `docs/how-to/` oluşturulabilir.
 - `RESULTS.md`, `RAG_MODEL_COMPARISON.md`, `GLM52_vs_GEMMA4_n500.md` —
   deney bulguları (bunlar Diátaxis'in dışında, projenin kendi bulgu
   günlüğü formatı).

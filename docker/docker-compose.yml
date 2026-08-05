@@ -65,7 +65,9 @@ services:
     # yeniden build almak için (geliştirme makinesinde kullanılan yol) — ikisi
     # birlikte bulunabilir, Compose `up` sırasında build'i zorlamaz.
     image: docker.unlemcloud.com/unlembilisim/efatura-kdv-tdhp-sistemi:1.0.0
-    build: .
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
     environment:
       DATABASE_URL: postgresql://efatura:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD env var tanımlı olmalı}@postgres:5432/efatura_kdv
       OLLAMA_HOST: http://ollama:11434

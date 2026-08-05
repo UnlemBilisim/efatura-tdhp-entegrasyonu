@@ -72,9 +72,9 @@ Bilinçli bir ayrım (`model_eval_koprusu.py:80-88` yorumunda gerekçesi var):
 > `POSTGRES_PASSWORD env var tanımlı olmalı` hatasıyla durdu; doğru parolayla
 > her iki servis de sağlıklı ayağa kalktı.
 >
-> Docker Compose ile çalıştırıldığında (`docker-compose.yml`) aynı disiplin
-> zaten uygulanıyordu — `POSTGRES_PASSWORD` env var'ı orada da zorunlu
-> (`docker-compose.yml:21`, `:47`). Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
+> Docker Compose ile çalıştırıldığında (`docker/docker-compose.yml`) aynı
+> disiplin zaten uygulanıyordu — `POSTGRES_PASSWORD` env var'ı orada da
+> zorunlu (`docker/docker-compose.yml:21`, `:47`). Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
 ## PostgreSQL tabloları
 
@@ -102,9 +102,9 @@ ikisi de **git'e/Docker image'a farklı şekilde davranır**:
 | Kaynak | Nerede | Image'a gömülü mü | Taşıma yolu |
 |---|---|---|---|
 | ChromaDB vektör veritabanı | `model_eval/vector_db/` (container'da `/app/model_eval/vector_db`) | Hayır — `.gitignore`+`.dockerignore`'da hariç | `docker cp` + `efatura-vector-db` volume (bkz. `docker-ile-calistirma.md` §5.5) |
-| Excel referansları (NACE/KDV, mizan) | `Mcp_mimarisi/exceller/*.xlsx`, `model_eval/exceller/mizan.xlsx` | **Evet** — `Dockerfile` COPY ile | Image'ın yeniden build+push+pull edilmesi (dosyayı tek başına kopyalamak kalıcı değildir) |
+| Excel referansları (NACE/KDV, mizan) | `Mcp_mimarisi/exceller/*.xlsx`, `model_eval/exceller/mizan.xlsx` | **Evet** — `docker/Dockerfile` COPY ile | Image'ın yeniden build+push+pull edilmesi (dosyayı tek başına kopyalamak kalıcı değildir) |
 
-> ✅ **Uygulandı** (2026-07-29): `docker-compose.yml`'deki `app` servisine
+> ✅ **Uygulandı** (2026-07-29): `docker/docker-compose.yml`'deki `app` servisine
 > `efatura-vector-db` named volume eklendi — daha önce ChromaDB verisi
 > hiçbir kalıcı volume'a bağlı değildi, container yeniden oluşturulduğunda
 > (`down`+`up`, image güncelleme) RAG'ın öğrendiği onaylı kayıtlar sessizce

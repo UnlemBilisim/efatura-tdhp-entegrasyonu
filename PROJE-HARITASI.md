@@ -68,8 +68,8 @@ bir asimetri — detaylı gerekçe [`mimari.md`](mimari.md) §2.1'de.
 | `proje-calistirma.md` | Yerel (Docker'sız) çalıştırma kılavuzu, sık karşılaşılan sorunlar (how-to) |
 | `CLAUDE.md` | AI ajanları (Claude Code vb.) için çalışma disiplini rehberi |
 | `baslat.sh` / `durdur.sh` | Tüm sistemi (PostgreSQL + Mcp_mimarisi + entegrasyon) tek komutla başlatır/durdurur |
-| `Dockerfile` | Tek image'da üç Python bileşeni (kardeş dizin yapısını korur) |
-| `docker-compose.yml` | PostgreSQL + Ollama + app servislerini birlikte ayağa kaldırır |
+| `docker/Dockerfile` | Tek image'da üç Python bileşeni (kardeş dizin yapısını korur) |
+| `docker/docker-compose.yml` | PostgreSQL + Ollama + app servislerini birlikte ayağa kaldırır |
 | `docs/` | Üç bileşenin **birlikte** çalışmasına ait belgeler (Diátaxis: how-to/reference/explanation) |
 | `teslim/API-ENTEGRASYON-KILAVUZU.md` | **Dış ekibin okuması gereken tek belge** — `POST /fatura/isle` nasıl çağrılır |
 
@@ -99,11 +99,13 @@ bir asimetri — detaylı gerekçe [`mimari.md`](mimari.md) §2.1'de.
 | `static/index.html` | Kendi test arayüzümüz — **teslim kapsamında değil**, dış ekip referans almamalı |
 
 > ❌ **`v2_api.py` / `v2_semalar.py` / `is_deposu.py` — iptal edildi
-> (2026-07-28).** Asenkron (job_id tabanlı) bir v2 API tasarlanıp kodlanmıştı,
-> ama sunucuya taşıma öncesi son kontrolde kullanıcı kararıyla **iptal
-> edildi** — dış ekibe teslim v1 (`/fatura/isle`) ile devam ediyor. Kod
-> repoda duruyor ama `app.py`'ye **bağlı değil**, sunucuda çalışmıyor/erişilebilir
-> değil. Gerekçe: [`docs/explanation/v2-api-tasarim-karari.md`](docs/explanation/v2-api-tasarim-karari.md).
+> (2026-07-28), dosyalar artık repoda da yok (2026-08-04'te doğrulandı).**
+> Asenkron (job_id tabanlı) bir v2 API tasarlanıp kodlanmıştı, ama sunucuya
+> taşıma öncesi son kontrolde kullanıcı kararıyla **iptal edildi** — dış
+> ekibe teslim v1 (`/fatura/isle`) ile devam ediyor. `app.py:78-81`'de bunu
+> açıklayan bir yorum kalıyor, ama dosyaların kendisi silinmiş durumda;
+> `model_eval/tests/test_v2_semalar.py` bunu `pytest.importorskip` ile
+> güvenli şekilde atlıyor. Gerekçe: [`docs/explanation/v2-api-tasarim-karari.md`](docs/explanation/v2-api-tasarim-karari.md).
 
 ### 3.4 `model_eval/` — TDHP tahmini (LLM + RAG)
 

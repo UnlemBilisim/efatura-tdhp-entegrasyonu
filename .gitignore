@@ -25,6 +25,14 @@ model_eval/vector_db/
 # İşletim sistemi
 .DS_Store
 
+# Excel'in kendi geçici kilit dosyaları (dosya adı ".~" ile başlar)
+.~*
+
+# Test/inceleme amaçlı gerçek fatura PDF'leri ve kök dizine düşen başıboş
+# XML'ler — gerçek fatura verisi içerir, git'e gömülmez.
+pdfler/
+*.xml
+
 # Muhtemelen hassas/kişisel veri — içeriği doğrulanmadan commit'lenmiyor
 Archive2/
 
@@ -36,3 +44,4 @@ db-yedek/
 # sunucusunda port çakışmasını önlemek için) — kalıcı/paylaşılan
 # yapılandırma değil, commit'lenmemeli.
 docker-compose.override.yml
+.calistirma

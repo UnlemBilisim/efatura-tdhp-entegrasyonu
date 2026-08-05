@@ -100,7 +100,7 @@ ss -tlnp | grep 11435
 
 ## 5. Docker Compose ile bağlantı
 
-`docker-compose.yml`'deki `app` servisi bu tünele
+`docker/docker-compose.yml`'deki `app` servisi bu tünele
 `http://host.docker.internal:11435` üzerinden erişir — tünel yukarıdaki
 adımlarla host'ta systemd servisi olarak çalıştığı sürece **ek bir
 yapılandırma gerekmez**, `docker compose up` sonrası otomatik çalışır.

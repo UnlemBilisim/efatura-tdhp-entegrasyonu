@@ -53,6 +53,23 @@ def model_eval_hazir_mi() -> tuple[bool, str]:
     return True, "hazır"
 
 
+def _tenant_kaynaklarini_coz(own_vkn: str) -> dict:
+    """own_vkn'den (2026-07-30, coklu sirket gecisi) sirkete ozel rag_collection'i
+    turetir. model_eval'in kendi rag_common modulunu cagirir - isim string'i
+    burada UYDURULMAZ, tek dogru kaynak onda kalir. own_vkn DEFAULT_OWN_VKN
+    ise (mevcut sirket) eski sabit isme duser, davranis DEGISMEZ.
+
+    2026-08-05: mizan_path artik burada YOK - core/mizan.py Excel'den
+    PostgreSQL'e tasindiktan sonra predict_single_invoice() mizan'ini own_vkn'i
+    kendisi kullanarak (get_conn(tenant_vkn=own_vkn) ile) DB'den okuyor,
+    bu koprunun ayrica bir dosya yolu turetmesine gerek kalmadi."""
+    import rag_common
+
+    return {
+        "rag_collection": rag_common.get_collection(collection_name=rag_common.koleksiyon_adi_coz(own_vkn)),
+    }
+
+
 def tdhp_tahmini_yap(
     fatura_xml: str,
     own_vkn: str,
@@ -95,6 +112,10 @@ def tdhp_tahmini_yap(
 
     from core.single import predict_single_invoice
 
+    # own_vkn'e ozel mizan/RAG kaynaklari (2026-07-30, coklu sirket gecisi) -
+    # bkz. _tenant_kaynaklarini_coz docstring'i.
+    tenant_kaynaklari = _tenant_kaynaklarini_coz(own_vkn)
+
     # ollama_host (LLM tahmini icin, gemma4:31b-cloud gibi bulut modeller)
     # tunele gitmeli - bu modeller yerelde yok. rag_ollama_host (embedding,
     # embeddinggemma) ise BILEREK tunele YONLENDIRILMEZ - embeddinggemma
@@ -109,6 +130,7 @@ def tdhp_tahmini_yap(
         ollama_host=DEFAULT_MODEL_EVAL_OLLAMA_HOST,
         convert_to_try=convert_to_try,
         parsed_invoice=parsed_invoice,
+        rag_collection=tenant_kaynaklari["rag_collection"],
     )
 
     # Dis ekip semasi (2026-07-27 sozlesmesi): ayni kayitlarin onlarin
@@ -191,10 +213,30 @@ def faturayi_onayla(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict, onaylandi
         "onaylandi_zamani": onaylandi_zamani,
         "error": None,
     }
-    reporting.append_result("entegrasyon_onaylandi", kayit)
+    reporting.append_result("entegrasyon_onaylandi", kayit, tenant_vkn=own_vkn)
 
-    collection = rag_common.get_collection()
+    collection = rag_common.get_collection(collection_name=rag_common.koleksiyon_adi_coz(own_vkn))
     rag_common.upsert_approved_invoice(collection, invoice, tdhp_tahmini.get("entries", []))
+
+
+def kayitli_vknleri_getir() -> list[str]:
+    """Arayüzdeki own_vkn input'una öneri göstermek için (2026-07-30, çoklu
+    şirket geçişi) — onboard edilmiş tüm şirketlerin VKN'lerini döner.
+
+    DEFAULT_OWN_VKN (mevcut şirket, henüz tenant_<vkn> şemasına göç etmediyse
+    public'te duruyor) listeye HER ZAMAN dahil edilir — aksi halde göç
+    tamamlanana kadar arayüzde hiç görünmez, ki bu mevcut kullanıcı için
+    bir gerileme olurdu. `core.db.kayitli_tenant_vknleri()` sadece
+    tenant_<vkn> şemalarını okur, public'i bilmez."""
+    model_eval_yolunu_ekle()
+
+    from core.constants import DEFAULT_OWN_VKN
+    from core.db import kayitli_tenant_vknleri
+
+    vknler = kayitli_tenant_vknleri()
+    if DEFAULT_OWN_VKN not in vknler:
+        vknler = [DEFAULT_OWN_VKN] + vknler
+    return vknler
 
 
 def fatura_kur_bilgisi(fatura_xml: str, own_vkn: str) -> dict:

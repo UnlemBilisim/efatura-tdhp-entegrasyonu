@@ -64,15 +64,42 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         return f"ollama-{self.model}"
 
 
-def get_collection(persist_dir=DEFAULT_PERSIST_DIR, embed_model=DEFAULT_EMBED_MODEL, ollama_host=None):
-    key = (str(persist_dir), embed_model, ollama_host)
+def koleksiyon_adi_coz(own_vkn):
+    """own_vkn'e gore RAG koleksiyon adini turetir (2026-07-30, coklu sirket
+    gecisi). own_vkn == DEFAULT_OWN_VKN ise (geriye donuk uyumluluk) eski
+    sabit ada (COLLECTION_NAME) duser - mevcut sirketin (Akuzulu) ChromaDB
+    koleksiyonu TASINMADAN calismaya devam eder. Ayni ChromaDB persist_dir
+    (SQLite dosyasi) tum sirketler icin PAYLASILIR - izolasyon koleksiyon
+    adiyla saglanir, ayri persist_dir GEREKMEZ.
+
+    own_vkn bos/None ise (2026-07-31 duzeltmesi - mizan.py'nin ayni donemdeki
+    Excel-yolu-cozme mantigiyla AYNI bug'in RAG karsiligi: own_vkn eksik geldiginde Akuzulu'nun
+    COLLECTION_NAME'ine sessizce dusuluyordu, yani baska bir sirketin
+    faturasi islenirken Akuzulu'nun gecmis faturalari YANLISLIKLA emsal
+    olarak kullanilabiliyordu) ARTIK COLLECTION_NAME'e DUSULMEZ - "hangi
+    sirket oldugu bilinmiyor" ile "Akuzulu" birbirine KARISTIRILMAMALI.
+    Var olmayan/bos bir koleksiyon adi donulur (get_or_create_collection
+    onu BOS bir koleksiyon olarak acar), boylece o istekte RAG hicbir
+    emsal bulamaz - guvenli varsayilan, veri sizintisi degil."""
+    from core.constants import DEFAULT_OWN_VKN
+
+    if own_vkn == DEFAULT_OWN_VKN:
+        return COLLECTION_NAME
+    if not own_vkn:
+        return "tdhp_invoices___own_vkn_belirtilmemis__"
+    return f"tdhp_invoices_{own_vkn}"
+
+
+def get_collection(persist_dir=DEFAULT_PERSIST_DIR, embed_model=DEFAULT_EMBED_MODEL, ollama_host=None,
+                    collection_name=COLLECTION_NAME):
+    key = (str(persist_dir), embed_model, ollama_host, collection_name)
     if key in _collection_cache:
         return _collection_cache[key]
     with _collection_cache_lock:
         if key not in _collection_cache:
             client = chromadb.PersistentClient(path=str(persist_dir))
             ef = OllamaEmbeddingFunction(model=embed_model, host=ollama_host)
-            _collection_cache[key] = client.get_or_create_collection(COLLECTION_NAME, embedding_function=ef)
+            _collection_cache[key] = client.get_or_create_collection(collection_name, embedding_function=ef)
     return _collection_cache[key]
 
 

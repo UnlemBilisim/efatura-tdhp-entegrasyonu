@@ -40,12 +40,16 @@ def sanitize_file_label(label):
     return re.sub(r"[^A-Za-z0-9_.+-]", "_", label)
 
 
-def load_done_ids(file_label):
+def load_done_ids(file_label, tenant_vkn=None):
     """Sadece basariyla skorlanmis (hatasiz) faturalari 'tamamlandi' sayar.
     Hata alan kayitlar (429/403/timeout vb.) done sayilmaz, bir sonraki
     calistirmada otomatik tekrar denenir. Bir invoice_id icin birden fazla
     kayit varsa (once hata, sonra basarili tekrar deneme) EN SON kayit
-    (id DESC) esas alinir."""
+    (id DESC) esas alinir.
+
+    tenant_vkn (2026-07-30, coklu sirket gecisi): verilmezse public semaya
+    duser (mevcut davranis DEGISMEZ), verilirse o sirketin tenant semasindan
+    okur - bkz. core/db.py::get_conn."""
     file_label = sanitize_file_label(file_label)
     query = """
         SELECT DISTINCT ON (invoice_id) invoice_id, is_error
@@ -54,7 +58,7 @@ def load_done_ids(file_label):
         ORDER BY invoice_id, id DESC
     """
     done = set()
-    with db.get_conn() as conn:
+    with db.get_conn(tenant_vkn) as conn:
         with conn.cursor() as cur:
             cur.execute(query, (file_label,))
             for invoice_id, is_error in cur.fetchall():
@@ -63,25 +67,28 @@ def load_done_ids(file_label):
     return done
 
 
-def delete_results(file_label):
+def delete_results(file_label, tenant_vkn=None):
     """--overwrite icin: bu file_label altindaki tum onceki kayitlari siler."""
     file_label = sanitize_file_label(file_label)
-    with db.get_conn() as conn:
+    with db.get_conn(tenant_vkn) as conn:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM model_eval_sonuclar WHERE file_label = %s", (file_label,))
         conn.commit()
 
 
-def append_result(file_label, record):
+def append_result(file_label, record, tenant_vkn=None):
     """Bir fatura sonucunu tabloya ekler. Eskiden `out_f.write()` + write_lock
     ile korunan tek-dosyaya-append davranisinin karsiligi - burada satir
     ekleme dogrudan bir INSERT, PostgreSQL kendi ic kilitlemesini yapar,
     ayrica bir uygulama-ici lock'a gerek yok (cok process/worker'da da
-    guvenli, tek process'e ozgu threading.Lock'un aksine)."""
+    guvenli, tek process'e ozgu threading.Lock'un aksine).
+
+    tenant_vkn (2026-07-30, coklu sirket gecisi): verilmezse public semaya
+    yazar (mevcut davranis DEGISMEZ)."""
     file_label = sanitize_file_label(file_label)
     invoice_id = record.get("invoice_id")
     is_error = bool(record.get("error"))
-    with db.get_conn() as conn:
+    with db.get_conn(tenant_vkn) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -93,9 +100,9 @@ def append_result(file_label, record):
         conn.commit()
 
 
-def count_results(file_label):
+def count_results(file_label, tenant_vkn=None):
     file_label = sanitize_file_label(file_label)
-    with db.get_conn() as conn:
+    with db.get_conn(tenant_vkn) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT COUNT(DISTINCT invoice_id) FROM model_eval_sonuclar WHERE file_label = %s",
@@ -104,7 +111,7 @@ def count_results(file_label):
             return cur.fetchone()[0]
 
 
-def _latest_records(file_label):
+def _latest_records(file_label, tenant_vkn=None):
     """Her invoice_id icin EN SON kaydi (id DESC) doner - bir fatura hata
     alip sonra basarili tekrar denendiyse eski hata kaydi metrige girmez."""
     file_label = sanitize_file_label(file_label)
@@ -114,7 +121,7 @@ def _latest_records(file_label):
         WHERE file_label = %s
         ORDER BY invoice_id, id DESC
     """
-    with db.get_conn() as conn:
+    with db.get_conn(tenant_vkn) as conn:
         with conn.cursor() as cur:
             cur.execute(query, (file_label,))
             return [row[0] for row in cur.fetchall()]
@@ -124,8 +131,8 @@ def safe_div(a, b):
     return a / b if b else 0.0
 
 
-def summarize_model(file_label, label=None):
-    records = _latest_records(file_label)
+def summarize_model(file_label, label=None, tenant_vkn=None):
+    records = _latest_records(file_label, tenant_vkn)
 
     total = len(records)
     hard_errors = [r for r in records if r.get("error") in ("json_parse_error", "no_entries_field") or (r.get("error") and "tp_pairs" not in r)]

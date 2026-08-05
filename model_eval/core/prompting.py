@@ -216,6 +216,11 @@ Kurallar:
   gibi bir isim, faturadaki tevkifat oranina uyuyorsa onu seç.
 - Cari hesaplarda (ör. 120 Alicilar, 320 Saticilar) alt kirilimi KARSI TARAFIN
   unvanina EN YAKIN ismi bularak seç - faturadaki karsi taraf unvanini kontrol et.
+- Alt kirilim adinda bir PARA BIRIMI/DOVIZ ifadesi geçiyorsa (ör. "Yurt Disi
+  TL Satislari" vs "Yurt Disi Euro Satislari" vs "Yurt Disi Dolar Satislari")
+  MUTLAKA faturanin PARA BIRIMI bilgisiyle (asagida FATURA BAGLAMI'nda verilir)
+  UYUMLU olani seç - fatura EUR ise "Euro" gecen alt kirilimi sec, "TL" gecen
+  degil. Bu ayrimi atlarsan yanlis para biriminde bir hesaba kayit dusmus olur.
 - Uygun bir alt kirilim bulamazsan (hiçbir seçenek uymuyorsa, ör. yeni bir
   musteri/tedarikçi ise) o ana kodu ATLA (ciktida o kod icin hiçbir seyi
   degistirme) - alt kirilim uydurmaktansa ana kodda birakmak daha dogrudur.
@@ -232,7 +237,13 @@ def build_alt_kirilim_user_prompt(invoice, entries, alt_kirilimlar_by_code):
 
     alt_kirilimlar_by_code: {"191": [("191.05.00005", "%20 5/10 Tevkifatli KDV"), ...], ...}
     - sadece entries'te GECEN kodlar icin dolu olmasi beklenir (cagiran taraf
-    core/single.py bu filtrelemeyi yapar, gereksiz kod icin mizan aranmaz)."""
+    core/single.py bu filtrelemeyi yapar, gereksiz kod icin mizan aranmaz).
+
+    Para Birimi (2026-07-31 eklendi): FATURA BAGLAMI'na invoice['header']
+    ['currency'] eklendi - kok neden: bir EUR faturada 601 (Yurtdisi Satislar)
+    altinda "Yurt Disi TL Satislari" (601.01.00001) alt kirilimi yanlislikla
+    secildi, cunku LLM'e faturanin para birimi hic gosterilmiyordu (ALT_KIRILIM_
+    SYSTEM_PROMPT'taki doviz-uyum kuraliyla birlikte kullanilir)."""
     h = invoice["header"]
     kod_bloklari = []
     for ana_kod, secenekler in alt_kirilimlar_by_code.items():
@@ -244,6 +255,7 @@ def build_alt_kirilim_user_prompt(invoice, entries, alt_kirilimlar_by_code):
     return f"""### FATURA BAGLAMI
 - Karsi Taraf: {h.get('account_title', '?')} (VKN/TCKN: {h.get('account_tax_number', '?')})
 - Fatura Tipi: {h.get('invoice_type', '?')}
+- Para Birimi: {h.get('currency', '?')}
 
 ### BIR ONCEKI ADIMDA BULUNAN HESAP KODLARI
 {entries_text}
