@@ -21,6 +21,7 @@ model_eval/vector_db/
 # Sırlar — sunucuda gerçek parola/env dosyası commit'lenmemeli
 .env
 .env.*
+!.env.example
 
 # İşletim sistemi
 .DS_Store

@@ -7,7 +7,8 @@
 > bkz. `teslim/API-ENTEGRASYON-KILAVUZU.md`) ile devam ediyor;
 > `teslim/API-ENTEGRASYON-KILAVUZU-v2.md` hiç yazılmadı ve yazılmayacak. Kod
 > (`entegrasyon/v2_api.py`, `v2_semalar.py`, `is_deposu.py`) repoda kalıyor
-> ama `entegrasyon/app.py`'ye artık **bağlanmıyor** — kimlik doğrulamasız,
+> ve ilgili v2 dosyaları repodan kaldırıldı. Aktif API `entegrasyon/app.py`'de
+> Bearer token ile korunuyor. Eski tasarım kimlik doğrulamasız,
 > Postgres'e yazan endpoint'leri sunucuda gereksiz yere açık bırakmamak için
 > (bkz. `docs/explanation/guvenlik-durumu-2026-07-27.md`). Aşağıdaki
 > "Uygulandı" notu bu kararla geçersiz — tarihsel kayıt olarak bırakıldı.

@@ -11,7 +11,7 @@
 # seviyesinde systemd servisi olarak kalır — bkz. mimari.md, uzak GPU'ya
 # gittiği için container içine alınamaz).
 
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 

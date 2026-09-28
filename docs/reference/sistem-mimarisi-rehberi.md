@@ -98,7 +98,7 @@ dış ekip aynı isteği `onay:true` ile tekrar göndermek zorundadır.
 3. LLM çağrısı (Ollama, uzak GPU'ya SSH tüneli üzerinden `11435`) → 3 haneli
    TDHP kodu + yön (`entries[]`, `dc="Borc"/"Alacak"` iç şemasında) + tutar.
 4. Self-correction: emsalle çelişirse ikinci LLM çağrısı.
-5. Mizan alt kırılımı: 3 haneli kodlar (`120`, `600`...) `mizan.xlsx`'e karşı
+5. Mizan alt kırılımı: 3 haneli kodlar (`120`, `600`...) PostgreSQL'deki tenant mizanına karşı
    ayrı bir LLM çağrısıyla (ya da önce deterministik fuzzy isim eşleşmesiyle)
    alt kırılıma (`120.01.00008`) çözülür.
 6. Denge kontrolü (borç toplamı = alacak toplamı).
@@ -753,14 +753,13 @@ ground-truth modu ya da `xml` tahmin modu) → `--invoice-type`/
 
 ### 4.11 `core/mizan.py` — Şirkete Özel Alt Kırılım Listesi
 
-`get_alt_kirilimlar(mizan_path=None)` (satır 44-69): `model_eval/exceller/
-mizan.xlsx`'i `openpyxl` ile okur (`_mizan_satirlarini_oku`, satır 7'den
-itibaren, A=HESAP KODU/B=HESAP ADI), yalnızca 3-seviyeli kodları
+`get_alt_kirilimlar(tenant_vkn=...)`, ilgili tenant şemasındaki PostgreSQL
+`mizan_alt_kirilim` tablosunu okur. Yalnızca 3-seviyeli kodları
 (`XXX.YY.ZZZZZ`) alıp 3 haneli ana koda göre gruplar:
 `{"191": [("191.05.00005", "%20 5/10 Tevkifatli KDV"), ...]}`. Process-ömrü
 `threading.Lock` korumalı cache (`rag_common.get_collection` ile aynı
-desen) — Excel her istekte yeniden okunmaz. `TDHP_GLOSSARY`'den farkı: bu
-liste TEK bir şirkete (Akyüzlü) özeldir, genelleştirilemez.
+desen) — PostgreSQL her istekte yeniden sorgulanmaz. `TDHP_GLOSSARY`'den
+farkı: her tenant'ın listesi kendine özeldir.
 
 ### 4.12 `core/disa_aktarim.py` — İç Şema ↔ Dış Şema Dönüşümü
 
@@ -1066,9 +1065,8 @@ ChromaDB doğrulanmış).
 - `entegrasyon/mcp_mimarisi_istemcisi.py`
 - `entegrasyon/model_eval_koprusu.py`
 - `entegrasyon/model_eval_yolu.py`
-- `entegrasyon/is_deposu.py`
-- `entegrasyon/v2_api.py`
-- `entegrasyon/v2_semalar.py`
+- `entegrasyon/auth.py`
+- `entegrasyon/security.py`
 - `entegrasyon/README.md`
 
 ---
@@ -1136,8 +1134,9 @@ Zarf 9 alan: yukarıdakilere ek `invoice_id`, `issue_date`, `currency`,
 Sözleşmenin garantisi: iç şema (`entries[]`/`Borc`/`Alacak`) serbestçe
 değişebilir, `model_eval/core/disa_aktarim.py` dışındaki hiçbir yer bu
 dönüşümü tekrarlamaz — "paralel ikinci liste oluşturma" kuralına (kök
-`CLAUDE.md`) doğrudan bağlanıyor. Kimlik doğrulama yok, çağrı
-sunucu-sunucu, CORS bilinçli olarak yapılandırılmamış (bkz.
+`CLAUDE.md`) doğrudan bağlanıyor. İş uçları Bearer token ile korunur;
+entegrasyon→MCP çağrısı ayrı bir dahili token kullanır. CORS bilinçli olarak
+yapılandırılmamıştır (bkz.
 `docs/explanation/guvenlik-durumu-2026-07-27.md`).
 
 ### 6.3 PostgreSQL paylaşımı
@@ -1150,6 +1149,7 @@ Tek sunucu (`:5434`), tablolar net sahiplik sınırıyla ayrılmış:
 | `gecmis_fatura_kalemleri` | Mcp_mimarisi | Emsal (geçmiş kalem-oran) |
 | `islenmis_faturalar` | Mcp_mimarisi | Race-condition claim tablosu |
 | `model_eval_sonuclar` | model_eval | Tahmin + onay denetim izi |
+| `model_eval_bekleyen_tahminler` | model_eval | Süreli, sunucu tarafı onay kayıtları |
 
 Hiçbiri diğerinin tablosuna dokunmaz (`mimari.md:87-97`, kök
 `System/CLAUDE.md` Değişmez Kural 4).
