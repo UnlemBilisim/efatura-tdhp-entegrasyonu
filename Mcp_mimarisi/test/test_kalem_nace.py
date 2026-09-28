@@ -17,6 +17,11 @@ havuzda birleştirilir; kalemin oranı bu havuzda mı diye bakılır.
 import os
 import sys
 
+if "pytest" in sys.modules:
+    import pytest
+
+    pytest.skip("Gercek DB/XML isteyen manuel dogrulama script'i", allow_module_level=True)
+
 PROJE_KOKU = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(PROJE_KOKU, "src"))
 os.chdir(PROJE_KOKU)

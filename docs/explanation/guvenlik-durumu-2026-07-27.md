@@ -1,5 +1,13 @@
 # Güvenlik Durumu ve Tarama Bulguları (2026-07-27)
 
+> ✅ **Güncel durum (2026-09-11):** Bu belgedeki tarihsel bulgular giderildi:
+> ayrı dış/dahili Bearer token'lar eklendi, yerel bind ve Docker portları
+> loopback'e alındı, DTD/entity girdileri ile büyük istekler reddediliyor,
+> LLM çıktısı TDHP/mizan/fatura toplamıyla doğrulanıyor, onay akışı
+> sunucu tarafı `prediction_id` kaydına geçti ve test arayüzündeki dinamik
+> fatura alanları escape ediliyor. Aşağıdaki metin ilk taramanın tarihsel
+> kanıtı olarak korunmuştur.
+
 > **Tür:** explanation — bulguların NEDEN böyle değerlendirildiği ve hangi
 > kararların bilinçli alındığı.
 >

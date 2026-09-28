@@ -62,12 +62,24 @@ POST http://<host>:8100/fatura/onayla      — tahmini kalıcı kayıt/RAG'a al 
 > ⚠️ **Gerçek adres henüz iletilmedi.** `<host>` bir yer tutucudur — dağıtım
 > adresi (IP/domain/tünel) netleşince ayrı bir kanaldan bildirilecektir.
 
-Kimlik doğrulama şu an **yok** (bkz. §6 Güvenlik). `POST /fatura/isle`
-detayları aşağıda; diğer üçü ayrı bölümlerde (§2.1, §7) anlatılıyor.
+`/durum` dışındaki iş endpoint'leri Bearer token ister. Token ayrı ve
+güvenli bir kanaldan `EFATURA_API_TOKEN` olarak iletilir.
+
+> ⚠️ **GEÇİCİ OLARAK GEVŞETİLDİ (2026-09-11, kullanıcı kararı):**
+> `/fatura/isle`, `/fatura/onayla` ve `/kayitli-sirketler` şu an token
+> OLMADAN da kabul ediliyor — `entegrasyon/app.py`'den
+> `Depends(require_api_token)` geçici olarak kaldırıldı (kalıcı bir karar
+> değil, ayrıntı: `System/CLAUDE.md`). **Bu, token göndermeyi bırakmanız
+> gerektiği anlamına gelmez** — aşağıdaki örneklerdeki gibi
+> `Authorization: Bearer <token>` göndermeye devam edin; token doğrulaması
+> geri eklendiğinde entegrasyonunuz değişiklik gerektirmeden çalışmaya
+> devam edecek. Gerçek dağıtım adresi iletilmeden önce bu geçicilik
+> kaldırılıp burası güncellenecektir.
 
 ```
 POST /fatura/isle
 Content-Type: application/json
+Authorization: Bearer <token>
 ```
 
 ## 2. İstek gövdesi
@@ -80,6 +92,7 @@ Content-Type: application/json
 | `onay` | boolean | Hayır | Uyarıya rağmen devam; **outbox'ta gerekebilir** (§4) |
 | `kur_secimi` | string | Hayır | `"orijinal"` \| `"tl"` — TL dışı faturalarda (§5) |
 | `dosya_adi` | string | Hayır | Yüklenen XML dosyasının orijinal adı. Sadece izleme/loglama amaçlı — işleme mantığını etkilemez, boş bırakılabilir |
+| `gonderen_kullanici` | string | Hayır | Faturayı gönderen kişinin kimliği (kendi arayüzünüzde login olan kullanıcının adı/kullanıcı adı — en fazla 200 karakter). **DOĞRULANMAZ**, sadece audit log'a işlenir ("kim kaç fatura işledi" raporlaması için, 2026-09-11 eklendi). Boş bırakılabilir |
 
 ### 2.1 `GET /kayitli-sirketler` — hangi VKN'ler bizde tanımlı
 
@@ -110,6 +123,7 @@ VKN'lerin bizim tarafımızda önceden onboard edildiğini gösterir.**
 ```bash
 curl -X POST http://localhost:8100/fatura/isle \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $EFATURA_API_TOKEN" \
   -d '{
     "fatura_xml": "<?xml version=\"1.0\"?><Invoice ...>",
     "satici_vkn": "0460351893"
@@ -119,13 +133,14 @@ curl -X POST http://localhost:8100/fatura/isle \
 Python ile (XML'i dosyadan okuyarak):
 
 ```python
-import json, requests
+import json, os, requests
 
 with open("fatura.xml", encoding="utf-8") as f:
     xml = f.read()
 
 r = requests.post(
     "http://localhost:8100/fatura/isle",
+    headers={"Authorization": f"Bearer {os.environ['EFATURA_API_TOKEN']}"},
     json={"fatura_xml": xml, "satici_vkn": "0460351893", "onay": True},
     timeout=600,          # LLM çağrısı 10-30 sn sürer, cömert timeout verin
 )
@@ -338,6 +353,9 @@ davranışı §7'de).**
 | Kod | Anlamı |
 |---|---|
 | 400 | Bozuk XML, VKN uyuşmazlığı, yön belirlenemedi |
+| 401 | Bearer token yok veya geçersiz (§1'deki geçici gevşetme nedeniyle şu an tetiklenmiyor) |
+| 413 | İstek/XML boyut sınırı aşıldı |
+| 422 | İstek şeması geçersiz veya tahmin onaylanabilir değil |
 | 502 | Ön filtreleme servisi (Mcp_mimarisi) erişilemiyor |
 
 `model_eval` hazır değilse `/fatura/isle` **200 döner**, `asama` alanı
@@ -348,17 +366,11 @@ davranışından farklıdır, o gerçek bir `501` döner (§7).
 erişilemedi). Bu durumda `records[]` boş olur — **boş listeyi "kayıt yok"
 diye yorumlamayın**, `success`'i kontrol edin.
 
-**Güvenlik (2026-07-27 durumu).** Servis şu an kimlik doğrulama içermiyor ve
-`0.0.0.0`'a bind ediliyor — yani API'ye erişebilen herkes fatura işletebilir.
-Bu belge **iç ağdaki test entegrasyonu** için yazılmıştır. Üretime çıkmadan
-önce en az şu ikisi gerekli:
-
-1. Kimlik doğrulama (API key ya da servis-hesabı token'ı) — çağrı
-   sunucu-sunucu olduğu için paylaşılan bir sır yeterli.
-2. Servisin `127.0.0.1`'e bind edilmesi ya da ağ seviyesinde kısıtlanması.
-
-Bunlar bizim tarafımızda yapılacak işlerdir; entegrasyonu etkileyeceği için
-(istek başlığına token eklenmesi) zamanı geldiğinde haber vereceğiz.
+**Güvenlik.** Bearer token zorunludur (şu an geçici olarak devre dışı,
+yukarıdaki §1 notuna bakın — token göndermeye yine de devam edin); servis
+yerel başlatmada varsayılan olarak `127.0.0.1`'e bağlanır. Docker portları
+da loopback'e yayınlanır. Dış erişim HTTPS reverse proxy ve ağ izin listesi
+üzerinden verilmelidir.
 
 **Uyarılar kaybolmaz.** Bir cari hesap mizanda bulunamazsa (yeni
 müşteri/tedarikçi) kod 3 haneli kalır ve uyarı `account_code_reason` metninin
@@ -367,10 +379,10 @@ muhasebecinin kontrol etmesi gerekir.
 
 ## 7. `POST /fatura/onayla` — tahmini kalıcı hâle getirme (opsiyonel)
 
-`POST /fatura/isle`'ın döndürdüğü tahmin **hiçbir yere kaydedilmez** —
-sonucu görüp değerlendirmeniz için üretilir, kalıcı değildir. Kullanıcınız
-(muhasebeci) tahmini "doğru" olarak onaylarsa, **aynı tahmini** bu endpoint'e
-göndererek iki şeyi tetiklersiniz:
+`POST /fatura/isle`, tahmini sunucuda 30 dakika geçerli bir bekleyen kayıt
+olarak saklar ve cevapta `prediction_id` döndürür. İstemci tahmin içeriğini
+geri göndermez. Yalnızca deterministik doğrulamadan geçen
+(`tdhp_tahmini.approvable=true`) tahminler onaylanabilir.
 
 1. Kayıt PostgreSQL'e (denetim/geçmiş amaçlı) yazılır.
 2. Kayıt RAG (emsal) veritabanına eklenir — **gelecekteki benzer faturaların
@@ -380,13 +392,16 @@ göndererek iki şeyi tetiklersiniz:
 ```
 POST /fatura/onayla
 Content-Type: application/json
+Authorization: Bearer <token>
 ```
 
 | Alan | Tip | Zorunlu | Açıklama |
 |---|---|---|---|
-| `fatura_xml` | string | **Evet** | `/fatura/isle`'a gönderdiğiniz AYNI XML |
-| `satici_vkn` | string | **Evet** | `/fatura/isle`'a gönderdiğiniz AYNI VKN |
-| `tdhp_tahmini` | object | **Evet** | `/fatura/isle` cevabındaki `tdhp_tahmini` alanının **aynen geri gönderilmiş hâli** (sunucu tekrar LLM'e gitmez, sadece bu veriyi kaydeder) |
+| `prediction_id` | UUID string | **Evet** | `/fatura/isle` cevabındaki sunucu taraflı tahmin kimliği |
+
+```json
+{"prediction_id": "f8d7d2c7-..."}
+```
 
 Cevap:
 
@@ -394,11 +409,8 @@ Cevap:
 {"kaydedildi": true, "mesaj": "Fatura onaylandı — PostgreSQL'e kaydedildi ve RAG vektör veritabanına eklendi."}
 ```
 
-`501` döner (`model_eval` hazır değilse) — bu, `/fatura/isle`'daki
-`asama: "model_eval_hazir_degil"` davranışından **farklıdır**: `/fatura/isle`
-bu durumda 200 + özel bir `asama` değeriyle "eksik ama hata değil" der,
-`/fatura/onayla` ise gerçek bir HTTP hata kodu (501) döner çünkü kaydedecek
-bir şey olmadan devam edemez.
+Bulunmayan tahmin `404`; süresi dolan, daha önce onaylanan veya eş zamanlı
+onaylanan tahmin `409`; doğrulamadan geçmeyen tahmin `422` döner.
 
 ## 8. İlgili belgeler
 

@@ -103,9 +103,12 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 
 > ✅ **Uygulandı (2026-07-22):** Orkestrasyon servisi (`app.py`) ve test
 > arayüzü (`static/index.html`) yazıldı. Mcp_mimarisi bağlantısı
-> (`mcp_mimarisi_istemcisi.py`) gerçek HTTP çağrısı yapar, ayrı onay
-> gerektiren kod eklenmedi (Mcp_mimarisi'nin auth'u yok, bu servis de
-> eklemedi — bkz. `Mcp_mimarisi/project.md` §3.8).
+> (`mcp_mimarisi_istemcisi.py`) gerçek HTTP çağrısı yapar.
+>
+> ✅ **Güvenlik güncellemesi (2026-09-11):** Dış API `EFATURA_API_TOKEN`,
+> dahili MCP servisi ayrı `MCP_INTERNAL_API_TOKEN` Bearer token'ı ister.
+> Onay akışı istemci tahminini kabul etmez; `/fatura/isle` cevabındaki
+> süreli `prediction_id` sunucu tarafı kaydı onaylamak için kullanılır.
 >
 > ✅ **model_eval bağlantısı tamamlandı (2026-07-22, aynı gün):**
 > `model_eval/core/single.py::predict_single_invoice` eklendi (kod+yön+tutar
@@ -166,7 +169,8 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 
 ```bash
 # 1. Mcp_mimarisi'nin kendi API'sini ayrıca başlat (bkz. Mcp_mimarisi/docs/how-to/api-calistirma.md)
-#    DATABASE_URL=... uvicorn efatura_kdv.api:app --app-dir src --host 0.0.0.0 --port 8000
+#    DATABASE_URL=... MCP_INTERNAL_API_TOKEN=<en-az-32-karakter> \
+#      uvicorn efatura_kdv.api:app --app-dir src --host 127.0.0.1 --port 8000
 
 # 2. Bu servisi başlat
 cd entegrasyon

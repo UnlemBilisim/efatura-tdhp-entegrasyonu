@@ -57,6 +57,13 @@
 <h1>Ön Filtreleme (KDV/Mevzuat) → TDHP Tahmini — Test Arayüzü</h1>
 <div id="durum-cubugu" class="durum-cubugu">Durum kontrol ediliyor...</div>
 
+<fieldset>
+  <legend>API Erişimi</legend>
+  <label for="api-token">Bearer token</label>
+  <input type="password" id="api-token" autocomplete="off" placeholder="EFATURA_API_TOKEN">
+  <p class="kucuk-not">Token yalnızca bu tarayıcının yerel deposunda tutulur.</p>
+</fieldset>
+
 <div class="sekmeler">
   <button class="sekme-btn aktif" id="sekme-tek-btn" onclick="sekmeGoster('tek')">Tek Fatura</button>
   <button class="sekme-btn" id="sekme-toplu-btn" onclick="sekmeGoster('toplu')">Toplu İşlem</button>
@@ -133,7 +140,28 @@
 <script>
 let sonGonderilenIstek = null;
 let sonAlinanTdhpTahmini = null;
+let sonPredictionId = null;
 const BASLIK = document.title;  // sekme başlığının orijinali (bitince geçici olarak değiştirilir)
+
+const tokenInput = document.getElementById('api-token');
+tokenInput.value = localStorage.getItem('efaturaApiToken') || '';
+tokenInput.addEventListener('change', () => {
+  localStorage.setItem('efaturaApiToken', tokenInput.value.trim());
+  kayitliVknleriYukle();
+});
+
+function apiHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + tokenInput.value.trim(),
+  };
+}
+
+function h(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+}
 
 // ---- sekme yönetimi ----
 function sekmeGoster(ad) {
@@ -167,7 +195,7 @@ durumGetir();
 // (ana akışı bloklamaz), zaten var olan durumGetir() ile aynı desen.
 async function kayitliVknleriYukle() {
   try {
-    const r = await fetch('/kayitli-sirketler');
+    const r = await fetch('/kayitli-sirketler', {headers: apiHeaders()});
     const d = await r.json();
     const datalist = document.getElementById('kayitli-vknler');
     datalist.innerHTML = '';
@@ -240,18 +268,18 @@ async function faturaGonder(onay) {
   try {
     const r = await fetch('/fatura/isle', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: apiHeaders(),
       body: JSON.stringify(istek),
     });
     if (!r.ok) {
       const hata = await r.json();
-      sonucAlani.innerHTML = `<div class="sonuc-kutusu sonuc-hata"><strong>Hata (${r.status}):</strong> ${hata.detail || r.statusText}</div>`;
+      sonucAlani.innerHTML = `<div class="sonuc-kutusu sonuc-hata"><strong>Hata (${r.status}):</strong> ${h(hata.detail || r.statusText)}</div>`;
       return;
     }
     const cevap = await r.json();
     render(cevap);
   } catch (e) {
-    sonucAlani.innerHTML = `<div class="sonuc-kutusu sonuc-hata"><strong>İstek başarısız:</strong> ${e}</div>`;
+    sonucAlani.innerHTML = `<div class="sonuc-kutusu sonuc-hata"><strong>İstek başarısız:</strong> ${h(e)}</div>`;
   } finally {
     btn.disabled = false;
   }
@@ -277,12 +305,12 @@ function render(cevap) {
   if (cevap.asama === 'kur_onayi_bekliyor') {
     const kur = cevap.kur_bilgisi;
     html += `<div class="sonuc-kutusu sonuc-uyari">
-      <strong>💱 Bu fatura ${kur.currency} cinsinden düzenlenmiş</strong>
+      <strong>💱 Bu fatura ${h(kur.currency)} cinsinden düzenlenmiş</strong>
       ${yonEtiketi}
-      <p>1 ${kur.currency} = ${Number(kur.exchange_rate).toLocaleString('tr-TR', {minimumFractionDigits: 4})} ${kur.exchange_target_currency}</p>
+      <p>1 ${h(kur.currency)} = ${Number(kur.exchange_rate).toLocaleString('tr-TR', {minimumFractionDigits: 4})} ${h(kur.exchange_target_currency)}</p>
       <p class="kucuk-not">TDHP tahminini hangi para biriminde üretmek istersiniz?</p>
       <div id="onay-alani" style="display:block">
-        <button onclick="kurSecVeDevamEt('orijinal')">Orijinal para biriminde devam et (${kur.currency})</button>
+        <button onclick="kurSecVeDevamEt('orijinal')">Orijinal para biriminde devam et (${h(kur.currency)})</button>
         <button class="ikincil" onclick="kurSecVeDevamEt('tl')">TL'ye çevir ve devam et</button>
       </div>
     </div>`;
@@ -290,7 +318,7 @@ function render(cevap) {
     html += `<div class="sonuc-kutusu sonuc-uyari">
       <strong>⚠️ İnsan İncelemesi Gerekli</strong>
       ${yonEtiketi}
-      <p>${cevap.mesaj}</p>
+      <p>${h(cevap.mesaj)}</p>
       ${satirTablosu(onFiltre.satir_sonuclari)}
       <div id="onay-alani" style="display:block">
         <button onclick="onayVerVeDevamEt()">Yine de devam et (TDHP tahminine gönder)</button>
@@ -301,9 +329,12 @@ function render(cevap) {
     html += `<div class="sonuc-kutusu sonuc-uyari">
       ${yonEtiketi}
       ${onFiltre ? `<strong>Ön filtre sonucu:</strong> ${karar === 'uygun' ? '✅ uygun' : '⚠️ insan incelemesi gerekli (onaylandı)'}${satirTablosu(onFiltre.satir_sonuclari)}` : ''}
-      <p class="kucuk-not">${cevap.mesaj}</p>
+      <p class="kucuk-not">${h(cevap.mesaj)}</p>
     </div>`;
-  } else if (cevap.asama === 'tdhp_tahmini_tamamlandi') {
+  } else if (
+    cevap.asama === 'tdhp_tahmini_tamamlandi' ||
+    cevap.asama === 'tdhp_dogrulama_basarisiz'
+  ) {
     if (onFiltre) {
       html += `<div class="sonuc-kutusu sonuc-uygun">
         <strong>✅ Ön filtreden geçti${karar !== 'uygun' ? ' (insan onayıyla)' : ''}</strong>
@@ -314,17 +345,21 @@ function render(cevap) {
       html += `<div class="sonuc-kutusu sonuc-uygun">
         <strong>ℹ️ Ön filtreleme atlandı</strong>
         ${yonEtiketi}
-        <p class="kucuk-not">${cevap.mesaj}</p>
+        <p class="kucuk-not">${h(cevap.mesaj)}</p>
       </div>`;
+    }
+    if (cevap.asama === 'tdhp_dogrulama_basarisiz') {
+      html += `<div class="sonuc-kutusu sonuc-hata"><strong>⚠️ Tahmin onaylanamaz:</strong> ${h(cevap.mesaj)}</div>`;
     }
     html += tdhpTablosu(cevap.tdhp_tahmini);
   }
 
   sonucAlani.innerHTML = html;
   sonAlinanTdhpTahmini = cevap.tdhp_tahmini || null;
+  sonPredictionId = cevap.prediction_id || null;
 
   const onayAlani = document.getElementById('tdhp-onay-alani');
-  if (onayAlani && sonAlinanTdhpTahmini && !sonAlinanTdhpTahmini.error) {
+  if (onayAlani && sonAlinanTdhpTahmini && sonAlinanTdhpTahmini.approvable && sonPredictionId) {
     onayAlani.innerHTML = `<button id="tdhp-onay-btn" onclick="faturaOnayla()">✓ Bu doğru, kaydet</button>`;
   }
 }
@@ -334,11 +369,11 @@ function satirTablosu(satirlar) {
   let rows = satirlar.map(s => {
     const uyumsuz = s.karar !== 'uygun';
     return `<tr class="${uyumsuz ? 'satir-uyumsuz' : ''}">
-      <td>${s.kalem_adi || '-'}</td>
+      <td>${h(s.kalem_adi || '-')}</td>
       <td>${(s.beyan_edilen_oranlar || []).join(', ')}</td>
       <td>${(s.izin_verilen_oranlar_havuzu || []).join(', ')}</td>
-      <td>${s.karar}</td>
-      <td class="kucuk-not">${s.gerekce || ''}</td>
+      <td>${h(s.karar)}</td>
+      <td class="kucuk-not">${h(s.gerekce || '')}</td>
     </tr>`;
   }).join('');
   return `<table>
@@ -350,25 +385,29 @@ function satirTablosu(satirlar) {
 function tdhpTablosu(tahmin) {
   if (!tahmin) return '';
   if (tahmin.error) {
-    return `<div class="sonuc-kutusu sonuc-hata"><strong>TDHP tahmini hatası:</strong> ${tahmin.error}</div>`;
+    return `<div class="sonuc-kutusu sonuc-hata"><strong>TDHP tahmini hatası:</strong> ${h(tahmin.error)}</div>`;
   }
   const entries = tahmin.entries || [];
   const uyariliVar = entries.some(e => e.uyari);
+  const dogrulamaHatalari = (tahmin.validation_errors || []).map(error =>
+    `<li>${h(error.message || error.code)}</li>`
+  ).join('');
   let rows = entries.map(e => {
     const uyariHucre = e.uyari ? `⚠️ ${e.uyari}` : '';
-    return `<tr class="${e.uyari ? 'satir-uyumsuz' : ''}"><td>${e.account_code}</td><td>${e.dc}</td><td>${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})}</td><td class="kucuk-not">${uyariHucre}</td></tr>`;
+    return `<tr class="${e.uyari ? 'satir-uyumsuz' : ''}"><td>${h(e.account_code)}</td><td>${h(e.dc)}</td><td>${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})}</td><td class="kucuk-not">${h(uyariHucre)}</td></tr>`;
   }).join('');
   return `<div class="sonuc-kutusu sonuc-uygun">
-    <strong>Tek Düzen Hesap Planı Tahmini${tahmin.currency ? ' (' + tahmin.currency + ')' : ''}</strong>
+    <strong>Tek Düzen Hesap Planı Tahmini${tahmin.currency ? ' (' + h(tahmin.currency) + ')' : ''}</strong>
     <table>
       <tr><th>Hesap Kodu</th><th>Borç/Alacak</th><th>Tutar</th><th>Uyarı</th></tr>
       ${rows}
     </table>
     ${uyariliVar ? '<p class="kucuk-not">⚠️ İşaretli satırlar: karşı taraf mizanda bulunamadı — muhasebecinin yeni bir cari kart (alt kırılım) açması gerekebilir.</p>' : ''}
+    ${dogrulamaHatalari ? `<div class="kucuk-not"><strong>Doğrulama hataları:</strong><ul>${dogrulamaHatalari}</ul></div>` : ''}
     <p class="kucuk-not">
       Borç toplam: ${tahmin.borc_toplam ?? '-'} | Alacak toplam: ${tahmin.alacak_toplam ?? '-'} |
       Dengeli mi: ${tahmin.balanced === true ? 'evet' : tahmin.balanced === false ? 'HAYIR ⚠️' : '-'}
-      ${tahmin.self_corrected ? ' | Kendi kendini düzeltti (' + tahmin.self_correct_reason + ')' : ''}
+      ${tahmin.self_corrected ? ' | Kendi kendini düzeltti (' + h(tahmin.self_correct_reason) + ')' : ''}
     </p>
     <div id="tdhp-onay-alani"></div>
   </div>`;
@@ -380,26 +419,24 @@ async function faturaOnayla() {
   if (btn) btn.disabled = true;
 
   const istek = {
-    fatura_xml: sonGonderilenIstek.fatura_xml,
-    satici_vkn: sonGonderilenIstek.satici_vkn,
-    tdhp_tahmini: sonAlinanTdhpTahmini,
+    prediction_id: sonPredictionId,
   };
 
   try {
     const r = await fetch('/fatura/onayla', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: apiHeaders(),
       body: JSON.stringify(istek),
     });
     const cevap = await r.json();
     if (!r.ok) {
-      onayAlani.innerHTML = `<p class="kucuk-not">⚠️ Kaydedilemedi: ${cevap.detail || r.statusText}</p>`;
+      onayAlani.innerHTML = `<p class="kucuk-not">⚠️ Kaydedilemedi: ${h(cevap.detail || r.statusText)}</p>`;
       if (btn) btn.disabled = false;
       return;
     }
-    onayAlani.innerHTML = `<p class="kucuk-not">✅ ${cevap.mesaj}</p>`;
+    onayAlani.innerHTML = `<p class="kucuk-not">✅ ${h(cevap.mesaj)}</p>`;
   } catch (e) {
-    onayAlani.innerHTML = `<p class="kucuk-not">⚠️ İstek başarısız: ${e}</p>`;
+    onayAlani.innerHTML = `<p class="kucuk-not">⚠️ İstek başarısız: ${h(e)}</p>`;
     if (btn) btn.disabled = false;
   }
 }
@@ -443,7 +480,7 @@ async function topluDosyalariAl(fileList) {
   const liste = document.getElementById('toplu-dosya-listesi');
   liste.innerHTML = topluDosyalar.length
     ? '<strong>' + topluDosyalar.length + ' dosya seçildi:</strong><br>' +
-      topluDosyalar.map(d => '• ' + d.ad).join('<br>')
+      topluDosyalar.map(d => '• ' + h(d.ad)).join('<br>')
     : '';
 }
 
@@ -544,7 +581,7 @@ async function birFaturaIsle(dosya, onay, kur_secimi) {
   try {
     const r = await fetch('/fatura/isle', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: apiHeaders(),
       body: JSON.stringify(istek),
     });
     if (!r.ok) {
@@ -587,18 +624,18 @@ function bekleyenleriCiz() {
     if (cevap.asama === 'kur_onayi_bekliyor') {
       const kur = cevap.kur_bilgisi;
       html += `<div class="sonuc-kutusu sonuc-uyari">
-        <strong>💱 ${dosya.ad}</strong> — ${kur.currency} cinsinden düzenlenmiş
-        (1 ${kur.currency} = ${Number(kur.exchange_rate).toLocaleString('tr-TR', {minimumFractionDigits: 4})} ${kur.exchange_target_currency})
+        <strong>💱 ${h(dosya.ad)}</strong> — ${h(kur.currency)} cinsinden düzenlenmiş
+        (1 ${h(kur.currency)} = ${Number(kur.exchange_rate).toLocaleString('tr-TR', {minimumFractionDigits: 4})} ${h(kur.exchange_target_currency)})
         <div>
-          <button class="kucuk" onclick="bekleyeniOnayla('${id}', false, 'orijinal')">Orijinal (${kur.currency}) ile hesapla</button>
+          <button class="kucuk" onclick="bekleyeniOnayla('${id}', false, 'orijinal')">Orijinal (${h(kur.currency)}) ile hesapla</button>
           <button class="kucuk ikincil" onclick="bekleyeniOnayla('${id}', false, 'tl')">TL'ye çevir ve hesapla</button>
         </div>
       </div>`;
     } else {  // on_filtre_insan_incelemesi_bekliyor
       const onFiltre = cevap.on_filtre_sonucu;
       html += `<div class="sonuc-kutusu sonuc-uyari">
-        <strong>⚠️ ${dosya.ad}</strong> — İnsan incelemesi gerekli
-        <p class="kucuk-not">${cevap.mesaj || ''}</p>
+        <strong>⚠️ ${h(dosya.ad)}</strong> — İnsan incelemesi gerekli
+        <p class="kucuk-not">${h(cevap.mesaj || '')}</p>
         ${onFiltre ? satirTablosu(onFiltre.satir_sonuclari) : ''}
         <div>
           <button class="kucuk" onclick="bekleyeniOnayla('${id}', true, null)">Yine de devam et (hesapla)</button>
@@ -624,7 +661,7 @@ async function bekleyeniOnayla(id, onay, kur_secimi) {
   try {
     const r = await fetch('/fatura/isle', {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: apiHeaders(),
       body: JSON.stringify(istek),
     });
     const cevap = r.ok ? await r.json() : { asama: 'hata', mesaj: `Hata (${r.status})` };
@@ -677,7 +714,7 @@ function sonucSatirIci(dosyaAdi, cevap) {
     const k = cevap.on_filtre_sonucu.genel_karar;
     onFiltreHtml = k === 'uygun'
       ? '<span class="rozet rozet-uygun">uygun</span>'
-      : `<span class="rozet rozet-uyari">${k}</span>`;
+      : `<span class="rozet rozet-uyari">${h(k)}</span>`;
   } else if (yon === 'inbox') {
     onFiltreHtml = '<span class="kucuk-not">atlandı (inbox)</span>';
   }
@@ -685,13 +722,15 @@ function sonucSatirIci(dosyaAdi, cevap) {
   // Durum rozeti
   let durumHtml;
   if (cevap.asama === 'hata') {
-    durumHtml = `<span class="rozet rozet-hata">hata</span><br><span class="kucuk-not">${cevap.mesaj || ''}</span>`;
+    durumHtml = `<span class="rozet rozet-hata">hata</span><br><span class="kucuk-not">${h(cevap.mesaj || '')}</span>`;
   } else if (cevap.asama === 'model_eval_hazir_degil') {
     durumHtml = `<span class="rozet rozet-hata">model_eval hazır değil</span>`;
   } else if (cevap.asama === 'tdhp_tahmini_tamamlandi') {
     durumHtml = '<span class="rozet rozet-uygun">tamamlandı</span>';
+  } else if (cevap.asama === 'tdhp_dogrulama_basarisiz') {
+    durumHtml = '<span class="rozet rozet-hata">doğrulama başarısız</span>';
   } else {
-    durumHtml = `<span class="rozet rozet-bekliyor">${cevap.asama}</span>`;
+    durumHtml = `<span class="rozet rozet-bekliyor">${h(cevap.asama)}</span>`;
   }
 
   // TDHP özeti
@@ -699,19 +738,22 @@ function sonucSatirIci(dosyaAdi, cevap) {
   const t = cevap.tdhp_tahmini;
   if (t) {
     if (t.error) {
-      tdhpHtml = `<span class="rozet rozet-hata">tahmin hatası</span><br><span class="kucuk-not">${t.error}</span>`;
+      tdhpHtml = `<span class="rozet rozet-hata">tahmin hatası</span><br><span class="kucuk-not">${h(t.error)}</span>`;
     } else {
       const entries = t.entries || [];
       const uyariliVar = entries.some(e => e.uyari);
       const satirlar = entries.map(e =>
-        `${e.account_code} <span class="kucuk-not">(${e.dc}, ${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})})</span>${e.uyari ? ' ⚠️' : ''}`
+        `${h(e.account_code)} <span class="kucuk-not">(${h(e.dc)}, ${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})})</span>${e.uyari ? ' ⚠️' : ''}`
       ).join('<br>');
       const dengeNotu = t.balanced === false ? ' <strong style="color:#a00">DENGESİZ ⚠️</strong>' : '';
-      tdhpHtml = `${satirlar}${dengeNotu}` + (uyariliVar ? '<br><span class="kucuk-not">⚠️ cari mizanda bulunamadı</span>' : '');
+      const dogrulamaNotu = (t.validation_errors || []).map(error => h(error.message || error.code)).join('<br>');
+      tdhpHtml = `${satirlar}${dengeNotu}` +
+        (uyariliVar ? '<br><span class="kucuk-not">⚠️ cari mizanda bulunamadı</span>' : '') +
+        (dogrulamaNotu ? `<br><span class="kucuk-not">⚠️ ${dogrulamaNotu}</span>` : '');
     }
   }
 
-  return `<td>${dosyaAdi}</td><td>${yon}</td><td>${onFiltreHtml}</td><td>${durumHtml}</td><td>${tdhpHtml}</td>`;
+  return `<td>${h(dosyaAdi)}</td><td>${h(yon)}</td><td>${onFiltreHtml}</td><td>${durumHtml}</td><td>${tdhpHtml}</td>`;
 }
 </script>
 </body>

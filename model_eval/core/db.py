@@ -49,6 +49,24 @@ CREATE TABLE IF NOT EXISTS mizan_alt_kirilim (
 
 CREATE INDEX IF NOT EXISTS idx_mizan_alt_kirilim_ana_kod
     ON mizan_alt_kirilim (ana_kod);
+
+CREATE TABLE IF NOT EXISTS model_eval_bekleyen_tahminler (
+    prediction_id  UUID PRIMARY KEY,
+    tenant_vkn     TEXT NOT NULL,
+    invoice_id     TEXT NOT NULL,
+    invoice_hash   TEXT NOT NULL,
+    invoice_xml    TEXT NOT NULL,
+    prediction     JSONB NOT NULL,
+    approvable     BOOLEAN NOT NULL DEFAULT FALSE,
+    status         TEXT NOT NULL DEFAULT 'pending'
+                   CHECK (status IN ('pending', 'approving', 'approved')),
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at     TIMESTAMPTZ NOT NULL,
+    approved_at    TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_bekleyen_tahminler_tenant_invoice
+    ON model_eval_bekleyen_tahminler (tenant_vkn, invoice_id);
 """
 
 

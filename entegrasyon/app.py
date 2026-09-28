@@ -40,28 +40,37 @@ import os
 import time
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
+from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from auth import require_api_token  # noqa: F401 — auth geçici kaldırıldı, geri eklenirken hazır dursun
+from security import SecurityMiddleware
+from log_ortak import RequestIdMiddleware, loglamayi_kur
+from es_zamanli_sinir import fatura_isle_sirasi
 
 from mcp_mimarisi_istemcisi import McpMimarisiErisilemezHatasi, fatura_kontrol_et
 from model_eval_koprusu import (
+    BekleyenTahminHatasi,
+    bekleyen_tahmin_kaydet,
+    bekleyen_tahmini_onayla,
     fatura_kur_bilgisi,
-    faturayi_onayla,
     model_eval_hazir_mi,
     tdhp_tahmini_yap,
 )
 from yon_tespiti import FaturaYonuBelirsizHatasi, faturayi_parse_et_ve_yonu_dogrula
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
-_logger = logging.getLogger("entegrasyon")
+_logger = loglamayi_kur("entegrasyon", "entegrasyon.log")
+# Ayri isimde bir logger - ayni handler'lari (stdout+dosya) miras alir ama
+# "entegrasyon.audit" adiyla filtrelenebilir/aranabilir (log toplama
+# araclarinda "logger=entegrasyon.audit" filtresiyle sadece audit izini
+# gormek icin).
+_audit_logger = logging.getLogger("entegrasyon.audit")
 
 app = FastAPI(
     title="Ön Filtreleme + TDHP Tahmini Entegrasyonu",
@@ -70,24 +79,42 @@ app = FastAPI(
         "kodu tahmini) arasındaki orkestrasyon katmanı — test arayüzü dahil."
     ),
 )
+# Middleware'ler TERSTEN calisir (en son eklenen, ISTEGE en once uygulanir) -
+# RequestIdMiddleware en son eklendi ki her istegin EN BASINDA (SecurityMiddleware
+# dahil butun sonraki islemlerden once) bir request-id atansin, boylece boyut
+# limiti reddi gibi erken donen cevaplarda bile log satirlari korele edilebilsin.
+app.add_middleware(SecurityMiddleware)
+app.add_middleware(RequestIdMiddleware)
 
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# v2 API (2026-07-27) tasarlandı, kullanıcı kararıyla iptal edildi
-# (2026-07-28) — dış ekibe v1 (/fatura/isle) teslim edilmeye devam ediyor.
-# v2_api.py kodu repoda kalıyor ama BAĞLANMIYOR — kimlik doğrulamasız,
-# Postgres'e yazan endpoint'leri sunucuda gereksiz yere açık bırakmamak için.
-# Gerekçe: docs/explanation/v2-api-tasarim-karari.md
+@app.exception_handler(Exception)
+async def _beklenmeyen_hata_handler(request: Request, exc: Exception):
+    """Genel yakalayici - Starlette, `HTTPException` firlatildiginda bu
+    handler'i DEGIL kendi dahili HTTPException handler'ini cagirir, yani
+    buraya sadece gercekten beklenmeyen (bir `except` blogunda yakalanmamis)
+    hatalar duser. Stack trace ile (`exc_info=True`) loglanir - onceden boyle
+    bir handler yoktu, FastAPI'nin varsayilan 500 davranisina birakilmisti ve
+    stack trace kaybolabiliyordu (bkz. Mcp_mimarisi/api.py'deki ayni desen)."""
+    _logger.error("Beklenmeyen hata: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Beklenmeyen bir sunucu hatası oluştu."},
+    )
+
+STATIC_DIR = Path(__file__).resolve().parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Iptal edilen v2 API dosyalari repodan kaldirildi; aktif sozlesme bu moduldedir.
 
 
 class FaturaIsleIstegi(BaseModel):
-    fatura_xml: str
+    fatura_xml: str = Field(min_length=1, max_length=5_000_000)
     satici_vkn: str
     """Kullanıcının KENDİ şirketinin VKN'si (fatura üzerindeki gerçek satıcı
     VKN'si değil — fatura outbox ise ikisi aynı olur, inbox ise farklıdır).
     İsim tarihsel nedenlerle 'satici_vkn' kalmıştır (Mcp_mimarisi'nin
     şemasıyla aynı alan adı) ama artık 'own_vkn' anlamında kullanılır."""
-    satici_nace_kodlari: list[str] = []
+    satici_nace_kodlari: list[str] = Field(default_factory=list)
     """Sadece outbox faturalarda (Mcp_mimarisi çağrılırken) kullanılır.
     İnbox faturalarda Mcp_mimarisi hiç çağrılmadığı için gerekmez, boş
     liste bırakılabilir."""
@@ -107,6 +134,14 @@ class FaturaIsleIstegi(BaseModel):
     kur oranıyla TL'ye çevrilip TDHP tahmini TL üzerinden üretilir). İlk
     çağrıda (henüz uyarı gösterilmeden) None olmalı — bkz. 2026-07-23
     kullanıcı kararı (kur çevirisi sessizce yapılmaz, önce sorulur)."""
+    gonderen_kullanici: Optional[str] = Field(default=None, max_length=200)
+    """Faturayı gönderen kişinin kimliği (2026-09-11, kullanıcı isteği —
+    'ilerde kaç fatura işlediğini loglarız'). Dış ekibin arayüzü kullanıcı
+    login olduktan sonra bu alanı doldurup gönderir — sistem BU BİLGİYİ
+    DOĞRULAMAZ (kimlik doğrulaması dış ekibin arayüzünün sorumluluğunda,
+    bkz. entegrasyon/docs/reference/dis-ekip-api-kullanimi.md), sadece
+    audit log'a (_audit_logla) işler. Verilmezse (örn. iç test arayüzünden
+    gönderilirse) 'bilinmiyor' olarak loglanır, işleme mantığını ETKİLEMEZ."""
 
 
 class KalemTahmini(BaseModel):
@@ -148,8 +183,8 @@ class TdhpTahminiCevabi(BaseModel):
     currency: Optional[str] = None
     """Kayıtların üretildiği para birimi — kur_secimi='tl' seçildiyse TRY,
     aksi halde faturanın kendi para birimi (bkz. core/single.py)."""
-    entries: list[KalemTahmini] = []
-    records: list[KayitDisa] = []
+    entries: list[KalemTahmini] = Field(default_factory=list)
+    records: list[KayitDisa] = Field(default_factory=list)
     """Dış ekip sözleşmesi (2026-07-27) — `entries` ile AYNI kayıtların,
     onların beklediği alan adlarıyla (account_description / account_code_type /
     account_code_reason / debit_credit=BORÇ|ALACAK) yazılmış hâli. İki liste
@@ -166,15 +201,12 @@ class TdhpTahminiCevabi(BaseModel):
     self_corrected: Optional[bool] = None
     self_correct_reason: Optional[str] = None
     error: Optional[str] = None
+    validation_errors: list[dict] = Field(default_factory=list)
+    approvable: bool = False
 
 
 class FaturaOnaylaIstegi(BaseModel):
-    fatura_xml: str
-    satici_vkn: str
-    """own_vkn — yön tespiti ve fatura parse'ı için (bkz. FaturaIsleIstegi)."""
-    tdhp_tahmini: "TdhpTahminiCevabi"
-    """Kullanıcının 'doğru' dediği TDHP tahmini — /fatura/isle cevabından
-    aynen geri gönderilir, sunucu tekrar LLM'e gitmez, sadece kaydeder."""
+    prediction_id: UUID
 
 
 class FaturaOnaylaCevabi(BaseModel):
@@ -191,7 +223,8 @@ class KurBilgisiCevabi(BaseModel):
 class FaturaIsleCevabi(BaseModel):
     asama: str
     """'on_filtre_insan_incelemesi_bekliyor' | 'kur_onayi_bekliyor' |
-    'tdhp_tahmini_tamamlandi' | 'model_eval_hazir_degil'
+    'tdhp_tahmini_tamamlandi' | 'tdhp_dogrulama_basarisiz' |
+    'model_eval_hazir_degil'
     (inbox faturalarda ön filtre hiç çalışmaz ama ayrı bir asama değeri
     üretilmez — doğrudan 'tdhp_tahmini_tamamlandi' döner, 'mesaj' alanı
     "ön filtreleme atlandı" diye açıklar; bkz. fatura_isle() satır ~306)"""
@@ -204,12 +237,13 @@ class FaturaIsleCevabi(BaseModel):
     """Fatura TL dışında bir para biriminde ve kur bilgisi taşıyorsa dolu —
     'kur_onayi_bekliyor' aşamasında kullanıcıya gösterilir."""
     tdhp_tahmini: Optional[TdhpTahminiCevabi] = None
+    prediction_id: Optional[str] = None
     mesaj: str
 
 
 @app.get("/")
 def index():
-    return FileResponse("static/index.html")
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/durum")
@@ -217,11 +251,14 @@ def durum():
     """Test arayüzünün başlangıçta göstereceği hazırlık bilgisi — model_eval
     tarafı henüz eklenmediyse kullanıcı bunu net görsün (sessizce mock
     veri dönülmez)."""
-    hazir, mesaj = model_eval_hazir_mi()
-    return {"model_eval_hazir": hazir, "model_eval_mesaj": mesaj}
+    hazir, _mesaj = model_eval_hazir_mi()
+    return {
+        "model_eval_hazir": hazir,
+        "model_eval_mesaj": "hazir" if hazir else "hazir_degil",
+    }
 
 
-@app.get("/kayitli-sirketler")
+@app.get("/kayitli-sirketler")  # ⚠️ auth GEÇİCİ kaldırıldı, bkz. fatura_isle() notu
 def kayitli_sirketler():
     """Arayüzdeki VKN input'una (own_vkn — kullanıcının KENDİ şirketi) yazı
     yazılırken öneri göstermek için (2026-07-30, çoklu şirket geçişi).
@@ -238,48 +275,121 @@ def kayitli_sirketler():
     return {"vkn_listesi": kayitli_vknleri_getir()}
 
 
-@app.post("/fatura/onayla", response_model=FaturaOnaylaCevabi)
-def fatura_onayla(istek: FaturaOnaylaIstegi) -> FaturaOnaylaCevabi:
-    """Kullanıcı arayüzde TDHP tahminini görüp 'bu doğru, kaydet' butonuna
-    bastığında çağrılır (2026-07-23, kullanıcı kararı). Sunucu tekrar LLM'e
-    gitmez — istek zaten önceki /fatura/isle cevabındaki tdhp_tahmini'ni
-    taşıyor, burada sadece PostgreSQL + RAG vektör DB'sine yazılır (bkz.
-    model_eval_koprusu.py::faturayi_onayla)."""
-    onaylandi_zamani = datetime.now(timezone.utc).isoformat()
-    _logger.info(
-        "[ONAY] İSTEK — invoice_id=%s, kaydedilecek zaman=%s",
-        istek.tdhp_tahmini.invoice_id, onaylandi_zamani,
-    )
+@app.post("/fatura/onayla", response_model=FaturaOnaylaCevabi)  # ⚠️ auth GEÇİCİ kaldırıldı, bkz. fatura_isle() notu
+def fatura_onayla(istek: FaturaOnaylaIstegi, request: Request) -> FaturaOnaylaCevabi:
+    """Yalniz sunucuda saklanan, dogrulanmis bir prediction_id'yi onaylar."""
+    prediction_id = str(istek.prediction_id)
+    istemci_ip = request.client.host if request.client else "bilinmiyor"
+    _logger.info("[ONAY] ISTEK — prediction_id=%s", prediction_id)
     try:
-        faturayi_onayla(
-            istek.fatura_xml,
-            own_vkn=istek.satici_vkn,
-            tdhp_tahmini=istek.tdhp_tahmini.model_dump(),
-            onaylandi_zamani=onaylandi_zamani,
+        invoice_id = bekleyen_tahmini_onayla(prediction_id)
+    except BekleyenTahminHatasi as exc:
+        _audit_logger.info(
+            json.dumps(
+                {
+                    "olay": "fatura_onayla_basarisiz",
+                    "istemci_ip": istemci_ip,
+                    "prediction_id": prediction_id,
+                    "hata": str(exc),
+                },
+                ensure_ascii=False,
+            )
         )
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     except NotImplementedError as exc:
         _logger.warning("[ONAY] MODEL_EVAL HAZIR DEĞİL — %s", exc)
         raise HTTPException(status_code=501, detail=str(exc)) from exc
 
-    _logger.info("[ONAY] KAYDEDİLDİ — invoice_id=%s", istek.tdhp_tahmini.invoice_id)
-    _test_kaydini_onaylandi_isaretle(istek.tdhp_tahmini.invoice_id)
+    _logger.info("[ONAY] KAYDEDILDI — invoice_id=%s", invoice_id)
+    _audit_logger.info(
+        json.dumps(
+            {
+                "olay": "fatura_onayla",
+                "istemci_ip": istemci_ip,
+                "prediction_id": prediction_id,
+                "invoice_id": invoice_id,
+            },
+            ensure_ascii=False,
+        )
+    )
+    _test_kaydini_onaylandi_isaretle(invoice_id)
     return FaturaOnaylaCevabi(
         kaydedildi=True,
-        mesaj="Fatura onaylandı — PostgreSQL'e kaydedildi ve RAG vektör veritabanına eklendi.",
+        mesaj="Fatura onaylandi — PostgreSQL'e kaydedildi ve RAG vektor veritabanina eklendi.",
     )
 
 
 @app.post("/fatura/isle", response_model=FaturaIsleCevabi)
-def fatura_isle(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
+def fatura_isle(istek: FaturaIsleIstegi, request: Request) -> FaturaIsleCevabi:
     """Gerçek işleme mantığı `_fatura_isle_ic()`'te — bu dış katman SADECE
     sonucu (onaylansın/onaylanmasın, her çağrı) test-kayıtları dosyasına
     loglar (2026-07-31, kullanıcı isteği: arayüzden test edilen her fatura
     izlenebilir olsun). `_fatura_isle_ic()` HTTPException fırlatırsa (400/
     502 gibi) o da aynen yukarı geçer, loglama sadece BAŞARILI dönüşlerde
-    (asama ne olursa olsun) çalışır."""
-    cevap = _fatura_isle_ic(istek)
+    (asama ne olursa olsun) çalışır.
+
+    `fatura_isle_sirasi()` (2026-09-11, kullanıcı kararı — 'işlemleri
+    sıraya alalım, hepsini aynı anda işlemeyelim'): ayni anda en fazla
+    MAX_ESZAMANLI_ISLEM (varsayılan 2) çağrı `_fatura_isle_ic()`'i
+    çalıştırabilir — fazlası burada, semaphore serbest kalana kadar bekler
+    (istek REDDEDİLMEZ, sadece kuyruğa girer).
+
+    ⚠️ **Auth GEÇİCİ olarak kaldırıldı** (2026-09-11, kullanıcı kararı —
+    yerel ağda demo.html ile test ederken 401 alınması istenmedi, "token
+    kısmını şimdilik aktif etme"). `Depends(require_api_token)` bu ve
+    `/fatura/onayla`, `/kayitli-sirketler` endpoint'lerinden kaldırıldı —
+    artık BU AĞDAKİ HERKES (token bilmeden) istek atabilir. Tekrar aktif
+    etmek için üç endpoint'e de `dependencies=[Depends(require_api_token)]`
+    geri eklenmeli (import zaten yerinde duruyor). Mcp_mimarisi tarafındaki
+    `MCP_INTERNAL_API_TOKEN` kontrolü (entegrasyon→Mcp_mimarisi iç çağrısı)
+    bu karardan ETKİLENMEDİ, hâlâ zorunlu."""
+    with fatura_isle_sirasi():
+        cevap = _fatura_isle_ic(istek)
     _test_kaydini_logla(istek, cevap)
+    _audit_logla(istek, cevap, request)
     return cevap
+
+
+def _audit_logla(istek: "FaturaIsleIstegi", cevap: "FaturaIsleCevabi", request: Request) -> None:
+    """Canliya cikis hazirligi (2026-09-11, kullanici istegi — 'onemli
+    yerleri loglamak istiyorum'): kim/hangi fatura/ne zaman/ne sonucla
+    islendi bilgisini ayri, yapilandirilmis (JSON) bir audit satiri olarak
+    loglar — normal islem loglarindan (`_logger.info("[1/5]...")`) FARKLI
+    bir amaca hizmet eder: guvenlik/uyum denetimi icin aranabilir tek bir
+    kayit noktasi. Ham fatura XML'i veya token ASLA buraya yazilmaz — sadece
+    istemci IP'si, gonderen_kullanici (dis ekip arayuzunden, DOGRULANMAMIS),
+    dosya adi, fatura no, VKN, yon, asama ve karar.
+
+    `gonderen_kullanici` (2026-09-11 eklendi): 'kim kac fatura isledi'
+    sorusuna ileride cevap verebilmek icin - dis ekibin arayuzu login'den
+    sonra bu alani doldurup gonderecek (henuz aktif kullanilmiyor, sadece
+    alan/loglama hazir). Bos gelirse 'bilinmiyor' loglanir.
+
+    `dosya_adi` (2026-09-28 eklendi, kullanici karari — auth 3 endpoint'te
+    GECICI kapaliyken IP+dosya izlenebilirligini guclendirmek icin):
+    onceden SADECE `_test_kaydini_logla`'nin yazdigi Excel test-kayit
+    dosyasinda vardi, asil JSON audit satirinda YOKTU — "hangi dosya
+    islendi" sorusu audit log'dan tek basina cevaplanamiyordu. Bos gelirse
+    'bilinmiyor' loglanir (alan optional, dis ekip her zaman doldurmayabilir)."""
+    invoice_id = cevap.tdhp_tahmini.invoice_id if cevap.tdhp_tahmini else None
+    on_filtre_karari = cevap.on_filtre_sonucu.get("genel_karar") if cevap.on_filtre_sonucu else None
+    istemci_ip = request.client.host if request.client else "bilinmiyor"
+    _audit_logger.info(
+        json.dumps(
+            {
+                "olay": "fatura_isle",
+                "istemci_ip": istemci_ip,
+                "gonderen_kullanici": istek.gonderen_kullanici or "bilinmiyor",
+                "dosya_adi": istek.dosya_adi or "bilinmiyor",
+                "satici_vkn": istek.satici_vkn,
+                "invoice_id": invoice_id,
+                "yon": cevap.yon,
+                "asama": cevap.asama,
+                "on_filtre_karari": on_filtre_karari,
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
@@ -346,10 +456,9 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
 
         _log_model_eval_cevabi(tahmin, time.monotonic() - t0, adim="[5/5]")
         _logger.info("TAMAMLANDI (inbox) — toplam süre %.2fs", time.monotonic() - istek_basi)
-        return FaturaIsleCevabi(
-            asama="tdhp_tahmini_tamamlandi", yon=yon,
-            tdhp_tahmini=TdhpTahminiCevabi(**tahmin),
-            mesaj="İnbox fatura — ön filtreleme atlandı, doğrudan TDHP tahmini üretildi.",
+        return _tahmin_cevabi_olustur(
+            istek, tahmin, yon,
+            mesaj="Inbox fatura — on filtreleme atlandi, dogrudan TDHP tahmini uretildi.",
         )
 
     # yon == "outbox" — mevcut akış: önce Mcp_mimarisi, sonra (uygunsa) model_eval.
@@ -360,7 +469,9 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
             istek.fatura_xml, istek.satici_vkn, istek.satici_nace_kodlari
         )
     except McpMimarisiErisilemezHatasi as exc:
-        _logger.error("[3/5] MCP_MIMARISI HATASI (%.2fs) — %s", time.monotonic() - t0, exc)
+        _logger.error(
+            "[3/5] MCP_MIMARISI HATASI (%.2fs) — %s", time.monotonic() - t0, exc, exc_info=True
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         # Mcp_mimarisi'nin kendi 400 hatası (bozuk XML / VKN uyuşmazlığı).
@@ -434,11 +545,31 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
     _log_model_eval_cevabi(tahmin, time.monotonic() - t0, adim="[5/5]")
     _logger.info("TAMAMLANDI (outbox) — toplam süre %.2fs", time.monotonic() - istek_basi)
 
+    return _tahmin_cevabi_olustur(
+        istek, tahmin, yon, on_filtre_sonucu=on_filtre,
+        mesaj="On filtreden gecti, TDHP tahmini uretildi.",
+    )
+
+
+def _tahmin_cevabi_olustur(
+    istek: FaturaIsleIstegi,
+    tahmin: dict,
+    yon: str,
+    mesaj: str,
+    on_filtre_sonucu: Optional[dict] = None,
+) -> FaturaIsleCevabi:
+    """Tahmini sunucuda saklar ve yalniz dogrulanmissa onaylanabilir yapar."""
+    prediction_id = bekleyen_tahmin_kaydet(istek.fatura_xml, istek.satici_vkn, tahmin)
+    approvable = bool(tahmin.get("approvable"))
+    if not approvable:
+        mesaj = "TDHP tahmini uretildi ancak deterministik dogrulamadan gecmedi; onaylanamaz."
     return FaturaIsleCevabi(
-        asama="tdhp_tahmini_tamamlandi", yon=yon,
-        on_filtre_sonucu=on_filtre,
+        asama="tdhp_tahmini_tamamlandi" if approvable else "tdhp_dogrulama_basarisiz",
+        yon=yon,
+        on_filtre_sonucu=on_filtre_sonucu,
         tdhp_tahmini=TdhpTahminiCevabi(**tahmin),
-        mesaj="Ön filtreden geçti, TDHP tahmini üretildi.",
+        prediction_id=prediction_id,
+        mesaj=mesaj,
     )
 
 
@@ -544,7 +675,7 @@ def _test_kaydini_logla(istek: "FaturaIsleIstegi", cevap: "FaturaIsleCevabi") ->
         wb.active.append(satir)
         wb.save(TEST_KAYITLARI_DOSYASI)
     except Exception as exc:  # noqa: BLE001
-        _logger.warning("[TEST-KAYDI] Excel'e yazılamadı: %s", exc)
+        _logger.warning("[TEST-KAYDI] Excel'e yazılamadı: %s", exc, exc_info=True)
 
 
 def _test_kaydini_onaylandi_isaretle(invoice_id: Optional[str]) -> None:
@@ -566,7 +697,7 @@ def _test_kaydini_onaylandi_isaretle(invoice_id: Optional[str]) -> None:
                 break
         wb.save(TEST_KAYITLARI_DOSYASI)
     except Exception as exc:  # noqa: BLE001
-        _logger.warning("[TEST-KAYDI] onay işareti yazılamadı: %s", exc)
+        _logger.warning("[TEST-KAYDI] onay işareti yazılamadı: %s", exc, exc_info=True)
 
 
 def _log_model_eval_cevabi(tahmin: dict, sure_s: float, adim: str) -> None:

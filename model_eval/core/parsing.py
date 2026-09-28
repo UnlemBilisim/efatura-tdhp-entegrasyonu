@@ -9,6 +9,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from .constants import DEFAULT_OWN_VKN, UBL_NS
+from .safe_xml import reject_unsafe_xml, validate_tree_complexity
 
 _UNSET = object()
 
@@ -118,7 +119,11 @@ def parse_invoice_xml(path, own_vkn=DEFAULT_OWN_VKN):
     AccountingSupplierParty/AccountingCustomerParty VKN'sinden tespit edilir:
     sirketin kendi VKN'si (own_vkn) alici tarafta ise inbox (biz aliciyiz),
     satici tarafta ise outbox (biz saticiyiz)."""
-    tree = ET.parse(path)
+    with open(path, "r", encoding="utf-8") as f:
+        xml_text = f.read()
+    reject_unsafe_xml(xml_text)
+    tree = ET.ElementTree(ET.fromstring(xml_text))
+    validate_tree_complexity(tree.getroot())
     return _parse_invoice_xml_tree(tree, path, own_vkn)
 
 
@@ -127,7 +132,9 @@ def parse_invoice_xml_string(xml_text, invoice_id_fallback="?", own_vkn=DEFAULT_
     XML string'i alir (henuz diske yazilmamis, entegrasyon katmanindan gelen
     ham UBL-TR metni icin - bkz. core/single.py). `path` alani sonuc
     sozlugunde None doner (kaynak bir dosya degil)."""
+    reject_unsafe_xml(xml_text)
     tree = ET.parse(io.StringIO(xml_text))
+    validate_tree_complexity(tree.getroot())
     return _parse_invoice_xml_tree(tree, invoice_id_fallback, own_vkn, source_path=None)
 
 

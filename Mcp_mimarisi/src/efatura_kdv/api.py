@@ -14,8 +14,8 @@ başlatılır).
 
 Çalıştırma (proje kökünden):
 
-    DATABASE_URL=postgresql://... uvicorn efatura_kdv.api:app \\
-        --app-dir src --host 0.0.0.0 --port 8000
+    DATABASE_URL=postgresql://... MCP_INTERNAL_API_TOKEN=<en-az-32-karakter> \\
+        uvicorn efatura_kdv.api:app --app-dir src --host 127.0.0.1 --port 8000
 
 Kurulum ve endpoint şeması: docs/how-to/api-calistirma.md,
 docs/reference/api-semasi.md.
@@ -23,16 +23,15 @@ docs/reference/api-semasi.md.
 
 from __future__ import annotations
 
-import logging
 import xml.etree.ElementTree as ET
 from contextlib import asynccontextmanager
 from typing import Optional
 
 import psycopg2
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from psycopg2.pool import PoolError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .gecmis_kontrol import (
     GecmisFaturaDeposu,
@@ -41,6 +40,10 @@ from .gecmis_kontrol import (
     faturayi_gecmise_kaydet,
     gecmis_kontrol_et,
 )
+from .auth import require_internal_token
+from .security import RequestSizeLimitMiddleware
+from .log_ortak import RequestIdMiddleware, loglamayi_kur
+from .es_zamanli_sinir import fatura_isle_sirasi
 from .kalem_nace_esleme import (
     FaturaSatirBazliSonuc,
     SaticiNaceBilgisi,
@@ -50,18 +53,8 @@ from .kalem_nace_esleme import (
 from .nace_kural_kontrolu import NaceOranTablosu
 from .ubl_parser import parse_ubl_invoice_from_string
 
-# Uvicorn kendi log handler'larını (uvicorn.error/uvicorn.access) kurar ama
-# bu projenin kendi logger'ına ("efatura_kdv.api") bir handler eklemez —
-# basicConfig olmadan _logger.info(...) çağrıları hiçbir yere yazdırılmadan
-# sessizce yutulurdu (root logger'ın handler'ı yoksa varsayılan davranış).
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%H:%M:%S",
-)
-
 _state: dict = {}
-_logger = logging.getLogger("efatura_kdv.api")
+_logger = loglamayi_kur("efatura_kdv.api", "mcp_mimarisi_api.log")
 
 
 @asynccontextmanager
@@ -89,6 +82,8 @@ app = FastAPI(
     ),
     lifespan=_lifespan,
 )
+app.add_middleware(RequestSizeLimitMiddleware)
+app.add_middleware(RequestIdMiddleware)
 
 
 @app.exception_handler(psycopg2.OperationalError)
@@ -134,7 +129,7 @@ async def _beklenmeyen_hata_handler(request: Request, exc: Exception):
 
 
 class FaturaKontrolIstegi(BaseModel):
-    fatura_xml: str
+    fatura_xml: str = Field(min_length=1, max_length=5_000_000)
     satici_vkn: str
     satici_nace_kodlari: list[str]
 
@@ -192,7 +187,7 @@ class GecmisKontrolIstegi(BaseModel):
 
 
 class CokluKontrolIstegi(BaseModel):
-    fatura_xml_listesi: list[str]
+    fatura_xml_listesi: list[str] = Field(max_length=100)
     satici_vkn: str
     satici_nace_kodlari: list[str]
 
@@ -295,17 +290,22 @@ def _tek_fatura_kontrol_et(fatura_xml: str, satici_vkn: str, satici_nace_kodlari
     return fatura, sonuc
 
 
-@app.post("/fatura/kontrol-et", response_model=FaturaKontrolCevabi)
+@app.post("/fatura/kontrol-et", response_model=FaturaKontrolCevabi, dependencies=[Depends(require_internal_token)])
 def fatura_kontrol_et(istek: FaturaKontrolIstegi) -> FaturaKontrolCevabi:
     """Ham UBL-TR XML'ini ve satıcının NACE kod(lar)ını alıp kalem bazlı
-    KDV oran kontrolü sonucunu döner."""
-    _fatura, sonuc = _tek_fatura_kontrol_et(
-        istek.fatura_xml, istek.satici_vkn, istek.satici_nace_kodlari
-    )
+    KDV oran kontrolü sonucunu döner.
+
+    `fatura_isle_sirasi()` (2026-09-11, kullanıcı kararı — 'işlemleri
+    sıraya alalım'): ayni anda en fazla MAX_ESZAMANLI_ISLEM (varsayılan 2)
+    çağrı işlenir, fazlası kuyrukta bekler (reddedilmez)."""
+    with fatura_isle_sirasi():
+        _fatura, sonuc = _tek_fatura_kontrol_et(
+            istek.fatura_xml, istek.satici_vkn, istek.satici_nace_kodlari
+        )
     return FaturaKontrolCevabi.from_dataclass(sonuc)
 
 
-@app.post("/fatura/gecmis-kontrol", response_model=list[GecmisKontrolSonucCevabi])
+@app.post("/fatura/gecmis-kontrol", response_model=list[GecmisKontrolSonucCevabi], dependencies=[Depends(require_internal_token)])
 def fatura_gecmis_kontrol(istek: GecmisKontrolIstegi) -> list[GecmisKontrolSonucCevabi]:
     """Her kalem için, satıcının geçmişte (outbox faturalarda) bu kalemi
     hangi oran(lar)la kestiğini döner. KARAR ÜRETMEZ — sadece bilgi/uyarı
@@ -323,7 +323,7 @@ def fatura_gecmis_kontrol(istek: GecmisKontrolIstegi) -> list[GecmisKontrolSonuc
     ]
 
 
-@app.post("/fatura/coklu-kontrol", response_model=list[CokluKontrolFaturaSonucu])
+@app.post("/fatura/coklu-kontrol", response_model=list[CokluKontrolFaturaSonucu], dependencies=[Depends(require_internal_token)])
 def fatura_coklu_kontrol(istek: CokluKontrolIstegi) -> list[CokluKontrolFaturaSonucu]:
     """Aynı satıcı VKN + NACE kod(lar)ıyla BİRDEN FAZLA fatura XML'ini
     kontrol eder — muhasebecinin tek oturumda tek şirketin tüm faturalarını
@@ -343,47 +343,53 @@ def fatura_coklu_kontrol(istek: CokluKontrolIstegi) -> list[CokluKontrolFaturaSo
 
     Bir fatura başarısız olursa (bozuk XML, VKN uyuşmazlığı) TÜM istek
     düşmez — o faturanın sonucu `basarili=false` + `hata` alanıyla
-    işaretlenir, diğer faturalar işlenmeye devam eder."""
+    işaretlenir, diğer faturalar işlenmeye devam eder.
+
+    `fatura_isle_sirasi()` (2026-09-11, kullanıcı kararı): tüm bu istek
+    (fatura listesinin tamamı) tek bir "slot" kaplar — aynı anda en fazla
+    MAX_ESZAMANLI_ISLEM adet /fatura/kontrol-et veya /fatura/coklu-kontrol
+    isteği işlenir, fazlası kuyrukta bekler."""
     sonuclar = []
-    for index, fatura_xml in enumerate(istek.fatura_xml_listesi):
-        try:
-            fatura, sonuc = _tek_fatura_kontrol_et(
-                fatura_xml, istek.satici_vkn, istek.satici_nace_kodlari
-            )
-        except HTTPException as exc:
+    with fatura_isle_sirasi():
+        for index, fatura_xml in enumerate(istek.fatura_xml_listesi):
+            try:
+                fatura, sonuc = _tek_fatura_kontrol_et(
+                    fatura_xml, istek.satici_vkn, istek.satici_nace_kodlari
+                )
+            except HTTPException as exc:
+                sonuclar.append(
+                    CokluKontrolFaturaSonucu(dosya_index=index, basarili=False, hata=exc.detail)
+                )
+                continue
+
+            gecmis_kontrolleri = [
+                gecmis_kontrol_et(
+                    istek.satici_vkn, s.kalem_adi or "", s.beyan_edilen_oranlar, _state["gecmis_depo"]
+                )
+                for s in sonuc.satir_sonuclari
+            ]
+
+            kalemler_kayit_icin = fatura_kalemlerini_kayit_icin_hazirla(fatura)
+            gecmise_kaydedildi = False
+            if kalemler_kayit_icin and fatura.fatura_no:
+                gecmise_kaydedildi = faturayi_gecmise_kaydet(
+                    _state["gecmis_depo"],
+                    istek.satici_vkn,
+                    fatura.fatura_no,
+                    fatura.duzenleme_tarihi,
+                    kalemler_kayit_icin,
+                )
+
             sonuclar.append(
-                CokluKontrolFaturaSonucu(dosya_index=index, basarili=False, hata=exc.detail)
+                CokluKontrolFaturaSonucu(
+                    dosya_index=index,
+                    basarili=True,
+                    fatura_kontrol=FaturaKontrolCevabi.from_dataclass(sonuc),
+                    gecmis_kontrolleri=[
+                        GecmisKontrolSonucCevabi.from_dataclass(g) for g in gecmis_kontrolleri
+                    ],
+                    gecmise_kaydedildi=gecmise_kaydedildi,
+                )
             )
-            continue
-
-        gecmis_kontrolleri = [
-            gecmis_kontrol_et(
-                istek.satici_vkn, s.kalem_adi or "", s.beyan_edilen_oranlar, _state["gecmis_depo"]
-            )
-            for s in sonuc.satir_sonuclari
-        ]
-
-        kalemler_kayit_icin = fatura_kalemlerini_kayit_icin_hazirla(fatura)
-        gecmise_kaydedildi = False
-        if kalemler_kayit_icin and fatura.fatura_no:
-            gecmise_kaydedildi = faturayi_gecmise_kaydet(
-                _state["gecmis_depo"],
-                istek.satici_vkn,
-                fatura.fatura_no,
-                fatura.duzenleme_tarihi,
-                kalemler_kayit_icin,
-            )
-
-        sonuclar.append(
-            CokluKontrolFaturaSonucu(
-                dosya_index=index,
-                basarili=True,
-                fatura_kontrol=FaturaKontrolCevabi.from_dataclass(sonuc),
-                gecmis_kontrolleri=[
-                    GecmisKontrolSonucCevabi.from_dataclass(g) for g in gecmis_kontrolleri
-                ],
-                gecmise_kaydedildi=gecmise_kaydedildi,
-            )
-        )
 
     return sonuclar

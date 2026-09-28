@@ -22,6 +22,9 @@ from __future__ import annotations
 
 import logging
 import os
+import hashlib
+import uuid
+from datetime import datetime, timedelta, timezone
 
 from model_eval_yolu import MODEL_EVAL_DIR, model_eval_yolunu_ekle
 
@@ -35,6 +38,19 @@ _logger = logging.getLogger("entegrasyon.model_eval_koprusu")
 # host burada 11434 değil 11435. Farklı bir tünel/port kullanılıyorsa
 # MODEL_EVAL_OLLAMA_HOST env var'ı ile override edilebilir.
 DEFAULT_MODEL_EVAL_OLLAMA_HOST = os.environ.get("MODEL_EVAL_OLLAMA_HOST", "http://localhost:11435")
+
+# ✅ Uygulandı (2026-09-11, kullanıcı kararı — proje bitene kadar yerelde
+# çalıştırma, Ollama'ya SADECE SSH tüneli üzerinden erişilsin): embedding
+# (RAG, embeddinggemma) de artık varsayılan olarak tünele yönlendiriliyor.
+# ⚠️ Bunun DAHA ÖNCE gerçek testte "Connection reset by peer" hatasına yol
+# açtığı biliniyor (bkz. git geçmişi/hafıza notu) — kullanıcı riski bilerek
+# kabul edip tekrar denemeyi istedi. Sorun tekrar çıkarsa
+# MODEL_EVAL_RAG_OLLAMA_HOST=http://localhost:11434 (yerel) ile geri alınabilir,
+# ya da bu sabit tekrar None'a çevrilip rag_common'un kendi yerel
+# varsayılanına düşülebilir.
+DEFAULT_MODEL_EVAL_RAG_OLLAMA_HOST = os.environ.get(
+    "MODEL_EVAL_RAG_OLLAMA_HOST", DEFAULT_MODEL_EVAL_OLLAMA_HOST
+)
 
 
 def model_eval_hazir_mi() -> tuple[bool, str]:
@@ -117,17 +133,18 @@ def tdhp_tahmini_yap(
     tenant_kaynaklari = _tenant_kaynaklarini_coz(own_vkn)
 
     # ollama_host (LLM tahmini icin, gemma4:31b-cloud gibi bulut modeller)
-    # tunele gitmeli - bu modeller yerelde yok. rag_ollama_host (embedding,
-    # embeddinggemma) ise BILEREK tunele YONLENDIRILMEZ - embeddinggemma
-    # yerelde zaten kurulu (bkz. mimari.md SS4, "veri gizliligi gerekcesiyle
-    # yerelde calisir"), tunel uzerinden gondermek gereksiz network riski
-    # (baglanti kopmasi/gecikme) ekliyordu, gercek testte "Connection reset
-    # by peer" hatasina yol acti - rag_ollama_host=None birakilarak
-    # rag_common'un kendi varsayilanina (yerel 11434) dusmesi saglaniyor.
+    # tunele gider - bu modeller yerelde yok. rag_ollama_host (embedding,
+    # embeddinggemma) da 2026-09-11'den itibaren AYNI tunele yonlendiriliyor
+    # (kullanici karari, proje bitene kadar yerel calistirmada Ollama'ya
+    # sadece SSH tuneli uzerinden erisim) - DAHA ONCE bu "Connection reset
+    # by peer" hatasina yol acmisti (bkz. DEFAULT_MODEL_EVAL_RAG_OLLAMA_HOST
+    # yorumu), sorun tekrar cikarsa MODEL_EVAL_RAG_OLLAMA_HOST env var'iyla
+    # yerele (http://localhost:11434) geri alinabilir.
     sonuc = predict_single_invoice(
         fatura_xml,
         own_vkn=own_vkn,
         ollama_host=DEFAULT_MODEL_EVAL_OLLAMA_HOST,
+        rag_ollama_host=DEFAULT_MODEL_EVAL_RAG_OLLAMA_HOST,
         convert_to_try=convert_to_try,
         parsed_invoice=parsed_invoice,
         rag_collection=tenant_kaynaklari["rag_collection"],
@@ -140,6 +157,11 @@ def tdhp_tahmini_yap(
     from core.parsing import convert_invoice_to_try, parse_invoice_xml_string
 
     sonuc["records"] = kayitlari_disa_aktar(sonuc)
+    # LLM ciktisinda ayni isimde bir alan bulunsa bile ona guvenilmez.
+    # Dogrulama tamamlanana kadar ve yardimci adimlardan biri hata verirse
+    # tahmin kesinlikle onaylanamaz durumda kalir.
+    sonuc["approvable"] = False
+    sonuc["validation_errors"] = []
     try:
         # Fatura ust bilgileri (customer/supplier/issue_date/payable_amount)
         # icin: parsed_invoice verildiyse TEKRAR parse ETMEDEN onu kullan,
@@ -157,11 +179,21 @@ def tdhp_tahmini_yap(
         if convert_to_try:
             invoice = convert_invoice_to_try(invoice)
         sonuc["dis_sema"] = faturayi_disa_aktar(sonuc, invoice, own_vkn, file_path=file_path)
+        from core.validation import validate_prediction
+
+        validation = validate_prediction(sonuc, invoice, own_vkn)
+        sonuc["validation_errors"] = validation["errors"]
+        sonuc["approvable"] = validation["valid"] and not sonuc.get("error")
     except Exception as exc:  # noqa: BLE001
         # Zarf uretimi ANA tahmini etkilemez - records[] zaten hazir, sadece
         # ust bilgiler eksik kalir (alt kirilim adiminin fallback deseniyle
         # ayni: yardimci bir adimin hatasi ana sonucu dusurmez).
         _logger.warning("dis_sema zarfi uretilemedi (records[] etkilenmedi): %s", exc)
+        sonuc["approvable"] = False
+        sonuc["validation_errors"] = [{
+            "code": "VALIDATION_UNAVAILABLE",
+            "message": "Deterministik dogrulama tamamlanamadi.",
+        }]
     return sonuc
 
 
@@ -217,6 +249,108 @@ def faturayi_onayla(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict, onaylandi
 
     collection = rag_common.get_collection(collection_name=rag_common.koleksiyon_adi_coz(own_vkn))
     rag_common.upsert_approved_invoice(collection, invoice, tdhp_tahmini.get("entries", []))
+
+
+def bekleyen_tahmin_kaydet(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict) -> str:
+    """Sunucunun urettigi tahmini 30 dakika sureyle onay bekleyen depoya yazar."""
+    model_eval_yolunu_ekle()
+    from psycopg2.extras import Json
+    from core.db import get_conn
+
+    prediction_id = str(uuid.uuid4())
+    invoice_id = str(tdhp_tahmini.get("invoice_id") or "?")
+    invoice_hash = hashlib.sha256(fatura_xml.encode("utf-8")).hexdigest()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """DELETE FROM model_eval_bekleyen_tahminler
+                   WHERE expires_at < now() - interval '1 day'
+                     AND status <> 'approved'"""
+            )
+            cur.execute(
+                """INSERT INTO model_eval_bekleyen_tahminler
+                   (prediction_id, tenant_vkn, invoice_id, invoice_hash, invoice_xml,
+                    prediction, approvable, expires_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    prediction_id, own_vkn, invoice_id, invoice_hash, fatura_xml,
+                    Json(tdhp_tahmini), bool(tdhp_tahmini.get("approvable")), expires_at,
+                ),
+            )
+        conn.commit()
+    return prediction_id
+
+
+class BekleyenTahminHatasi(Exception):
+    def __init__(self, message: str, status_code: int):
+        super().__init__(message)
+        self.status_code = status_code
+
+
+def bekleyen_tahmini_onayla(prediction_id: str) -> str:
+    """Tahmini atomik olarak sahiplenir; yalniz dogrulanmis sunucu kaydini onaylar."""
+    model_eval_yolunu_ekle()
+    from core.db import get_conn
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE model_eval_bekleyen_tahminler
+                   SET status = 'approving'
+                   WHERE prediction_id = %s AND status = 'pending'
+                     AND approvable = TRUE AND expires_at > now()
+                   RETURNING invoice_xml, tenant_vkn, prediction, invoice_id""",
+                (prediction_id,),
+            )
+            row = cur.fetchone()
+            if row is None:
+                cur.execute(
+                    """SELECT status, approvable, expires_at <= now()
+                       FROM model_eval_bekleyen_tahminler WHERE prediction_id = %s""",
+                    (prediction_id,),
+                )
+                state = cur.fetchone()
+                conn.rollback()
+                if state is None:
+                    raise BekleyenTahminHatasi("Tahmin bulunamadi.", 404)
+                if state[0] == "approved":
+                    raise BekleyenTahminHatasi("Tahmin daha once onaylanmis.", 409)
+                if state[2]:
+                    raise BekleyenTahminHatasi("Tahminin onay suresi dolmus.", 409)
+                if not state[1]:
+                    raise BekleyenTahminHatasi("Dogrulamadan gecmeyen tahmin onaylanamaz.", 422)
+                raise BekleyenTahminHatasi("Tahmin baska bir islem tarafindan onaylaniyor.", 409)
+        conn.commit()
+
+    fatura_xml, own_vkn, prediction, invoice_id = row
+    try:
+        faturayi_onayla(
+            fatura_xml,
+            own_vkn=own_vkn,
+            tdhp_tahmini=prediction,
+            onaylandi_zamani=datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE model_eval_bekleyen_tahminler SET status='pending' WHERE prediction_id=%s AND status='approving'",
+                    (prediction_id,),
+                )
+            conn.commit()
+        raise
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """UPDATE model_eval_bekleyen_tahminler
+                   SET status='approved', approved_at=now(), invoice_xml=''
+                   WHERE prediction_id=%s AND status='approving'""",
+                (prediction_id,),
+            )
+        conn.commit()
+    return invoice_id
 
 
 def kayitli_vknleri_getir() -> list[str]:

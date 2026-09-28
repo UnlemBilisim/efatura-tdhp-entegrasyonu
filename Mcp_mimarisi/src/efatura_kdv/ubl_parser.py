@@ -8,12 +8,32 @@ Fatura NACE kodu TAŞIMAZ — NACE, satıcının VKN'sine bağlı ayrı bir kayn
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+import re
 from dataclasses import dataclass, field, asdict
 
 NS = {
     "cbc": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
     "cac": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
 }
+
+_FORBIDDEN_XML_DECLARATION = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+
+
+def _parse_safe_xml(xml_metni: str) -> ET.Element:
+    if _FORBIDDEN_XML_DECLARATION.search(xml_metni):
+        raise ET.ParseError("DTD ve ENTITY bildirimlerine izin verilmiyor")
+    root = ET.fromstring(xml_metni)
+    seen = 0
+    stack = [(root, 1)]
+    while stack:
+        element, depth = stack.pop()
+        seen += 1
+        if seen > 100_000:
+            raise ET.ParseError("XML izin verilen eleman sayisini asiyor")
+        if depth > 128:
+            raise ET.ParseError("XML izin verilen derinligi asiyor")
+        stack.extend((child, depth + 1) for child in element)
+    return root
 
 
 def _text(node, path):
@@ -239,12 +259,11 @@ def _parse_root(root) -> Fatura:
 
 def parse_ubl_invoice(xml_path: str) -> Fatura:
     """Bir UBL-TR e-fatura XML dosyasını diskten ayrıştırır."""
-    tree = ET.parse(xml_path)
-    return _parse_root(tree.getroot())
+    with open(xml_path, encoding="utf-8") as xml_file:
+        return _parse_root(_parse_safe_xml(xml_file.read()))
 
 
 def parse_ubl_invoice_from_string(xml_metni: str) -> Fatura:
     """Bir UBL-TR e-fatura XML'ini string'den ayrıştırır (API girdisi için —
     dosya yoluna ihtiyaç duymaz)."""
-    root = ET.fromstring(xml_metni)
-    return _parse_root(root)
+    return _parse_root(_parse_safe_xml(xml_metni))

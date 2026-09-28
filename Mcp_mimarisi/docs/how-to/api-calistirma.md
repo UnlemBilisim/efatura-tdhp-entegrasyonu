@@ -20,7 +20,8 @@ python3 -m pip install -r requirements.txt
 
 ```bash
 export DATABASE_URL="postgresql://efatura:efatura@localhost:5434/efatura_kdv"
-python3 -m uvicorn efatura_kdv.api:app --app-dir src --host 0.0.0.0 --port 8000
+MCP_INTERNAL_API_TOKEN="<en-az-32-karakter>" \
+python3 -m uvicorn efatura_kdv.api:app --app-dir src --host 127.0.0.1 --port 8000
 ```
 
 `DATABASE_URL` tanımlı değilse API başlangıçta (`lifespan` içinde) net bir

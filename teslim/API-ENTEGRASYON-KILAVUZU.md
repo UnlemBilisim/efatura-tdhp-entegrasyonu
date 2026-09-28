@@ -5,6 +5,7 @@
 ```
 POST http://10.38.20.146:8100/fatura/isle
 Content-Type: application/json
+Authorization: Bearer <token>
 ```
 
 > ⚠️ Bu IP yerel ağdaki DHCP adresidir, **kalıcı değildir** — makine yeniden
@@ -50,11 +51,12 @@ Content-Type: application/json
 }
 ```
 
-`asama` dört değer alabilir:
+`asama` beş değer alabilir:
 
 | `asama` | Ne yapmalı |
 |---|---|
 | `tdhp_tahmini_tamamlandi` | ✅ `dis_sema` hazır, kullanın |
+| `tdhp_dogrulama_basarisiz` | Tahmin gösterilebilir ama onaylanamaz; `validation_errors` alanını inceleyin |
 | `on_filtre_insan_incelemesi_bekliyor` | `onay: true` ekleyip **tekrar gönderin** |
 | `kur_onayi_bekliyor` | `kur_secimi: "tl"` veya `"orijinal"` ekleyip **tekrar gönderin** |
 | `model_eval_hazir_degil` | Sistem hatası, tekrar denemeyin, bize bildirin |
@@ -73,6 +75,7 @@ json.dump({
 
 curl -s --max-time 600 -X POST http://10.38.20.146:8100/fatura/isle \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $EFATURA_API_TOKEN" \
   -d @istek.json | jq '.tdhp_tahmini.dis_sema'
 ```
 
@@ -80,5 +83,6 @@ curl -s --max-time 600 -X POST http://10.38.20.146:8100/fatura/isle \
 
 - **Timeout ≥ 600 saniye** — işlem 5-90 saniye sürebilir (yapay zekâ modeli çalışıyor)
 - **Sağlık kontrolü:** `GET http://10.38.20.146:8100/durum` → `{"model_eval_hazir": true}`
-- **Kimlik doğrulama yok** — sunucu-sunucu çağrı, tarayıcıdan çalışmaz (CORS yok)
+- **Kimlik doğrulama zorunlu** — token `EFATURA_API_TOKEN` olarak ayrı kanaldan verilir
+- Onay için `/fatura/isle` cevabındaki `prediction_id`, Bearer token ile `/fatura/onayla` endpoint'ine gönderilir
 - Boş `records[]` görürseniz önce `success` alanına bakın — `false` ise teknik hata var, "kayıt yok" değil

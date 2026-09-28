@@ -11,11 +11,11 @@
 
 | Port | Servis | Kim başlatır | Zorunlu mu |
 |---|---|---|---|
-| **8000** | Mcp_mimarisi API (FastAPI) | `baslat.sh` | Outbox faturalar için evet |
-| **8100** | entegrasyon servisi (FastAPI) | `baslat.sh` | Evet — dış API bu |
-| **5434** | PostgreSQL (Docker, iç port 5432) | `baslat.sh` → `docker run` | Evet |
-| **11434** | Ollama (yerel, embedding) | `baslat.sh` → `ollama serve` | RAG için evet |
-| **11435** | SSH tüneli → uzak GPU'daki Ollama | **Kullanıcı elle açar** | LLM için evet |
+| **8000** | Mcp_mimarisi API (FastAPI) | `docker compose up` (`app` container, supervisord) | Outbox faturalar için evet |
+| **8100** | entegrasyon servisi (FastAPI) | `docker compose up` (`app` container, supervisord) | Evet — dış API bu |
+| **5434** | PostgreSQL (Docker, iç port 5432) | `docker compose up` (`postgres` container) | Evet |
+| **11434** | Ollama (embedding) | `docker compose up` (`ollama` container) | RAG için evet |
+| **11435** | SSH tüneli → uzak GPU'daki Ollama | **Kullanıcı elle açar / systemd servisi** (container dışı, host seviyesinde) | LLM için evet |
 
 > ⚠️ **11435 tünelini ajan açamaz** — SSH parola/anahtar istiyor. Yerelde
 > komut kullanıcının kendi notlarında saklanıyor (`System/` dışına taşındı,
@@ -26,19 +26,14 @@
 > adımları: [`ssh-tunel-kurulumu.md`](../how-to/ssh-tunel-kurulumu.md).
 > Servis dosyası: [`docker/systemd/efatura-llm-tunnel.service`](../../docker/systemd/efatura-llm-tunnel.service).
 
-Her iki FastAPI servisi de `--host "$BIND_HOST"` ile başlatılır
-(`baslat.sh:73`, `baslat.sh:102`), varsayılan `0.0.0.0` (tüm ağ arayüzleri).
-Güvenlik etkisi: [`../explanation/guvenlik-durumu-2026-07-27.md`](../explanation/guvenlik-durumu-2026-07-27.md).
+> ✅ **Uygulandı** (2026-09-28, kullanıcı kararı): `baslat.sh`/`durdur.sh`
+> (host modunda üç süreci elle başlatan script'ler) kaldırıldı — tek
+> çalıştırma yolu artık `docker compose up` (detay:
+> [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md)).
 
-> ✅ **Uygulandı** (2026-07-28): `BIND_HOST` env var eklendi (`baslat.sh:24`)
-> — auth henüz eklenmediği için sunucuda geçici bir azaltma önlemi olarak,
-> dış ekibin bilinen IP aralığına özel bir iç ağ adresi verilebilir:
-> `BIND_HOST=10.0.x.x POSTGRES_PASSWORD=... ./baslat.sh`. Varsayılan
-> davranış (env var verilmezse `0.0.0.0`) değişmedi. Gerçek testte
-> doğrulandı: `BIND_HOST=127.0.0.1` ile çalıştırıldığında servisler yalnızca
-> `localhost`'ta dinledi (`lsof` ile teyit edildi), env var verilmediğinde
-> yine `*:` (tüm arayüzler) oldu. Bu, kalıcı çözüm değildir — asıl çözüm
-> kimlik doğrulamadır (bkz. güvenlik durumu belgesi).
+Docker container içinde servisler `0.0.0.0` dinler, ancak Compose portları
+host'un `127.0.0.1` adresine yayınlar (`docker/docker-compose.yml`). Dış
+erişim reverse proxy üzerinden HTTPS ile verilmelidir.
 
 ## Ortam değişkenleri
 
@@ -48,6 +43,9 @@ Güvenlik etkisi: [`../explanation/guvenlik-durumu-2026-07-27.md`](../explanatio
 | `MCP_MIMARISI_BASE_URL` | `http://localhost:8000` | `entegrasyon/mcp_mimarisi_istemcisi.py:17` | Varsayılana düşer |
 | `MODEL_EVAL_OLLAMA_HOST` | `http://localhost:11435` | `entegrasyon/model_eval_koprusu.py:37` | Varsayılana düşer (tünel portu) |
 | `OLLAMA_HOST` | `http://localhost:11434` | `model_eval/core/constants.py:10` | Varsayılana düşer (yerel) |
+| `EFATURA_API_TOKEN` | **yok** | `entegrasyon/auth.py` | İş endpoint'leri 503 ile kapalı kalır |
+| `MCP_INTERNAL_API_TOKEN` | **yok** | `Mcp_mimarisi/.../auth.py`, MCP istemcisi | Dahili endpoint'ler kapalı kalır |
+| `MAX_REQUEST_BYTES` | `10485760` | iki HTTP middleware'i | 10 MB toplam istek sınırı uygulanır |
 
 ### Neden iki farklı Ollama portu?
 
@@ -59,22 +57,19 @@ Bilinçli bir ayrım (`model_eval_koprusu.py:80-88` yorumunda gerekçesi var):
   yönlendirmek gereksiz ağ riski ekliyor ve gerçek testte
   "Connection reset by peer" hatasına yol açtı.
 
-> ✅ **Uygulandı** (2026-07-28): `baslat.sh`'teki gömülü parola kaldırıldı.
-> `POSTGRES_PASSWORD` artık zorunlu env var (`baslat.sh:15`, `: "${POSTGRES_PASSWORD:?...}"`)
-> — tanımlı değilse script açıkça hata verip durur, sessizce eski
-> `efatura` parolasına düşmez. Kullanım: `POSTGRES_PASSWORD=<parola> ./baslat.sh`.
-> **Dikkat:** bu, yalnızca container **ilk kez oluşturulurken** geçerli
-> parolayı belirler (`docker run -e POSTGRES_PASSWORD=...`) — halihazırda
-> var olan bir container'ın parolasını değiştirmez; container'ı oluştururken
-> hangi parola kullanıldıysa sonraki her `./baslat.sh` çağrısında da **aynı**
-> `POSTGRES_PASSWORD` verilmelidir (aksi halde PostgreSQL bağlantı reddeder).
-> Gerçek testte doğrulandı: env var olmadan çalıştırıldığında script
-> `POSTGRES_PASSWORD env var tanımlı olmalı` hatasıyla durdu; doğru parolayla
-> her iki servis de sağlıklı ayağa kalktı.
->
-> Docker Compose ile çalıştırıldığında (`docker/docker-compose.yml`) aynı
-> disiplin zaten uygulanıyordu — `POSTGRES_PASSWORD` env var'ı orada da
-> zorunlu (`docker/docker-compose.yml:21`, `:47`). Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
+> ✅ **Uygulandı** (2026-07-28, tarihsel — o zamanki host script'i için;
+> 2026-09-28'de `baslat.sh` kaldırıldı): Gömülü/varsayılan parola hiçbir
+> zaman Docker Compose yolunda yoktu, host script'inde vardı ve kaldırıldı.
+> **Docker Compose'da (tek geçerli yol) `POSTGRES_PASSWORD` env var'ı
+> zorunludur** (`docker/docker-compose.yml:35`, `:66`,
+> `:?POSTGRES_PASSWORD env var tanımlı olmalı`) — tanımlı değilse
+> `docker compose up` açıkça hata verip durur, sessizce bir varsayılana
+> düşmez. **Dikkat:** bu, yalnızca `postgres` container'ı **ilk kez
+> oluşturulurken** geçerli parolayı belirler — halihazırda var olan bir
+> container'ın parolasını değiştirmez; ilk oluşturmada hangi parola
+> kullanıldıysa sonraki her `docker compose up` çağrısında da **aynı**
+> `POSTGRES_PASSWORD` verilmelidir (aksi halde PostgreSQL bağlantı
+> reddeder). Detay: [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md).
 
 ## PostgreSQL tabloları
 
@@ -87,6 +82,7 @@ tablosuna dokunmazlar:
 | `gecmis_fatura_kalemleri` | Mcp_mimarisi | Geçmiş outbox kalemleri (emsal kontrolü) |
 | `islenmis_faturalar` | Mcp_mimarisi | Claim tablosu (aynı fatura iki kez işlenmesin) |
 | `model_eval_sonuclar` | model_eval | Tahmin sonuçları + onay kayıtları |
+| `model_eval_bekleyen_tahminler` | model_eval | Süreli, sunucu taraflı onay kayıtları |
 
 > ✅ **Uygulandı** (2026-07-28): Bu tabloların tam yedeği `pg_dump -F c` ile
 > alınıp `db-yedek/efatura_kdv_yedek.dump`'a kaydedildi (2138 + 1120 + 1
@@ -102,7 +98,8 @@ ikisi de **git'e/Docker image'a farklı şekilde davranır**:
 | Kaynak | Nerede | Image'a gömülü mü | Taşıma yolu |
 |---|---|---|---|
 | ChromaDB vektör veritabanı | `model_eval/vector_db/` (container'da `/app/model_eval/vector_db`) | Hayır — `.gitignore`+`.dockerignore`'da hariç | `docker cp` + `efatura-vector-db` volume (bkz. `docker-ile-calistirma.md` §5.5) |
-| Excel referansları (NACE/KDV, mizan) | `Mcp_mimarisi/exceller/*.xlsx`, `model_eval/exceller/mizan.xlsx` | **Evet** — `docker/Dockerfile` COPY ile | Image'ın yeniden build+push+pull edilmesi (dosyayı tek başına kopyalamak kalıcı değildir) |
+| NACE/KDV Excel aktarım kaynağı | `Mcp_mimarisi/exceller/*.xlsx` | **Evet** — `docker/Dockerfile` COPY ile | Excel PostgreSQL'e aktarılır |
+| Şirkete özel mizan | PostgreSQL `mizan_alt_kirilim` | Hayır | PostgreSQL yedeği/geri yüklemesi |
 
 > ✅ **Uygulandı** (2026-07-29): `docker/docker-compose.yml`'deki `app` servisine
 > `efatura-vector-db` named volume eklendi — daha önce ChromaDB verisi
@@ -139,20 +136,21 @@ sözleşme: [`../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`](../..
 > sunucuda çalışmıyor/erişilebilir değil. Gerekçe:
 > [`../explanation/v2-api-tasarim-karari.md`](../explanation/v2-api-tasarim-karari.md).
 
-## Durum dosyaları (`.calistirma/`)
+## Loglar
 
-`baslat.sh` tarafından yönetilir, elle düzenlenmemeli:
-
-| Dosya | İçerik |
-|---|---|
-| `*.pid` | Süreç kimlikleri (`durdur.sh` bunları kullanır) |
-| `*.log` | Servis logları — **dış ekip JSON'u burada görünür** |
-| `mcp_venv/` | Mcp_mimarisi için izole venv (~40 MB) |
+> ✅ **Uygulandı** (2026-09-28, kullanıcı kararı): `baslat.sh`/`durdur.sh`
+> ve onların yönettiği `.calistirma/` durum dizini kaldırıldı — sistem
+> artık sadece Docker ile çalıştırılıyor. Loglar container'ların stdout'una
+> JSON olarak basılır (`log_ortak.py::loglamayi_kur`, `LOG_DIR` set
+> edilmediği için dosya handler'ı hiç kurulmaz), `supervisord` bunu
+> `docker/supervisord.conf` üzerinden Docker'ın log akışına verir. Rotasyon
+> `docker/docker-compose.yml`'deki `logging:` ayarıyla (10MB × 5 dosya, her
+> üç serviste de) sağlanır.
 
 Log izleme (manuel test için):
 
 ```bash
-tail -f .calistirma/entegrasyon.log | grep -A 45 "DIŞ EKİP JSON"
+docker compose logs -f app | grep -A 45 "DIŞ EKİP JSON"
 ```
 
 ## Docker registry
