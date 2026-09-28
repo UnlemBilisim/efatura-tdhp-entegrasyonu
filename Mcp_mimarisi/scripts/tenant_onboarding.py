@@ -93,9 +93,9 @@ def onboard_et(vkn: str, database_url: str) -> str:
 
     print(f"[4/4] Tamamlandı — {sema} şeması hazır.")
     print(
-        f"Not: bu şirket için mizan dosyası (model_eval/exceller/{vkn}/mizan.xlsx) "
-        "ve RAG geçmişi (ChromaDB koleksiyonu) henüz YOK — bu normal, sistem "
-        "'emsal yok' yoluna düşer. Mizan varsa o dizine eklenmesi yeterli."
+        "Not: bu şirket için mizan ve RAG geçmişi henüz YOK olabilir. "
+        f"Mizanı yüklemek için: python3 model_eval/mizan_excel_yukle.py --vkn {vkn} "
+        "--excel <mizan.xlsx>. RAG yoksa sistem emsalsiz tahmin yoluna düşer."
     )
     return sema
 

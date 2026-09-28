@@ -102,6 +102,11 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > `rag_common.py::upsert_approved_invoice` docstring'i,
 > `entegrasyon/README.md` "Fatura onaylama" bölümü.
 >
+> **2026-08-05 güncellemesi — tamamlandı:** Mizan Excel'den PostgreSQL'e
+> taşındı. `get_alt_kirilimlar(tenant_vkn=...)` her şirketin
+> `tenant_<vkn>.mizan_alt_kirilim` tablosunu kullanır. Aşağıdaki 2026-07-24
+> metni tarihsel tasarım kaydıdır.
+>
 > **2026-07-24 güncellemesi — bu ihtiyaç kısmen giderildi:** Yeni
 > `core/mizan.py::get_alt_kirilimlar()` + `predict_single_invoice(alt_kirilim=True)`
 > (aşağıya bakın) artık şirkete özel bir kod→isim kaynağı (`model_eval/exceller/
