@@ -1,7 +1,8 @@
 # Docker İle Çalıştırma
 
-> **Tür:** how-to — görev odaklı tarif.
-> Yerel (Docker'sız) çalıştırma için: [`../../proje-calistirma.md`](../../proje-calistirma.md).
+> **Tür:** how-to — görev odaklı tarif. Sistemi çalıştırmanın **tek** yolu
+> budur (2026-09-28, kullanıcı kararı — `baslat.sh`/host modu kaldırıldı).
+> Hızlı özet + arayüz kullanımı: [`../../proje-calistirma.md`](../../proje-calistirma.md).
 > Mimari gerekçe (neden tek image, neden SSH tünel container dışında):
 > [`../../mimari.md`](../../mimari.md).
 
@@ -112,13 +113,15 @@ bakın.
 ## 1. Gereksinimler
 
 - Docker + Docker Compose (bu ortamda test edildi: Docker 29.6.2, Compose v5.3.1)
-- Güçlü bir PostgreSQL parolası (aşağıda `POSTGRES_PASSWORD` olarak geçecek)
+- Güçlü bir PostgreSQL parolası ve iki ayrı API token'ı
 
 ## 2. Başlatma
 
 ```bash
 cd System/docker/
-POSTGRES_PASSWORD="<güçlü-parola>" docker compose up -d
+POSTGRES_PASSWORD="<güçlü-parola>" \
+EFATURA_API_TOKEN="<dış-api-tokenı>" \
+MCP_INTERNAL_API_TOKEN="<dahili-api-tokenı>" docker compose up -d
 ```
 
 `POSTGRES_PASSWORD` **zorunludur** — tanımlı değilse `docker compose` açıkça
@@ -164,8 +167,9 @@ PostgreSQL'de henüz veri yok — §5'e bakın.
 
 ## 5. Mevcut PostgreSQL verisini geri yükleme
 
-Yerelde `./baslat.sh` ile biriktirilmiş veriyi (NACE-KDV tablosu, geçmiş
-fatura kalemleri) yeni bir Docker PostgreSQL'e taşımak için:
+Eski (host modu, artık kaldırıldı) bir kurulumda biriktirilmiş veriyi
+(NACE-KDV tablosu, geçmiş fatura kalemleri) yeni bir Docker PostgreSQL'e
+taşımak için:
 
 ```bash
 # Kaynak makinede yedek al (zaten alınmışsa db-yedek/ altında duruyor olabilir)
@@ -220,19 +224,13 @@ Bu adım atlanırsa sistem **çalışmaya devam eder** (RAG'sız degrade mod de�
 sadece few-shot emsalsiz tahmin) — sessizce bozulmaz ama doğruluk oranı
 düşer (bkz. `model_eval/CLAUDE.md` "En büyük tekil iyileştirme: RAG").
 
-**Excel referans dosyaları (`Mcp_mimarisi/exceller/*.xlsx`,
-`model_eval/exceller/mizan.xlsx`) — image'a GÖMÜLÜ, ayrıca taşınmaz ama
-DONMUŞ:**
+**NACE/KDV Excel aktarım dosyaları (`Mcp_mimarisi/exceller/*.xlsx`) image'a
+gömülüdür. Şirkete özel mizan ise PostgreSQL'deki tenant şemasında
+`mizan_alt_kirilim` tablosunda tutulur ve DB yedeğiyle taşınır.**
 
-Bu dosyalar (NACE/KDV oran referansı, şirkete özel mizan) SQL/vektör
-verisinin aksine `docker/Dockerfile`'daki `COPY` ile image'ın içine gömülüdür —
-build anındaki hâlleriyle sabitlenirler, ayrı bir taşıma adımı gerekmez.
-**Ama bu aynı zamanda bir tuzaktır:** mizan güncellenirse (ör. yeni alt
-kırılım kodları eklenirse, geçmişte "mizan_5" güncellemesinde olduğu gibi)
-sunucudaki container bunu görmez — image'ın güncel Excel dosyasıyla
-**yeniden build edilip push/pull edilmesi** gerekir. Container'a dosyayı
-tek başına `docker cp` ile kopyalamak geçici bir çözümdür, container
-yeniden oluşturulduğunda (kalıcı volume'a bağlı olmadığı için) kaybolur.
+NACE referans Excel'i değişirse image yeniden build edilmeli ve aktarım
+script'i yeniden çalıştırılmalıdır. Mizan güncellemeleri image build'i
+gerektirmez; ilgili tenant tablosu güncellenir.
 
 ## 6. `app` container'ı veri geldikten sonra ayağa kalkmıyorsa
 
@@ -260,5 +258,5 @@ sürece silinmez).
 ## İlgili belgeler
 
 - Port/env değişkeni envanteri: [`../reference/servisler-ve-portlar.md`](../reference/servisler-ve-portlar.md)
-- Güvenlik durumu (auth eksikliği, `0.0.0.0` bind): [`../explanation/guvenlik-durumu-2026-07-27.md`](../explanation/guvenlik-durumu-2026-07-27.md)
+- Güvenlik düzeltmelerinin geçmişi: [`../explanation/guvenlik-durumu-2026-07-27.md`](../explanation/guvenlik-durumu-2026-07-27.md)
 - Dış ekip API sözleşmesi: [`../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`](../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md)

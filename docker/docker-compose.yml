@@ -24,14 +24,20 @@
 #   - ChromaDB (model_eval/vector_db/, "ollama" container'ının DEĞİL, "app"
 #     container'ının kullandığı ayrı bir dizin) → aşağıdaki not
 #
-# --- Excel referans dosyaları (Mcp_mimarisi/exceller/, model_eval/exceller/mizan.xlsx) ---
-# Bunlar SQL/vektör verisinin aksine image'a GÖMÜLÜDÜR (Dockerfile'daki
-# COPY ile) — yani image build edildiği ANDAKİ hâlleriyle donarlar. Mizan
-# (şirkete özel hesap planı alt kırılımı, core/mizan.py) ileride
-# güncellenirse, güncellemenin sunucuya yansıması için image'ın YENİDEN
-# build edilip push/pull edilmesi gerekir — dosyayı tek başına container
-# içine kopyalamak, container yeniden başladığında/yeniden oluşturulduğunda
-# kaybolur (kalıcı volume'a bağlı değildir).
+# NACE/KDV Excel aktarım kaynakları image'a gömülüdür. Şirkete özel
+# mizan artık Excel'den değil PostgreSQL tenant şemasından okunur.
+
+# Üç servis de `restart: unless-stopped` ile sürekli çalışır ve Docker'ın
+# varsayılan `json-file` log sürücüsü rotasyonsuzdur (host modunda
+# log_ortak.py::loglamayi_kur'un uyguladığı 10MB×5 limitin bir eşi burada
+# yoktu) — sınırsız disk büyümesini önlemek için her serviste aynı limit
+# (10MB×5 dosya) tanımlanır (2026-09-28, kullanıcı kararı — baslat.sh
+# kullanımdan kalkıp sadece Docker ile çalıştırılacak).
+x-log-rotasyonu: &log-rotasyonu
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
 
 services:
   postgres:
@@ -41,7 +47,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD env var tanımlı olmalı — güçlü bir parola verin}
       POSTGRES_DB: efatura_kdv
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - efatura-kdv-pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -50,14 +56,16 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging: *log-rotasyonu
 
   ollama:
     image: ollama/ollama:latest
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"
     volumes:
       - efatura-ollama-data:/root/.ollama
     restart: unless-stopped
+    logging: *log-rotasyonu
 
   app:
     # image: registry'de varsa doğrudan pull edilir (sunucuda kullanılan yol).
@@ -74,9 +82,11 @@ services:
       # Uzak GPU'daki LLM'e giden SSH tüneli host makinede systemd servisi
       # olarak çalışıyor — container'dan host'a bu şekilde erişilir.
       MODEL_EVAL_OLLAMA_HOST: http://host.docker.internal:11435
+      EFATURA_API_TOKEN: ${EFATURA_API_TOKEN:?EFATURA_API_TOKEN env var tanımlı olmalı}
+      MCP_INTERNAL_API_TOKEN: ${MCP_INTERNAL_API_TOKEN:?MCP_INTERNAL_API_TOKEN env var tanımlı olmalı}
     ports:
-      - "8000:8000"
-      - "8100:8100"
+      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8100:8100"
     volumes:
       # ChromaDB (RAG) verisi — rag_common.py::DEFAULT_PERSIST_DIR burayı
       # kullanır. Volume olmadan container her yeniden oluşturulduğunda
@@ -91,6 +101,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    logging: *log-rotasyonu
 
 volumes:
   efatura-kdv-pgdata:

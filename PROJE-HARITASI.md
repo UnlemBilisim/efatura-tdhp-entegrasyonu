@@ -65,11 +65,10 @@ bir asimetri — detaylı gerekçe [`mimari.md`](mimari.md) §2.1'de.
 | Dosya | Ne işe yarar |
 |---|---|
 | `mimari.md` | Sistem mimarisi — bileşenler, akış, tasarım kararlarının gerekçesi (explanation) |
-| `proje-calistirma.md` | Yerel (Docker'sız) çalıştırma kılavuzu, sık karşılaşılan sorunlar (how-to) |
+| `proje-calistirma.md` | Docker ile çalıştırma özeti, arayüz kullanımı, sık karşılaşılan sorunlar (how-to) |
 | `CLAUDE.md` | AI ajanları (Claude Code vb.) için çalışma disiplini rehberi |
-| `baslat.sh` / `durdur.sh` | Tüm sistemi (PostgreSQL + Mcp_mimarisi + entegrasyon) tek komutla başlatır/durdurur |
 | `docker/Dockerfile` | Tek image'da üç Python bileşeni (kardeş dizin yapısını korur) |
-| `docker/docker-compose.yml` | PostgreSQL + Ollama + app servislerini birlikte ayağa kaldırır |
+| `docker/docker-compose.yml` | PostgreSQL + Ollama + app servislerini birlikte ayağa kaldırır — sistemi çalıştırmanın **tek** yolu (2026-09-28'de `baslat.sh`/`durdur.sh` kaldırıldı) |
 | `docs/` | Üç bileşenin **birlikte** çalışmasına ait belgeler (Diátaxis: how-to/reference/explanation) |
 | `teslim/API-ENTEGRASYON-KILAVUZU.md` | **Dış ekibin okuması gereken tek belge** — `POST /fatura/isle` nasıl çağrılır |
 

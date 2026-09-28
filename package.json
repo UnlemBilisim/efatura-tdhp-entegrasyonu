@@ -5,9 +5,7 @@
   "description": "e-Fatura KDV doğrulama (Mcp_mimarisi) + TDHP tahmini (model_eval) + orkestrasyon (entegrasyon) sistemi — Python tabanlıdır, bu paket yalnızca dağıtım amaçlıdır.",
   "scripts": {
     "postinstall": "node scripts/kur-python-bagimliliklari.js",
-    "baslat": "bash baslat.sh",
-    "durdur": "bash durdur.sh",
-    "test": "cd model_eval && /usr/bin/python3 -m pytest tests/ -q"
+    "test": "python3 -m pytest model_eval/tests -q && python3 -m pytest entegrasyon/tests -q"
   },
   "files": [
     "Mcp_mimarisi/src",
@@ -29,7 +27,12 @@
     "model_eval/generate_report.py",
     "model_eval/rag_common.py",
     "entegrasyon/app.py",
-    "entegrasyon/is_deposu.py",
+    "entegrasyon/auth.py",
+    "entegrasyon/security.py",
+    "entegrasyon/log_ortak.py",
+    "entegrasyon/es_zamanli_sinir.py",
+    "entegrasyon/static",
+    "entegrasyon/tests",
     "entegrasyon/mcp_mimarisi_istemcisi.py",
     "entegrasyon/model_eval_koprusu.py",
     "entegrasyon/model_eval_yolu.py",
@@ -39,11 +42,8 @@
     "entegrasyon/README.md",
     "docs",
     "scripts/kur-python-bagimliliklari.js",
-    "baslat.sh",
-    "durdur.sh",
-    "docker-compose.yml",
-    "Dockerfile",
     "docker",
+    ".env.example",
     "CLAUDE.md",
     "mimari.md",
     "proje-calistirma.md",

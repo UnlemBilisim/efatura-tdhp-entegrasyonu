@@ -160,7 +160,7 @@ parçası. Sırayla:
    düzeltme talebi ile **ikinci bir çağrı** yapılır
    (`rag_common.build_precedent_correction_request`)
 5. **Mizan alt kırılımı** — üretilen 3 haneli kodlar (`120`, `600`, `391`),
-   şirkete özel `exceller/mizan.xlsx`'ten okunan alt kırılımlarla eşlenir
+   şirkete özel PostgreSQL `mizan_alt_kirilim` tablosundan okunan alt kırılımlarla eşlenir
    (`120` → `120.01.00008`). Bu **tek bir ek LLM çağrısıyla** yapılır.
 6. **Denge kontrolü** — borç toplamı = alacak toplamı mı?
 
@@ -221,16 +221,22 @@ Bu, sistemin **öğrenen** kısmıdır:
 | **Ollama** (`:11434`) | Hem LLM çıkarımı hem RAG embedding'i | TDHP tahmini çalışmaz |
 | **ChromaDB** (`model_eval/vector_db/`, gömülü) | Emsal fatura vektör indeksi | RAG'sız tahmine düşer |
 
-`baslat.sh` üçünü de kontrol eder; PostgreSQL ve Ollama'yı gerekirse başlatır.
-`durdur.sh` ise Ollama ve PostgreSQL'i **bilerek durdurmaz** — başka süreçler
-de kullanıyor olabilir.
+> ✅ **Uygulandı** (2026-09-28, kullanıcı kararı — "baslat.sh'ı kaldırabilir
+> miyiz artık"): `baslat.sh`/`durdur.sh` (host modunda üç süreci elle
+> ayağa kaldıran/durduran script'ler) kaldırıldı. Üçü de artık
+> `docker compose up`/`down` (`docker/docker-compose.yml`) ile birlikte
+> ayağa kalkar/durur; `restart: unless-stopped` sayesinde Docker
+> Desktop/daemon her açıldığında otomatik başlarlar. Detay:
+> [`System/docs/how-to/docker-ile-calistirma.md`](System/docs/how-to/docker-ile-calistirma.md).
 
-### 4.1 İzole venv kararı
+### 4.1 İzole ortam — artık Docker image'ının kendisi
 
-`baslat.sh`, `Mcp_mimarisi` için `.calistirma/mcp_venv` altında **kendi izole
-venv'ini** kurar ve `Mcp_mimarisi/` klasörüne hiç dokunmaz. Sebep: sistem
-`python3`'ü PATH'e bağlı olarak başka bir alt projenin venv'ine
-düşebiliyordu; bu, `fastapi`/`psycopg2` bulunamama hatalarına yol açtı.
+Eskiden (`baslat.sh` ile) `Mcp_mimarisi` için ayrı bir izole venv
+kuruluyordu — sistem `python3`'ü PATH'e bağlı olarak başka bir alt
+projenin venv'ine düşebiliyordu, bu da `fastapi`/`psycopg2` bulunamama
+hatalarına yol açıyordu. Docker'a geçişle bu sorun kategorik olarak ortadan
+kalktı: her üç bileşen tek bir image içinde, kendi bağımlılıklarıyla,
+host'un Python kurulumundan tamamen izole çalışır (bkz. `docker/Dockerfile`).
 
 ---
 

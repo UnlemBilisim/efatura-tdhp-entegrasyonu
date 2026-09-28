@@ -74,14 +74,18 @@ indeksini de güncelle.
 
 ## Çalıştırmak için gerekenler (sık atlanan)
 
-`./baslat.sh` üç dış bağımlılık ister; biri eksikse ilgili adım sessizce
-çalışmaz, hata mesajı ilk bakışta yanıltıcı olabilir:
+> ✅ **Uygulandı** (2026-09-28, kullanıcı kararı): `baslat.sh` kaldırıldı,
+> tek çalıştırma yolu `docker compose up` (bkz.
+> [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md)).
+
+`docker compose up` üç dış bağımlılık ister; biri eksikse ilgili servis
+sessizce çalışmaz, hata mesajı ilk bakışta yanıltıcı olabilir:
 
 | Gereksinim | Eksikse ne olur |
 |---|---|
-| **Docker Desktop açık** | PostgreSQL başlamaz → ön filtreleme çalışmaz |
+| **Docker Desktop açık** | Hiçbir container ayağa kalkmaz |
 | **SSH tüneli (11435)** | LLM'e erişilemez → TDHP tahmini boş `entries` döner |
-| **Ollama (11434)** | RAG embedding çalışmaz |
+| **Ollama container'ı (11434) + `embeddinggemma` modeli çekilmiş** | RAG embedding çalışmaz |
 
 SSH tünel komutu [`çalıştırma.txt`](çalıştırma.txt) içinde. Tünel parola
 istiyor — ajan açamaz, kullanıcı açmalı.
@@ -103,8 +107,8 @@ cd model_eval && python3 -m pytest tests/ -q     # 205 test
 - **Prod DB'sine (`DATABASE_URL`) test verisi yazma** — ayrı bir test
   veritabanı kullan.
 
-Bir özelliği "tamamlandı" saymadan önce gerçekten çalıştır: `./baslat.sh` +
-`POST /fatura/isle` ile gerçek bir fatura işle. Kodu okuyup "böyle çalışması
+Bir özelliği "tamamlandı" saymadan önce gerçekten çalıştır: `docker compose up`
++ `POST /fatura/isle` ile gerçek bir fatura işle. Kodu okuyup "böyle çalışması
 lazım" demek yeterli değildir (kök CLAUDE.MD §3).
 
 ## Bilinen güvenlik durumu (2026-07-27 taraması)
@@ -118,30 +122,165 @@ yazarken bunları kötüleştirmemeye dikkat et:
 > preflight 405 döner). `entegrasyon/static/index.html` bizim kendi manuel
 > test aracımızdır — teslim kapsamında değil, ama bizde kalıyor.
 
-**Doğrulanmış açıklar:**
-- **XSS** — `entegrasyon/static/index.html` untrusted fatura alanlarını
-  escape'siz `innerHTML`'e yazıyor (16 kullanım, escape fonksiyonu yok).
-  Teslim kapsamı dışı olduğu için düzeltilmedi (kullanıcı kararı), ama
-  **yalnızca yerel test kullanımı** varsayımına dayanıyor: kötü niyetli bir
-  faturayı bu arayüzde açmak riskli. Yeni bir alanı arayüze taşırken escape et.
-- **XML entity expansion** — hem `Mcp_mimarisi/src/efatura_kdv/ubl_parser.py`
-  hem `model_eval/core/parsing.py` korumasız `ET` kullanıyor (463 byte → 1 MB
-  ölçüldü). XXE **yok** (harici entity çözülmüyor, test edildi).
-- **Kimlik doğrulama yok** — 8 endpoint'in (Mcp 4 + entegrasyon 4) hiçbirinde
-  auth yok, üstelik `baslat.sh` ikisini de `0.0.0.0`'a bind ediyor.
-- **`/fatura/onayla` istemci verisini doğrulamıyor** — gönderilen tahmini
-  sunucu kendisinin ürettiğini teyit etmeden PostgreSQL + RAG'a yazıyor.
-- **`baslat.sh`'te gömülü DB parolası** (`efatura:efatura`). Uygulama kodu
-  doğru yazılmış (env'den okur, yoksa hata verir) — sorun sadece scriptte.
+**Güvenlik durumu (2026-09-11):** Dış/dahili Bearer token, loopback bind,
+DTD/entity ve istek boyutu reddi, TDHP/mizan/tutar doğrulaması, sunucu
+tarafı `prediction_id` onayı ve arayüz escape'i uygulanmıştır. Yeni iş
+endpoint'leri auth bağımlılığı olmadan eklenmemeli; doğrulamadan geçmeyen
+tahmin RAG'a yazılmamalıdır. Tarihsel tarama:
+`docs/explanation/guvenlik-durumu-2026-07-27.md`.
+
+> 🔴 **GEÇİCİ OLARAK GEVŞETİLDİ (2026-09-11, kullanıcı kararı — "token
+> kısmını şimdilik aktif etme"):** `entegrasyon/app.py`'deki `/fatura/isle`,
+> `/fatura/onayla`, `/kayitli-sirketler` endpoint'lerinden
+> `Depends(require_api_token)` KALDIRILDI — bu üçü artık token OLMADAN
+> çalışıyor, ağdaki (`BIND_HOST=0.0.0.0` ile açılmışsa herkesin erişebildiği)
+> HERKES istek atabilir. Yerel ağda demo.html ile test ederken 401
+> istenmediği için yapıldı, kalıcı bir karar DEĞİLDİR. `Mcp_mimarisi`
+> tarafındaki `MCP_INTERNAL_API_TOKEN` kontrolü bundan ETKİLENMEDİ, hâlâ
+> zorunlu. İlgili iki test (`test_business_endpoint_requires_token`,
+> `test_wrong_token_is_rejected`, `entegrasyon/tests/test_api_security.py`)
+> bilinçli olarak `@pytest.mark.skip` ile işaretlendi.
+>
+> **Geri almak için:** üç endpoint'e `dependencies=[Depends(require_api_token)]`
+> geri ekle (import zaten `# noqa: F401` ile korunuyor,
+> `entegrasyon/app.py` başında duruyor), iki test'teki `@pytest.mark.skip`
+> dekoratörünü kaldır. Canlıya/paylaşılan bir ortama çıkmadan önce bu
+> mutlaka geri alınmalı — aksi halde sistem tamamen açık kalır.
+
+> ✅ **Uygulandı** (2026-09-11, kullanıcı isteği — canlıya çıkış hazırlığı,
+> "önemli yerleri loglamak istiyorum"): Profesyonel/structured loglama
+> eklendi. Yeni ortak modül `entegrasyon/log_ortak.py` (birebir kopyası
+> `Mcp_mimarisi/src/efatura_kdv/log_ortak.py` — iki proje kod olarak
+> birleştirilmediği için, bkz. üstteki değişmez kural #2, mantık ayrı ayrı
+> tutulur ama birebir aynı kalmalı):
+> - **JSON structured log** (varsayılan, `LOG_FORMAT=text` ile serbest metne
+>   dönülebilir) — her satırda `zaman` (tarih dahil, önceden sadece saat
+>   vardı), `seviye`, `logger`, `mesaj`, `request_id`.
+> - **Request-ID korelasyonu** (`RequestIdMiddleware`, `contextvars` ile) —
+>   her HTTP isteğine bir kimlik atanır, o istek boyunca çağrılan TÜM
+>   logger'lara (httpx, core.mizan, vb.) otomatik taşınır, cevaba
+>   `X-Request-ID` header'ı olarak eklenir. `entegrasyon` → `Mcp_mimarisi`
+>   isteklerinde de aynı kimlik `X-Request-ID` header'ıyla taşınır
+>   (`mcp_mimarisi_istemcisi.py::_auth_headers`) — iki servisin logları TEK
+>   bir request_id ile birlikte aranabilir, gerçek testte doğrulandı.
+> - **Log rotasyonu** — `LOG_DIR` verildiğinde `log_ortak.py::loglamayi_kur`
+>   `RotatingFileHandler` (10MB x 5 dosya) ekler.
+>   > ✅ **Düzeltildi** (2026-09-28, bu notun kendisi bayatlamıştı —
+>   > kullanıcı kararıyla `baslat.sh` artık kullanılmıyor, sadece Docker):
+>   > önceki metin "host modunda `baslat.sh` `.calistirma`'yı kullanır"
+>   > diyordu ama bu YANLIŞTI — `baslat.sh` `LOG_DIR`'ı hiçbir zaman set
+>   > ETMEMİŞTİ, bu yüzden `RotatingFileHandler` host modunda hiç
+>   > kurulmuyordu; `.calistirma/*.log` dosyaları uygulamanın kendi
+>   > rotasyonundan değil, `baslat.sh`'ın shell yönlendirmesinden
+>   > (`>> .calistirma/....log`) geliyordu ve gerçekten sınırsız büyüyordu
+>   > (bu, "önceden düzeltildi" denilen sorunun ta kendisiydi). Docker
+>   > tarafında (`docker/supervisord.conf`) `LOG_DIR` de hiç set edilmez —
+>   > bilinçli, uygulama sadece stdout'a JSON basar, container'da rotasyon
+>   > sorumluluğu Docker'ın kendi log sürücüsündedir. Ama
+>   > `docker-compose.yml`'de de rotasyon tanımlı DEĞİLDİ (varsayılan
+>   > `json-file` sürücüsü sınırsız büyür) — `postgres`/`ollama`/`app`
+>   > servislerinin üçüne de `logging: {driver: json-file, max-size: 10m,
+>   > max-file: "5"}` (`x-log-rotasyonu` anchor'ı ile, `docker/
+>   > docker-compose.yml`) eklenerek gerçek bir rotasyon sağlandı —
+>   > `restart: unless-stopped` ile sürekli çalışan servislerin disk
+>   > doldurmaması için. `baslat.sh`/host modu artık kullanılmadığından bu
+>   > yol için ayrıca düzeltme yapılmadı.
+> - **Tüm beklenmeyen hatalarda stack trace** — `entegrasyon/app.py`'ye
+>   `Mcp_mimarisi/api.py`'deki gibi bir global `@app.exception_handler(Exception)`
+>   eklendi (önceden yoktu, FastAPI'nin varsayılan 500'üne bırakılmıştı);
+>   `except Exception` bloklarında `exc_info=True` eklendi.
+> - **Auth reddi loglanıyor** (`auth.py`, her iki serviste) — token'ın
+>   kendisi DEĞİL, sha256 parmak izinin ilk 8 karakteri loglanır (log
+>   dosyası sızarsa token sızmasın diye).
+> - **Audit log** (`entegrasyon.audit` logger'ı, `_audit_logla()`) — her
+>   `/fatura/isle`/`/fatura/onayla` çağrısı için istemci IP + VKN +
+>   invoice_id + yön + karar, ayrı JSON satırı olarak. Ham fatura XML'i
+>   veya token bu satıra ASLA yazılmaz.
+>
+> ✅ **Uygulandı** (2026-09-28, kullanıcı kararı — "yerel ağım güvenli, IP
+> adreslerini ve dosyaları loglarsak sorun olmaz, log kısmı sağlam olsun"):
+> `_audit_logla()`'ya (`entegrasyon/app.py`) `dosya_adi` alanı eklendi —
+> önceden bu bilgi SADECE `_test_kaydini_logla`'nın yazdığı Excel
+> test-kayıt dosyasında vardı, asıl JSON audit satırında yoktu; "hangi
+> dosyanın işlendiği" audit log'dan tek başına cevaplanamıyordu. Bu, auth'ın
+> 3 endpoint'te (`/fatura/isle`, `/fatura/onayla`, `/kayitli-sirketler`)
+> hâlâ GEÇİCİ olarak kapalı olduğu (yukarıdaki 🔴 not) bir dönemde IP+dosya
+> izlenebilirliğini güçlendirmek için — kullanıcı, auth'u yerel ağda
+> demo/test bitene kadar kapalı tutmayı, bunun yerine loglamayı
+> sağlamlaştırmayı tercih etti. **Bu bir güvenlik ikamesi DEĞİLDİR** —
+> loglama sadece SONRADAN "kim/ne zaman/hangi dosya" sorusuna cevap verir,
+> isteği baştan ENGELLEMEZ; auth'suz geçen bir kötüye kullanım audit
+> log'da görülür ama önlenmez. Auth'un canlıya çıkmadan önce geri
+> eklenmesi gerekliliği (yukarıdaki 🔴 not) bundan ETKİLENMEDİ.
+>
+> **Otomatik yedekleme** (`scripts/otomatik-yedekleme.sh`, kullanıcı onayıyla
+> crontab'a eklendi — her gün 03:00) — PostgreSQL (`pg_dump -F c`) +
+> ChromaDB (`docker cp` ile `app` container'ından, tar.gz) `db-yedek/`
+> altına tarih damgalı dosya olarak yazılır, 14 günden eski yedekler
+> otomatik silinir. Önceden sadece elle alınmış TEK bir dump vardı,
+> tekrarlanan/zamanlanmış yedekleme yoktu. Gerçek çalıştırmayla doğrulandı
+> (`pg_restore --list` ile dump bütünlüğü teyit edildi).
+>
+> ✅ **Düzeltildi** (2026-09-28, `baslat.sh` kaldırılınca fark edildi):
+> ChromaDB yedeği önceden host'taki `model_eval/vector_db/` dizininden
+> alınıyordu — bu, `baslat.sh` (host modu) döneminde biriken bir kopyaydı.
+> Sistem artık sadece Docker ile çalıştığından güncel/gerçek RAG verisi
+> host dizininde DEĞİL, `docker-compose.yml`'deki `efatura-vector-db` named
+> volume'ünde birikiyor (bkz. `docker-ile-calistirma.md` §5.5); host
+> dizini yedeklemeye devam etmek sessizce **bayat/yanlış veriyi
+> yedeklemek** anlamına geliyordu. Script artık `docker cp` ile
+> `app` container'ının içinden (`com.docker.compose.service=app`
+> etiketiyle bulunur, container adı proje dizin adına göre değişebildiği
+> için isim yerine etiket kullanılır) kopyalıyor.
+>
+> **Kapsam dışı bırakıldı (kullanıcı kararı, ayrı ele alınabilir):** rate
+> limiting, container başlarken otomatik `alembic upgrade head`, Prometheus/
+> metrics endpoint'i, CI entegrasyonu — bkz. 2026-09-11 prod-readiness
+> denetimi (konuşma geçmişi).
+
+> ✅ **Uygulandı** (2026-09-11, kullanıcı kararı — "işlemleri sıraya alalım,
+> hepsini aynı anda işlemeyelim"): Eş zamanlı fatura işleme sınırlaması
+> eklendi. Yeni ortak modül `entegrasyon/es_zamanli_sinir.py` (birebir
+> kopyası `Mcp_mimarisi/src/efatura_kdv/es_zamanli_sinir.py`) —
+> `threading.Semaphore` tabanlı (endpoint'ler sync fonksiyon olduğu için
+> `asyncio.Semaphore` DEĞİL). `MAX_ESZAMANLI_ISLEM` env var'ı ile ayarlanır
+> (varsayılan 2). `entegrasyon/app.py::fatura_isle` ve
+> `Mcp_mimarisi/api.py::fatura_kontrol_et`/`fatura_coklu_kontrol` artık
+> `with fatura_isle_sirasi():` bloğu içinde çalışıyor — limiti aşan istekler
+> **reddedilmez**, semaphore serbest kalana kadar bekler (rate limiting
+> değil, kuyruklama). Gerçek threading testiyle doğrulandı (5 istek, her
+> biri 0.5s, limit=2 → toplam ~1.5s, sınırsız olsaydı ~0.5s olurdu).
+>
+> **Gönderen kullanıcı bilgisi** (aynı kullanıcı isteği — "ilerde kaç fatura
+> işlediğini loglarız"): `FaturaIsleIstegi`'ye opsiyonel `gonderen_kullanici`
+> alanı eklendi (dış ekibin arayüzü login'den sonra doldurup gönderecek —
+> **sistem bu bilgiyi doğrulamaz**, sadece `entegrasyon.audit` logger'ına
+> işler). Henüz aktif kullanılmıyor (dış ekip entegrasyonu bekleniyor),
+> sadece alan/loglama altyapısı hazır. Şema: `entegrasyon/docs/reference/
+> dis-ekip-api-kullanimi.md`.
 
 **Temiz çıkanlar** (bozmayın): SQL injection yok (tüm sorgular parametrize),
 unsafe deserialization yok, gömülü API anahtarı yok, `sys.path` manipülasyonu
 güvenli.
 
-**Eksik savunma:** `model_eval/core/single.py::_normalize_entries` LLM'in
-verdiği 3 haneli kodu `TDHP_GLOSSARY`'ye karşı doğrulamıyor ve tutarı faturanın
-`payable` değeriyle karşılaştırmıyor. Alt kırılım adımı bunu doğru yapıyor
-(`single.py:460` mizana karşı allowlist) — aynı disiplin ilk aşamada yok.
+> ✅ **Uygulandı** (2026-09-25, bu notun kendisi bayatlamıştı — düzeltildi):
+> `model_eval/core/single.py::_normalize_entries` hâlâ yalnızca format
+> normalizasyonu yapıyor (kod/dc normalize, borç=alacak toplamı) — LLM'in
+> verdiği 3 haneli kodu `TDHP_GLOSSARY`'ye karşı doğrulamıyor, tutarı
+> faturanın `payable` değeriyle karşılaştırmıyor. AMA bu doğrulama artık
+> **ayrı bir modülde var ve pipeline'a bağlı**: `model_eval/core/validation.py
+> ::validate_prediction` (kod formatı, `TDHP_GLOSSARY` üyeliği, alt kod
+> mizanda var mı, dc geçerliliği, borç=alacak, **ve `payable` ile borç
+> toplamının uyuşması** dahil) — bunu `single.py` değil,
+> `entegrasyon/model_eval_koprusu.py:182-186`'daki `faturayi_disa_aktar`
+> sonrası çağırıyor ve sonucu `sonuc["approvable"]` bayrağına yazıyor. Bu
+> bayrak `entegrasyon/app.py:555-559`'da `/fatura/onayla`'yı SUNUCU
+> TARAFINDA reddediyor (`approvable=False` ise onaylanamaz; DB sorgusunda da
+> `AND approvable = TRUE` şartı var, `model_eval_koprusu.py:302`). Yani
+> disiplin ilk aşamada (`single.py`) yok ama sisteme bir bütün olarak
+> (`entegrasyon` katmanı üzerinden) bağlı — sadece `model_eval/` tek başına
+> incelenirse "hiç çağrılmıyor" gibi görünüyor, asıl çağıran taraf
+> `entegrasyon`'dur.
 
 > Not: Prompt injection yapısal olarak mümkün görünüyor (fatura not alanı
 > prompt'a çitlemesiz giriyor) ama canlı LLM ile iki saldırı denendi, ikisi de
