@@ -65,7 +65,7 @@ indeksini de güncelle.
 5. **KDV uygunluğu LLM'e sorulmaz.** Mevzuat kontrolü deterministik kalır;
    LLM yalnızca muhasebe kaydı için kullanılır.
 6. **`records[]`/`dis_sema` dış sözleşmesi, iç şemadan TÜRETİLİR.** İç tarafta
-   `entries[]` + `dc="Borc"/"Alacak"` kalır (205 test + DB + RAG buna bağlı);
+   `entries[]` + `dc="Borc"/"Alacak"` kalır (model_eval testleri + DB + RAG buna bağlı);
    dönüşüm yalnızca `model_eval/core/disa_aktarim.py`'de yapılır. Dış ekibin
    tek kaynağı (API sözleşmesi + `records[]` şema detayı, 2026-08-05'te
    birleştirildi):
@@ -97,11 +97,20 @@ istiyor — ajan açamaz, kullanıcı açmalı.
 ## Test etme
 
 ```bash
-cd model_eval && python3 -m pytest tests/ -q     # 205 test
+python3 -m pytest Mcp_mimarisi/test -q          # 28 test
+python3 -m pytest entegrasyon/tests -q          # 4 test (+2 bilinçli skip)
+(cd model_eval && python3 -m pytest tests -q)   # 226 test
 ```
 
-- **PostgreSQL kapalıysa** 22 test otomatik `skip` edilir
-  (`requires_postgres` marker'ı) — bu bir hata değildir.
+Üç paket ayrı ayrı çalıştırılır (her biri kendi `sys.path` düzenini kurar).
+Ayrıntı ve skip'lerin anlamı: [`docs/how-to/sistemi-test-etme.md`](docs/how-to/sistemi-test-etme.md) §1.
+
+- **CI** (`.github/workflows/testler.yml`, 2026-09-28): `main`'e her push'ta
+  ve PR'da üç paketi Python 3.11 + gerçek PostgreSQL ile çalıştırır ve ikiz
+  modüllerin (`log_ortak.py`, `es_zamanli_sinir.py`) birebir aynı olduğunu
+  denetler. İkiz modüllerden birini değiştirip diğerini unutursan CI kırılır.
+- **PostgreSQL kapalıysa** model_eval'de 26 test otomatik `skip` edilir
+  (`requires_postgres` marker'ı) — bu bir hata değildir, CI'da koşarlar.
 - Sistem `.venv` kullanıyorsa `pytest` bulunamayabilir; `/usr/bin/python3 -m
   pytest` ile sistem python'unu kullan.
 - **Prod DB'sine (`DATABASE_URL`) test verisi yazma** — ayrı bir test

@@ -1,6 +1,6 @@
 """kalem_nace_esleme.py için ad-hoc doğrulama script'i (pytest değil).
 
-Repo'da otomatik test altyapısı yok — bu script, gerçek ubls/ faturaları ve
+Otomatik (DB'siz) karşılığı: test_kalem_nace_unit.py. Bu script ise gerçek ubls/ faturaları ve
 sentetik örneklerle 6 senaryoyu (tek-NACE, tek-NACE-ama-oran-uyuşmuyor,
 çoklu-NACE-havuz-uygun, çoklu-NACE-havuz-uyuşmuyor, genel-toplam-tek-oran,
 genel-toplam-karışık) çalıştırıp çıktıyı elle gözlemlemek için yazıldı

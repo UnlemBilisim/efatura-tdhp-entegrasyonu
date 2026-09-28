@@ -113,7 +113,7 @@ iç şemayı **tek yönlü** dış şemaya çevirir: `dc="Borc"/"Alacak"` →
 `account_code_reason` metni üretilir (LLM'e tekrar sorulmaz — post-hoc
 rasyonalizasyon riskinden kaçınma), `CARI_HESAP_KODLARI` kümesinden
 `account_code_type` (`C`/`G`) türetilir. İç şema (`entries[]`) hiç değişmez —
-205 test, ChromaDB kayıtları ve `model_eval_sonuclar` tablosu ona bağlı.
+model_eval testleri, ChromaDB kayıtları ve `model_eval_sonuclar` tablosu ona bağlı.
 
 **Adım 5 — Zarf ve cevap.** `disa_aktarim.py` 9 alanlı `dis_sema`'yı üretir
 (`invoice_id`, `issue_date`, `currency`, `payable_amount`,
@@ -772,7 +772,7 @@ farkı: her tenant'ın listesi kendine özeldir.
   TUTULMAZ**, mevcut sınıflandırmadan türetilir.
 - `debit_credit`: `DC_DIS_KARSILIGI = {"Borc": "BORÇ", "Alacak": "ALACAK"}`
   ile büyük harfli Türkçe karşılığa çevrilir; iç tarafta `"Borc"/"Alacak"`
-  AYNEN kalır (205 test + DB + RAG buna bağlı).
+  AYNEN kalır (model_eval testleri + DB + RAG buna bağlı).
 - `account_code_reason`: **deterministik üretilir, LLM'e sorulmaz**
   (`_gerekce_uret`, satır 40-89) — `entry["secim_kaynagi"]` izine göre
   (fuzzy/llm/3-hanede-kalma) insan-okur bir cümle kurulur; post-hoc
@@ -1204,7 +1204,7 @@ dis-ekip-api-kullanimi.md`, `entegrasyon/app.py:311-390`,
 |---|---|---|
 | `model_eval/core/single.py` | `predict_single_invoice()` — tek fatura için RAG+LLM+alt kırılım tam akışı | `entegrasyon`'un çağırdığı tek fonksiyon; sistemin TDHP tahmin çekirdeği, tüm halüsinasyon-reddi mimarisi burada toplanır |
 | `entegrasyon/app.py` | `/fatura/isle` orkestrasyonu — yön tespiti, ön filtre, kur onayı, TDHP tahmini akışını birleştirir | Dış ekibin gördüğü tek giriş noktası; inbox/outbox dallanması ve tüm "dur ve sor" noktaları burada |
-| `model_eval/core/disa_aktarim.py` | İç şema (`entries[]`) → dış şema (`records[]`/`dis_sema`) tek yönlü dönüşüm | Dış ekiple olan sözleşmenin TEK üretildiği yer; 205 test + DB + RAG iç şemaya bağlı, burada bozulursa dış ekip kırılır |
+| `model_eval/core/disa_aktarim.py` | İç şema (`entries[]`) → dış şema (`records[]`/`dis_sema`) tek yönlü dönüşüm | Dış ekiple olan sözleşmenin TEK üretildiği yer; model_eval testleri + DB + RAG iç şemaya bağlı, burada bozulursa dış ekip kırılır |
 | `Mcp_mimarisi/src/efatura_kdv/kalem_nace_esleme.py` | Çoklu NACE oran havuzu + istisna kodu doğrulaması ile kalem bazlı KDV kararı | Ön filtrenin asıl karar mantığı; VKN güvenlik kontrolü de burada (`SaticiVknUyusmazligiHatasi`) |
 | `Mcp_mimarisi/src/efatura_kdv/ubl_parser.py` | UBL-TR XML → `Fatura` dataclass, KDV/tevkifat/istisna ayrımı | Mcp_mimarisi'nin girdi kapısı; KDV vs. diğer vergi (Özel İletişim Vergisi vb.) ayrımı burada yanlış olursa tüm kontrol zinciri bozulur |
 | `model_eval/core/parsing.py` | Fatura XML/JSON ayrıştırma + **yön tespiti** (inbox/outbox) | Tüm sistemin dallanma kararı (`direction`) burada üretilir; hem `entegrasyon/yon_tespiti.py` hem `model_eval` bunu kullanır |

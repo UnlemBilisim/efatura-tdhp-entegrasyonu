@@ -30,26 +30,46 @@ istediği için elle açılmalı.
 
 ## 1. Birim testleri
 
-```bash
-cd model_eval && python3 -m pytest tests/ -q
-```
+Her bileşen kendi `sys.path` düzenini kurduğu için üç paket **ayrı ayrı**
+çalıştırılır (proje kökünden):
 
-Beklenen: **205 passed**.
+```bash
+python3 -m pytest Mcp_mimarisi/test -q          # 28 passed, 1 skipped
+python3 -m pytest entegrasyon/tests -q          # 4 passed, 2 skipped
+(cd model_eval && python3 -m pytest tests -q)   # 226 passed (PostgreSQL varsa)
+```
 
 | Durum | Anlamı |
 |---|---|
-| `183 passed, 22 skipped` | PostgreSQL kapalı — **hata değil**, `requires_postgres` marker'ı atlıyor |
+| Mcp_mimarisi `1 skipped` | `test/test_kalem_nace.py` gerçek DB + fatura dosyası isteyen manuel bir script'tir, pytest altında bilerek atlanır (`python3 test/test_kalem_nace.py` ile elle çalıştırılır) |
+| entegrasyon `2 skipped` | Auth 3 endpoint'te geçici olarak kapalı olduğu için iki auth testi bilerek skip'li (bkz. kök `CLAUDE.md` 🔴 notu) |
+| model_eval `200 passed, 26 skipped` | PostgreSQL'e (`TEST_DATABASE_URL`) bağlanılamıyor — **hata değil**, `requires_postgres` marker'ı atlıyor |
 | `No module named pytest` | Yanlış venv aktif; `/usr/bin/python3 -m pytest` ile sistem python'unu kullanın |
 
 Prod veritabanına (`DATABASE_URL`) test verisi yazmayın; testler
-`TEST_DATABASE_URL` kullanır.
+`TEST_DATABASE_URL` kullanır (varsayılan:
+`postgresql://efatura:efatura@localhost:5434/model_eval_test`).
+
+> ✅ **Uygulandı** (2026-09-28): **CI eklendi** —
+> [`.github/workflows/testler.yml`](../../.github/workflows/testler.yml)
+> `main`'e her push'ta ve her PR'da üç paketi Python 3.11'de (Docker
+> image'ıyla aynı sürüm) gerçek bir PostgreSQL servisiyle çalıştırır;
+> böylece yerelde atlanan `requires_postgres` testleri de koşar. Ayrıca
+> `log_ortak.py` ve `es_zamanli_sinir.py`'nin iki kopyasının birebir aynı
+> olduğunu `diff` ile denetler (önceden bu kural sadece belgedeydi).
+> Mcp_mimarisi'ye DB'siz çalışan gerçek pytest'ler eklendi:
+> `test/test_kalem_nace_unit.py` (karar mantığı — havuz, istisna kodu,
+> genel oran fallback'i, VKN uyuşmazlığı) ve `test/test_api.py` (HTTP
+> katmanı — dahili token 401/503, DTD reddi, boyut sınırı, request-id).
+> Adımların tamamı yerelde geçici bir `python:3.11-slim` container'ında
+> birebir çalıştırılarak doğrulandı.
 
 ## 2. Arayüzden manuel test (en pratik yol)
 
 Terminalde logu izlemeye başlayın:
 
 ```bash
-tail -f .calistirma/entegrasyon.log | grep -A 45 "DIŞ EKİP JSON"
+cd docker/ && docker compose logs -f app | grep -A 45 "DIŞ EKİP JSON"
 ```
 
 Tarayıcıdan http://localhost:8100 açıp fatura yükleyin. Dış ekibe gidecek JSON
@@ -109,7 +129,7 @@ print(json.dumps(s.get('dis_sema'), ensure_ascii=False, indent=2))
 Kök `CLAUDE.MD` §3 gereği: kodu okuyup "böyle çalışması lazım" demek yeterli
 değildir.
 
-- [ ] `pytest` geçiyor (205)
+- [ ] Üç test paketi geçiyor (§1) — push sonrası CI da yeşil
 - [ ] Gerçek bir faturayla `POST /fatura/isle` çalıştırıldı
 - [ ] Çıktı gözlemlendi (denge, `records[]`, `success`)
 - [ ] İlgili `docs/` güncellendi + `> ✅ Uygulandı (TARİH)` notu eklendi

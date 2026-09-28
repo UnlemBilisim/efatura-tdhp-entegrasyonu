@@ -102,9 +102,10 @@ bir asimetri — detaylı gerekçe [`mimari.md`](mimari.md) §2.1'de.
 > Asenkron (job_id tabanlı) bir v2 API tasarlanıp kodlanmıştı, ama sunucuya
 > taşıma öncesi son kontrolde kullanıcı kararıyla **iptal edildi** — dış
 > ekibe teslim v1 (`/fatura/isle`) ile devam ediyor. `app.py:78-81`'de bunu
-> açıklayan bir yorum kalıyor, ama dosyaların kendisi silinmiş durumda;
-> `model_eval/tests/test_v2_semalar.py` bunu `pytest.importorskip` ile
-> güvenli şekilde atlıyor. Gerekçe: [`docs/explanation/v2-api-tasarim-karari.md`](docs/explanation/v2-api-tasarim-karari.md).
+> açıklayan bir yorum kalıyor, ama dosyaların kendisi silinmiş durumda.
+> Onları test eden `model_eval/tests/test_v2_semalar.py` de 2026-09-28'de
+> kaldırıldı (hedefi olmadığı için her çalıştırmada atlanan ölü bir testti).
+> Gerekçe: [`docs/explanation/v2-api-tasarim-karari.md`](docs/explanation/v2-api-tasarim-karari.md).
 
 ### 3.4 `model_eval/` — TDHP tahmini (LLM + RAG)
 

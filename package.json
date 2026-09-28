@@ -5,7 +5,7 @@
   "description": "e-Fatura KDV doğrulama (Mcp_mimarisi) + TDHP tahmini (model_eval) + orkestrasyon (entegrasyon) sistemi — Python tabanlıdır, bu paket yalnızca dağıtım amaçlıdır.",
   "scripts": {
     "postinstall": "node scripts/kur-python-bagimliliklari.js",
-    "test": "python3 -m pytest model_eval/tests -q && python3 -m pytest entegrasyon/tests -q"
+    "test": "python3 -m pytest Mcp_mimarisi/test -q && python3 -m pytest entegrasyon/tests -q && cd model_eval && python3 -m pytest tests -q"
   },
   "files": [
     "Mcp_mimarisi/src",
