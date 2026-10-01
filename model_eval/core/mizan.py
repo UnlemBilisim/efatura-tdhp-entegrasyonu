@@ -24,12 +24,17 @@ bir adimda yapilir, ana tahmin akisi (3 haneli kod bulma) etkilenmez."""
 import logging
 import re
 import threading
+import time
 
 from .db import get_conn
 
 _logger = logging.getLogger(__name__)
 
-_mizan_cache = {}
+# Mizan başka bir süreçten (mizan_excel_yukle.py) güncellenebildiği için
+# süresiz tutulmaz; en geç bu kadar sonra yeniden okunur.
+MIZAN_CACHE_SURESI_SANIYE = 300
+
+_mizan_cache = {}  # tenant_vkn -> (okunma_zamani, sozluk)
 _mizan_cache_lock = threading.Lock()
 
 
@@ -73,42 +78,51 @@ def get_alt_kirilimlar(tenant_vkn=None):
     haneli koda duser (2026-07-30'dan itibaren gecerli davranis, kaynak
     Excel'den DB'ye tasinsa da DEGISMEDI).
 
-    Process-omru cache'lenir (rag_common.py::get_collection ile ayni desen,
-    key=tenant_vkn) - DB her istekte yeniden sorgulanmaz."""
-    key = tenant_vkn or ""
-    if key in _mizan_cache:
-        return _mizan_cache[key]
+    Dolu sonuc MIZAN_CACHE_SURESI_SANIYE boyunca cache'lenir (key=tenant_vkn).
+    Bos sonuc ve DB hatasi cache'lenMEZ (2026-09-28): onceden ikisi de
+    surec omru boyunca tutuluyordu - onboarding sonrasi mizan yuklenmeden
+    gelen ilk fatura "mizan yok" sonucunu kalicilastiriyor, anlik bir DB
+    hatasi da servis yeniden baslatilana kadar alt kirilimi kapatiyordu."""
+    if not _tenant_vkn_gecerli_mi(tenant_vkn):
+        _logger.info(
+            "mizan.py: gecersiz/bos own_vkn (%r) - mizan yok sayilacak, "
+            "alt kirilim adimi bu istek icin devre disi (3 haneli koda dusulecek)",
+            tenant_vkn,
+        )
+        return {}
+
+    kayit = _mizan_cache.get(tenant_vkn)
+    if kayit is not None and time.monotonic() - kayit[0] < MIZAN_CACHE_SURESI_SANIYE:
+        return kayit[1]
+
     with _mizan_cache_lock:
-        if key not in _mizan_cache:
-            if not _tenant_vkn_gecerli_mi(tenant_vkn):
-                _logger.info(
-                    "mizan.py: gecersiz/bos own_vkn (%r) - mizan yok sayilacak, "
-                    "alt kirilim adimi bu istek icin devre disi (3 haneli koda dusulecek)",
-                    tenant_vkn,
-                )
-                _mizan_cache[key] = {}
-            else:
-                try:
-                    with get_conn(tenant_vkn=tenant_vkn) as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("SELECT hesap_kodu, ana_kod, hesap_adi FROM mizan_alt_kirilim")
-                            rows = cur.fetchall()
-                    by_main_code = {}
-                    for kod, ana_kod, ad in rows:
-                        by_main_code.setdefault(ana_kod, []).append((kod, ad))
-                    if not by_main_code:
-                        _logger.info(
-                            "mizan.py: tenant_%s.mizan_alt_kirilim bos - mizan yok sayilacak",
-                            tenant_vkn,
-                        )
-                    _mizan_cache[key] = by_main_code
-                except Exception as exc:  # noqa: BLE001
-                    _logger.warning(
-                        "mizan.py: tenant_%s.mizan_alt_kirilim okunamadi (%s) - mizan yok sayilacak",
-                        tenant_vkn, exc,
-                    )
-                    _mizan_cache[key] = {}
-    return _mizan_cache[key]
+        kayit = _mizan_cache.get(tenant_vkn)
+        if kayit is not None and time.monotonic() - kayit[0] < MIZAN_CACHE_SURESI_SANIYE:
+            return kayit[1]
+        try:
+            with get_conn(tenant_vkn=tenant_vkn) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT hesap_kodu, ana_kod, hesap_adi FROM mizan_alt_kirilim")
+                    rows = cur.fetchall()
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning(
+                "mizan.py: tenant_%s.mizan_alt_kirilim okunamadi (%s) - mizan yok sayilacak",
+                tenant_vkn, exc,
+            )
+            return {}
+
+        by_main_code = {}
+        for kod, ana_kod, ad in rows:
+            by_main_code.setdefault(ana_kod, []).append((kod, ad))
+        if not by_main_code:
+            _logger.info(
+                "mizan.py: tenant_%s.mizan_alt_kirilim bos - mizan yok sayilacak",
+                tenant_vkn,
+            )
+            _mizan_cache.pop(tenant_vkn, None)
+            return {}
+        _mizan_cache[tenant_vkn] = (time.monotonic(), by_main_code)
+        return by_main_code
 
 
 def reset_mizan_cache_for_tests():
