@@ -21,7 +21,7 @@ def compute_iade_hint(invoice):
     ciktirtmak yerine burada deterministik olarak hesaplar.
 
     Archive2/jsons'daki 20 IADE faturasinin TAMAMINI inceleyerek dogrulanmis
-    kural (bkz. model_eval/RESULTS.md SS6.1-6.3):
+    kural:
     - outbox + IADE = ALISTAN IADE (tedarikciye mal/hizmet iade ediyoruz):
       karsi taraf (320 vb.) BORC, KDV hesabi 391 (Alistan Iade KDV) ALACAK,
       iade edilen mal/hizmet hesabi ALACAK.
@@ -89,7 +89,7 @@ def compute_ihrac_kayitli_hint(invoice):
     Not: compute_tevkifat_hint/compute_iade_hint'in aksine bu, henuz
     Archive2/jsons uzerinde n>1 bir deneyle olcülmedi - kullanicinin
     dogrudan onayladigi bir muhasebe kurali olarak eklendi. Ileride yanlis
-    ciktigi gozlenirse (RESULTS.md'ye benzer bir bulgu ile) gozden gecirilmeli.
+    ciktigi gozlenirse gozden gecirilmeli.
     """
     # faturada bulunana istisna kodu yukarda belirlenen 701-704 kodlarindan biri degilse bu hint'i tetikleme
     exemption_codes = {
@@ -186,8 +186,7 @@ def build_direction_text(invoice):
     bir IADE, 'biz saticiyiz' degil, tam tersine tedarikciye mal iade
     ettigimiz (yani ALIS'in tersi) bir islemdir - ve bunun tersi de gecerli.
     Bu yanlis cerceve, modelin IADE'de normal alis/satis yon mantigini
-    uygulamasina (ve 320/391 gibi hesaplari ters kullanmasina) yol aciyordu
-    (bkz. RESULTS.md SS6.1-6.3)."""
+    uygulamasina (ve 320/391 gibi hesaplari ters kullanmasina) yol aciyordu."""
     is_iade = (invoice["header"].get("invoice_type") or "").upper() == "IADE"
     if invoice["direction"] == "inbox":
         if is_iade:

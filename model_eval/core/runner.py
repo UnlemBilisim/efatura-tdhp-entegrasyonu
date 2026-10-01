@@ -112,8 +112,8 @@ def run_model(spec, invoices, args, sector, rag_collection=None):
                 correction_reason = "balance"
             elif self_correct and rag_similar is not None:
                 # RAG'a guclu bir emsal (ayni tedarikci, cok yuksek benzerlik) dustuyse
-                # ve model ona uymadiysa, RESULTS.md 6.1'in bulgusuna gore (16 hatanin
-                # 10'unda dogru emsal gosterilmis ama gormezden gelinmis) modele bunu
+                # ve model ona uymadiysa (gecmis bir analizde 16 hatanin 10'unda dogru
+                # emsal gosterilmis ama model gormezden gelmisti), modele bunu
                 # hatirlatip tek seferlik bir gozden gecirme sansi ver.
                 strong = rag_common.strongest_precedent(rag_similar)
                 if strong is not None:

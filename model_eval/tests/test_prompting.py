@@ -96,8 +96,8 @@ class TestBuildUserPromptNoLeak:
 
 # ---------------------------------------------------------------------------
 # build_direction_text / compute_iade_hint — IADE faturalarda ters kayit
-# mantigi (bkz. RESULTS.md SS6.3): normal alis/satis cerceevesi YANLIS,
-# outbox+IADE = alistan iade, inbox+IADE = satistan iade.
+# mantigi: normal alis/satis cerceevesi YANLIS, outbox+IADE = alistan iade,
+# inbox+IADE = satistan iade.
 # ---------------------------------------------------------------------------
 
 def _iade_invoice(direction, tax_exclusive=100.0, tax_total=20.0, payable=120.0):

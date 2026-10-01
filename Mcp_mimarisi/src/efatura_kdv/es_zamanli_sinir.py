@@ -11,7 +11,19 @@ altinda thread-safe ve tam da bu senaryo icin tasarlanmis.
 Limit ASILMAZ/reddedilmez — asan istekler semaphore serbest kalana kadar
 BEKLER (kuyruga alinir), kullanicinin istedigi "hepsini ayni anda
 islemeyelim" davranisi budur; rate limiting (istegi 429 ile reddetme)
-DEGILDIR, o ayri/kapsam disi birakildi (kullanici karari, 2026-09-11)."""
+DEGILDIR, o ayri/kapsam disi birakildi (kullanici karari, 2026-09-11).
+
+UYARI - SEMAFOR SURECE OZELDIR, UVICORN WORKER SAYISIYLA CARPILIR
+(2026-10-01, TODO.md maddesi): Bu modul-seviyesi Semaphore her Python
+sureci icin AYRI olusur. Su an hem Mcp_mimarisi hem entegrasyon
+`docker/supervisord.conf`'ta `--workers` BELIRTILMEDEN (tek worker)
+calistirildigi icin limit gercekten MAX_ESZAMANLI_ISLEM'dir. Ama ileride
+performans icin `uvicorn ... --workers N` eklenirse, her worker kendi
+semaforunu tutar - gercek es zamanli limit MAX_ESZAMANLI_ISLEM * N olur,
+sessizce ve fark edilmeden. Worker sayisi artirilacaksa: (a) MAX_ESZAMANLI_
+ISLEM'i N'e bolup dusur, YA DA (b) paylasilan bir sinirlayiciya (orn.
+Postgres advisory lock, Redis) gecilmeli - ikinci yol process sayisindan
+BAGIMSIZ calisir ama ek bir bagimlilik gerektirir, simdilik (a) yeterli."""
 
 from __future__ import annotations
 

@@ -117,7 +117,7 @@ class TestRunModelResumability:
         with patch.object(runner, "call_model", side_effect=[
             ('{"entries": []}', 0.5, None),
             (None, None, "429 Too Many Requests"),
-        ]) as mock_call:
+        ]):
             runner.run_model(spec, [inv_ok, inv_err], args, "Test Sektoru")
 
         records = _latest_records_for("ollama:test-model")
@@ -128,9 +128,9 @@ class TestRunModelResumability:
 
 
 # ---------------------------------------------------------------------------
-# run_model + --rag + --self-correct — RESULTS.md 6.2: model, RAG'in gosterdigi
-# GUCLU bir emsalden farkli (ama dengeli) bir kod urettiginde de duzeltme
-# turu tetiklenmeli (sadece dengesizlikte degil).
+# run_model + --rag + --self-correct — model, RAG'in gosterdigi GUCLU bir
+# emsalden farkli (ama dengeli) bir kod urettiginde de duzeltme turu
+# tetiklenmeli (sadece dengesizlikte degil).
 # ---------------------------------------------------------------------------
 
 class TestRunModelRagPrecedentSelfCorrect:

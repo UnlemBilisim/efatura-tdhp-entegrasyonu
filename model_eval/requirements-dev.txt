@@ -2,3 +2,4 @@
 # EDİLMEZ (core/ hiçbir yerinde pytest import etmiyor, sadece tests/ kullanıyor).
 -r requirements.txt
 pytest>=7.0.0
+ruff>=0.16.0

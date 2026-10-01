@@ -94,7 +94,7 @@ def main():
             "hesaplayip prompt'a ekler - LLM'e sadece hangi mal/hizmet hesabini "
             "kullanacagi kalir. Ayrica IADE faturalarda direction_text'in "
             "('biz saticiyiz'/'biz aliciyiz') yanlis cerceveledigi durum her "
-            "zaman (bu bayrak olmadan da) duzeltilmistir - bkz. RESULTS.md SS6.3. "
+            "zaman (bu bayrak olmadan da) duzeltilmistir. "
             "Ayri sonuc dosyasina yazar (+iadehint son eki)."
         ),
     )
@@ -106,7 +106,7 @@ def main():
             "dengesizligi gosterip tek seferlik duzeltme sansi verir. --rag ile "
             "birlikte kullanilirsa, model RAG'in gosterdigi GUCLU bir emsalden "
             "(ayni tedarikci, cok yuksek benzerlik) farkli bir kod urettiginde de "
-            "aynı duzeltme turu tetiklenir (bkz. RESULTS.md 6.1/6.2 - 16 hatanin "
+            "aynı duzeltme turu tetiklenir (gecmis bir analizde 16 hatanin "
             "10'unda dogru emsal gosterilmis ama model gormezden gelmisti). Sadece "
             "Ollama saglayicisi icin calisir. Ayri sonuc dosyasina yazar "
             "(+selfcorrect son eki)."
@@ -249,7 +249,7 @@ def main():
             file_label = result_label(s["label"], args.with_glossary, args.tevkifat_hint, args.self_correct, args.rag, args.iade_hint)
             n = count_results(file_label)
             print(f"[{s['label']}] {n} fatura icin tahmin uretildi -> model_eval_sonuclar (file_label={file_label})")
-        print(f"\nTahminler: PostgreSQL model_eval_sonuclar tablosunda (ground-truth olmadigi icin dogruluk metrigi hesaplanmadi)")
+        print("\nTahminler: PostgreSQL model_eval_sonuclar tablosunda (ground-truth olmadigi icin dogruluk metrigi hesaplanmadi)")
         return
 
     summaries = [

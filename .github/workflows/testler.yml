@@ -56,6 +56,11 @@ jobs:
           diff entegrasyon/log_ortak.py Mcp_mimarisi/src/efatura_kdv/log_ortak.py
           diff entegrasyon/es_zamanli_sinir.py Mcp_mimarisi/src/efatura_kdv/es_zamanli_sinir.py
 
+      - name: Linter (ruff)
+        # ruff.toml: kasıtlı dar kural seti (sadece F/E9 - gerçek mantık
+        # hataları), detay ve gerekçe o dosyada.
+        run: ruff check Mcp_mimarisi entegrasyon model_eval
+
       # Her bileşen kendi sys.path düzenini kurduğu için ayrı çalıştırılır.
       - name: Mcp_mimarisi testleri
         run: python -m pytest Mcp_mimarisi/test -q

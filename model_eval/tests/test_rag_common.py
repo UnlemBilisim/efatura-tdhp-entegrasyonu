@@ -185,8 +185,8 @@ class TestFormatFewShotBlock:
 
 
 class TestFormatFewShotBlockTiering:
-    """RESULTS.md 6.2: mesafeye gore kademeli dil - guclu eslesme zorlayici,
-    zayif eslesme sadece ilham amacli etiketlenir."""
+    """Mesafeye gore kademeli dil - guclu eslesme zorlayici, zayif eslesme
+    sadece ilham amacli etiketlenir."""
 
     def test_distance_below_threshold_tagged_strong_match(self):
         similar = [{

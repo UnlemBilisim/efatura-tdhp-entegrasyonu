@@ -307,9 +307,8 @@ def convert_invoice_to_try(invoice):
     SADECE kullanicinin acikca "TL'ye cevir" secimiyle cagrilir (bkz.
     entegrasyon/app.py) - varsayilan akiste asla otomatik tetiklenmez, cunku
     core/prompting.py::build_user_prompt SYSTEM_PROMPT'ta modele "kur cevirimi
-    yapma, fatura kendi para biriminde kal" talimati veriyor (bkz. RESULTS.md
-    ile celismesin diye kur cevirisi LLM'e degil, burada acik bir kullanici
-    talebiyle koda yaptirilir).
+    yapma, fatura kendi para biriminde kal" talimati veriyor - kur cevirisi
+    LLM'e degil, burada acik bir kullanici talebiyle koda yaptirilir.
 
     invoice["header"]["exchange_rate"] None ise (kur bilgisi XML'de yoksa)
     ValueError firlatir - cagiran taraf (entegrasyon) bu durumu kullaniciya

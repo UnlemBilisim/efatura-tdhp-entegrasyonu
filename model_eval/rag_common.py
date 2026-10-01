@@ -5,7 +5,7 @@ build_vector_db.py (indeksleme) ve evaluate_models.py --rag (sorgu/few-shot)
 tarafindan paylasilir. Amac: yeni gelen bir faturayi, Archive2'deki gecmis
 faturalarin embedding'leriyle karsilastirip "bu faturaya benzer, daha once
 nasil muhasebelestirilmis" ornekleri bulup LLM'in promptuna few-shot olarak
-eklemek (bkz. model_eval/RESULTS.md "Siradaki Adimlar" - RAG/few-shot).
+eklemek.
 
 Bagimlilik notu: bu modul chromadb ve ollama paketlerini import eder. Sadece
 --rag / build_vector_db.py kullanan akislarda import edilmelidir (evaluate_models.py
@@ -37,7 +37,7 @@ COLLECTION_NAME = "tdhp_invoices"
 _collection_cache = {}
 _collection_cache_lock = threading.Lock()
 
-# RESULTS.md 6.1'deki hata analizinde ayni tedarikciden/urunden gelen gercek
+# Gecmis bir hata analizinde ayni tedarikciden/urunden gelen gercek
 # emsallerin mesafesi tipik olarak <0.15 cikti (orn. 0.000, 0.036, 0.053, 0.138);
 # farkli tedarikci/urune kayan genel-benzerlik doldurmalari 0.27+ mesafede kaldi.
 # Bu esik, format_few_shot_block'ta "GUCLU ESLESME" etiketi ve
@@ -216,9 +216,8 @@ def retrieve_similar(collection, invoice, k=3, prefer_same_vkn=True):
     """Verilen fatura icin en benzer k gecmis faturayi dondurur (kendisi haric).
 
     prefer_same_vkn=True ise once ayni karsi tarafin (VKN) gecmisinden arar
-    (RESULTS.md'nin notu: 320/329 gibi ayrimlar sirketin kendi aliskanligina
-    bagli, bunu en iyi ayni tedarikcinin gecmisi yakalar); yetmezse genel
-    benzerlikle doldurur.
+    (320/329 gibi ayrimlar sirketin kendi aliskanligina bagli, bunu en iyi
+    ayni tedarikcinin gecmisi yakalar); yetmezse genel benzerlikle doldurur.
     """
     query_text = build_retrieval_text(invoice)
     self_id = invoice["invoice_id"]
@@ -267,10 +266,10 @@ def format_few_shot_block(similar_invoices):
     Her ornek, mesafesine gore kademeli bir dille etiketlenir: mesafe
     STRONG_MATCH_MAX_DISTANCE altindaysa "[GUCLU ESLESME]" (aksi bir sebep
     yoksa AYNI kodu kullanmasi istenir), ustundeyse "[referans]" (sadece
-    ilham amacli). RESULTS.md 6.1'deki analiz, ilk versiyondaki tek-duzey
-    "referans amaclidir, kor kor kopyalama yapma" dilinin, model dogru
-    emsali gorse bile onu gormezden gelmesine yol actigini gosterdi (16
-    hatali faturanin 10'unda dogru emsal gosterilmisti) - bu yuzden guclu
+    ilham amacli). Gecmis bir analiz, ilk versiyondaki tek-duzey "referans
+    amaclidir, kor kor kopyalama yapma" dilinin, model dogru emsali gorse
+    bile onu gormezden gelmesine yol actigini gosterdi (16 hatali
+    faturanin 10'unda dogru emsal gosterilmisti) - bu yuzden guclu
     eslesmelerde daha zorlayici bir ifade kullanilir."""
     if not similar_invoices:
         return ""

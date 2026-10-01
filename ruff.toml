@@ -1,0 +1,19 @@
+# Linter konfigürasyonu (2026-10-01, TODO.md "Linter ekle" maddesi).
+#
+# Kasıtlı olarak DAR bir kural seti: sadece gerçek mantık hatalarını
+# (kullanılmayan import, tanımsız değişken, f-string'de yer tutucu eksik
+# vb.) yakalayan "F" (pyflakes) ve "E9" (sözdizimi hataları) aktif.
+#
+# Neden daha geniş değil: varsayılan/popüler kural setleriyle (E, UP, I,
+# SIM vb.) ilk denemede 198+ uyarı çıktı — bunların büyük kısmı projenin
+# kendi stil tercihleriyle (Türkçe yorumlar/docstring'ler yüzünden uzun
+# satırlar, import sıralaması vb.) çakışan kozmetik tercihlerdi, gerçek
+# hata değildi. Geniş bir kural seti CI'yı anlamsız kırmızıya çevirip
+# "linter hep kırmızı, önemsenmez" alışkanlığına yol açardı. Dar başlangıç
+# sıfır-hata durumuyla kuruldu (`ruff check` CI'da gerçekten "yeşil"
+# anlamına gelir); ileride ekip isterse kapsam kullanıcı kararıyla
+# genişletilebilir.
+line-length = 200  # E501 (satır uzunluğu) bilerek kapalı, bu sadece diğer kurallar icin referans
+
+[lint]
+select = ["F", "E9"]

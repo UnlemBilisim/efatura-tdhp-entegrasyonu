@@ -17,7 +17,7 @@ DEFAULT_SECTOR = (
 # Sirketin kendi VKN'si - ham UBL XML'de AccountingSupplierParty/
 # AccountingCustomerParty'den hangisinin "biz" oldugumuzu (dolayisiyla
 # inbox/outbox yonunu ve karsi tarafi) belirlemek icin kullanilir.
-# (Akyuzlu Dovme ve Kaldirma Ekipmanlari San. - bkz. RESULTS.md)
+# (Akyuzlu Dovme ve Kaldirma Ekipmanlari San.)
 DEFAULT_OWN_VKN = "0460351893"
 
 UBL_NS = {
