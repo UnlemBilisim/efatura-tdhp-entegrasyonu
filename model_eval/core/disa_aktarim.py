@@ -61,12 +61,18 @@ def _gerekce_uret(entry, emsal_sayisi=0, karsi_taraf_vkn=None):
             "bir alt kırılım bulunamadı."
         )
 
-    if kaynak == "fuzzy":
+    if kaynak == "fuzzy_cari":
         benzerlik = iz.get("benzerlik")
         oran_metni = f" (isim benzerliği %{benzerlik * 100:.0f})" if benzerlik else ""
         return (
             f"Karşı taraf unvanı mizandaki '{entry.get('account_description', kod)}' "
             f"kaydıyla eşleşti{oran_metni}; aynı cari hesap kullanıldı."
+        )
+
+    if kaynak == "fuzzy_kalem":
+        return (
+            f"Faturadaki kalem adı, mizandaki '{entry.get('account_description', kod)}' "
+            "alt kırılım adıyla anahtar kelime eşleşmesi gösterdi; bu kod seçildi."
         )
 
     if kaynak == "llm":

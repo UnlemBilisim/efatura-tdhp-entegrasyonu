@@ -109,6 +109,70 @@ def _cari_fuzzy_esles(karsi_taraf_unvani, alt_secenekler):
     return None, en_iyi_oran
 
 
+# Cari OLMAYAN (gelir/gider/stok) hesaplarda kalem adi <-> alt kirilim adi
+# fuzzy eslemesi icin (2026-09-30, kullanici karari - mock test sirasinda
+# "EKMEK (TAZE, 350 GR)" kalemi olan bir faturada 600 (Ekmek Satislari/Pastane
+# Urunleri/Kek Ve Tatli - uc secenek) ana kodda kalmasi fark edildi; mizanda
+# net bir eslesme varken LLM ikinci-asama cagrisinda bunu bazen kacirabiliyordu,
+# bkz. model_eval/CLAUDE.md 2026-07-24 notu "gider/stok hesaplarinin belirsiz
+# semantik eslesmesi"). Cari fuzzy'nin kullandigi SequenceMatcher (karakter
+# dizisi benzerligi) urun adlari icin ISE YARAMIYOR - "EKMEK (TAZE, 350 GR)"
+# ile "Ekmek Satislari" arasinda ortak tek kelime ("EKMEK") olsa bile toplam
+# string uzunlugu farkli oldugu icin oran ~0.56 cikiyor (olculdu), herhangi
+# bir makul esigin altinda kaliyor. Bunun yerine KELIME KESISIMI kullanilir:
+# alt kirilim adindaki en az bir ANLAMLI kelime (jenerik ekler haric - asagida
+# KALEM_FUZZY_JENERIK_KELIMELER) kalem adinda GEcIYORSA eslesme sayilir.
+KALEM_FUZZY_JENERIK_KELIMELER = {
+    "VE", "ILE", "SATISLARI", "SATIS", "GELIRLERI", "GELIR", "GIDERLERI",
+    "GIDER", "URUNLERI", "URUN", "HIZMETLERI", "HIZMET", "MAL", "MALZEME",
+    "MALZEMELERI", "DIGER", "GENEL", "TOPLAM",
+}
+# Kelime kesisiminde bir kelime en az bu uzunlukta olmali - kisa kelimeler
+# ("AS", "BIR" gibi) rastgele eslesip yanlis pozitif uretebilir.
+KALEM_FUZZY_MIN_KELIME_UZUNLUGU = 3
+
+
+def _anlamli_kelimeler(s):
+    """_unvan_normalize edilmis bir string'i kelimelere ayirip jenerik
+    ekleri ve cok kisa kelimeleri eler - geriye sadece "ayirt edici" kelimeler
+    kalir (orn. "Ekmek Satislari" -> {"EKMEK"})."""
+    return {
+        k for k in s.split()
+        if len(k) >= KALEM_FUZZY_MIN_KELIME_UZUNLUGU and k not in KALEM_FUZZY_JENERIK_KELIMELER
+    }
+
+
+def _kalem_fuzzy_esles(kalem_adlari, alt_secenekler):
+    """Faturadaki kalem adlarini (invoice['lines'][*]['product_name']),
+    verilen (kod, ad) alt kirilim secenekleriyle ANLAMLI KELIME KESISIMINE
+    gore karsilastirir (bkz. yukaridaki not - karakter dizisi benzerligi
+    urun adlari icin calismiyor). Coklu kalemli faturalarda HER kalem ayri
+    ayri denenir. Tam olarak BIR alt kirilim secenegiyle kelime kesisimi
+    varsa (belirsizlik yok) o kod doner; birden fazla secenekle kesisirse
+    (hangisi oldugu belirsiz) ya da hic kesisim yoksa None doner - yanlis
+    secim yapmaktansa LLM'e birakilir.
+
+    Ek bagimlilik yok - standart kutuphane, ayni normalizasyon
+    (_unvan_normalize) cari fuzzy ile paylasilir."""
+    if not kalem_adlari or not alt_secenekler:
+        return None, 0.0
+    eslesen_kodlar = set()
+    en_iyi_oran = 0.0
+    for kalem_adi in kalem_adlari:
+        kalem_kelimeleri = _anlamli_kelimeler(_unvan_normalize(kalem_adi))
+        if not kalem_kelimeleri:
+            continue
+        for kod, ad in alt_secenekler:
+            alt_kelimeleri = _anlamli_kelimeler(_unvan_normalize(ad))
+            kesisim = kalem_kelimeleri & alt_kelimeleri
+            if kesisim:
+                eslesen_kodlar.add(kod)
+                en_iyi_oran = max(en_iyi_oran, len(kesisim) / max(len(alt_kelimeleri), 1))
+    if len(eslesen_kodlar) == 1:
+        return next(iter(eslesen_kodlar)), en_iyi_oran
+    return None, en_iyi_oran
+
+
 def _fatura_kdv_oranlari(invoice):
     """Faturadaki KDV oranlarini tam sayi kume olarak doner (ornek: {10} ya da
     {10, 20}). `invoice['taxes']` icinde name=KDV olan satirlarin 'percent'
@@ -220,13 +284,12 @@ def predict_single_invoice(
     fonksiyon icinde parse_model_spec() ile spec'e cevrilir.
 
     Varsayilan bayraklar (rag/self_correct/tevkifat_hint/iade_hint=True),
-    RESULTS.md'deki en iyi dogrulanmis kombinasyona (n=500, 0.817->0.956
-    pair_F1) karsilik gelir - bkz. model_eval/RESULTS.md SS6, CLAUDE.md
-    "Kritik gerceklecr". ihrac_kayitli_hint=True (2026-07-23 eklendi) bu
-    olcumun DISINDA - kullanici tarafindan onaylanmis bir muhasebe kurali
-    (192 Borc / 391 Alacak netleme, sadece istisna kodu 701-704) ama henuz
-    RESULTS.md'ye benzer n>1 bir deneyle olculmedi (bkz. core/prompting.py
-    compute_ihrac_kayitli_hint docstring'i).
+    en iyi dogrulanmis kombinasyona (n=500, 0.817->0.956 pair_F1) karsilik
+    gelir - bkz. CLAUDE.md "Kritik gercekler". ihrac_kayitli_hint=True
+    (2026-07-23 eklendi) bu olcumun DISINDA - kullanici tarafindan
+    onaylanmis bir muhasebe kurali (192 Borc / 391 Alacak netleme, sadece
+    istisna kodu 701-704) ama henuz genis orneklemli (n>1) bir deneyle
+    olculmedi (bkz. core/prompting.py compute_ihrac_kayitli_hint docstring'i).
 
     DB'ye (PostgreSQL/core.reporting) HICBIR SEY yazmaz - cagiran taraf
     donen sozlugu kendi tercih ettigi sekilde saklar/iletir.
@@ -338,9 +401,9 @@ def predict_single_invoice(
             )
             self_correct_reason = "balance"
         elif rag_similar is not None:
-            # RAG'a guclu bir emsal dustuyse ve model ona uymadiysa (RESULTS.md
-            # 6.1/6.2), tek seferlik bir gozden gecirme sansi ver - run_model()
-            # icindeki ayni tetikleyiciyle birebir ayni mantik.
+            # RAG'a guclu bir emsal dustuyse ve model ona uymadiysa, tek
+            # seferlik bir gozden gecirme sansi ver - run_model() icindeki
+            # ayni tetikleyiciyle birebir ayni mantik.
             strong = rag_common.strongest_precedent(rag_similar)
             if strong is not None:
                 pred_pairs = [(e["account_code"], e["dc"]) for e in entry_dicts]
@@ -413,7 +476,7 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
     ana_koddan_alt_koda = {}
     # Her cozulen kodun NEREDEN cozuldugunun izi (2026-07-27) - disa aktarim
     # katmani (core/disa_aktarim.py) bunu insan-okur gerekceye cevirir.
-    # {ana_kod: {"kaynak": "fuzzy"|"llm", "benzerlik": float|None,
+    # {ana_kod: {"kaynak": "fuzzy_cari"|"fuzzy_kalem"|"llm", "benzerlik": float|None,
     #            "oran_duzeltildi": bool}}
     kod_kaynagi = {}
 
@@ -431,9 +494,30 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
             secilen, oran = _cari_fuzzy_esles(karsi_taraf_unvani, ilgili_alt_kirilimlar[kod])
             if secilen:
                 ana_koddan_alt_koda[kod] = secilen
-                kod_kaynagi[kod] = {"kaynak": "fuzzy", "benzerlik": oran, "oran_duzeltildi": False}
+                kod_kaynagi[kod] = {"kaynak": "fuzzy_cari", "benzerlik": oran, "oran_duzeltildi": False}
 
-    # LLM'e sadece fuzzy'nin cozemedigi kodlar sorulur (cozulmus cari kodlari cikar).
+    # 1b) DETERMINISTIK KALEM-ADI FUZZY ESLEME (2026-09-30, kullanici karari -
+    # mock test: "EKMEK (TAZE, 350 GR)" kalemi olan bir faturada 600 ana kodda
+    # kaldi, mizanda "Ekmek Satislari" secenegi olmasina ragmen). Cari OLMAYAN
+    # kodlarda (gelir/gider/stok - 600/150/770 gibi) faturadaki kalem adlarini
+    # mizandaki alt kirilim isimleriyle karsilastir. KDV kodlari (191/391 -
+    # alt kirilim adi orana gore, urun adina gore DEGIL) bu adimdan HARIC
+    # tutulur - onlarin dogru eslesmesi zaten _kdv_oranini_duzelt ile saglanir,
+    # kalem adiyla karistirmak yanlis olur (_kdv_orani_isimden ile ayirt edilir:
+    # bir alt kirilimin adinda "%N" oran deseni varsa o kod KDV grubudur).
+    kalem_adlari = [ln.get("product_name") for ln in invoice.get("lines", []) if ln.get("product_name")]
+    for kod in list(ilgili_alt_kirilimlar):
+        if kod in ana_koddan_alt_koda or kod in CARI_HESAP_KODLARI:
+            continue
+        secenekler = ilgili_alt_kirilimlar[kod]
+        if any(_kdv_orani_isimden(ad) is not None for _kod, ad in secenekler):
+            continue
+        secilen, oran = _kalem_fuzzy_esles(kalem_adlari, secenekler)
+        if secilen:
+            ana_koddan_alt_koda[kod] = secilen
+            kod_kaynagi[kod] = {"kaynak": "fuzzy_kalem", "benzerlik": oran, "oran_duzeltildi": False}
+
+    # LLM'e sadece fuzzy'nin cozemedigi kodlar sorulur (cozulmus kodlari cikar).
     llm_kodlari = {
         kod: sec for kod, sec in ilgili_alt_kirilimlar.items() if kod not in ana_koddan_alt_koda
     }

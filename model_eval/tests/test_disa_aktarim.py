@@ -76,7 +76,7 @@ class TestGerekce:
                     "dc": "Alacak",
                     "amount": 1700.0,
                     "account_description": "Mehmet Kozcağız",
-                    "secim_kaynagi": {"kaynak": "fuzzy", "benzerlik": 0.94, "oran_duzeltildi": False},
+                    "secim_kaynagi": {"kaynak": "fuzzy_cari", "benzerlik": 0.94, "oran_duzeltildi": False},
                 }
             ]
         }

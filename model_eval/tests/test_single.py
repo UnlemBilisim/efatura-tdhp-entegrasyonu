@@ -496,6 +496,58 @@ class TestCariFuzzyEsleme:
         assert single._cari_fuzzy_esles("Acos", []) == (None, 0.0)
 
 
+class TestKalemFuzzyEsleme:
+    """Cari OLMAYAN (gelir/gider/stok) hesaplarda kalem adi <-> alt kirilim
+    adi ANAHTAR KELIME kesisimiyle esleme (2026-09-30, kullanici karari -
+    bkz. core/single.py::_kalem_fuzzy_esles). SequenceMatcher (cari fuzzy'nin
+    kullandigi) urun adlari icin ise yaramiyor - kelime kesisimi kullanilir."""
+
+    ALT_600 = [
+        ("600.01.00001", "Ekmek Satışları"),
+        ("600.01.00002", "Pastane Ürünleri Satışları"),
+        ("600.01.00003", "Kek Ve Tatlı Satışları"),
+    ]
+
+    def test_tek_kalem_net_eslesir(self):
+        """ANA SENARYO: mock test sirasinda bulunan gercek durum - tek kalemli
+        faturada urun adindaki anahtar kelime, mizan alt kirilim adinda
+        geciyorsa (jenerik ekler haric) otomatik secilir."""
+        kod, oran = single._kalem_fuzzy_esles(["EKMEK (TAZE, 350 GR)"], self.ALT_600)
+        assert kod == "600.01.00001"
+        assert oran > 0
+
+    def test_coklu_kalem_sadece_biri_eslesirse_secilir(self):
+        """Coklu kalemli faturada bir kalem eslesirken digeri hic eslesmiyorsa
+        (farkli kelime, mizanda karsiligi yok) yine de tek net secim yapilir."""
+        kod, oran = single._kalem_fuzzy_esles(
+            ["EKMEK (TAZE, 350 GR)", "ÇİKOLATALI PASTA"], self.ALT_600
+        )
+        assert kod == "600.01.00001"
+
+    def test_birden_fazla_secenekle_kesisirse_belirsiz_sayilir(self):
+        """Bir kalem adi BIRDEN FAZLA alt kirilimla kelime kesisimi gosterirse
+        (ornek: hem 'ekmek' hem 'kek' geciyor) hangisi oldugu belirsizdir -
+        yanlis secim yapmaktansa None doner, LLM'e birakilir."""
+        kod, oran = single._kalem_fuzzy_esles(["EKMEK VE KEK SEPETI"], self.ALT_600)
+        assert kod is None
+
+    def test_alakasiz_kalem_eslesmez(self):
+        kod, oran = single._kalem_fuzzy_esles(["DEMİR ÇİVATA M8"], self.ALT_600)
+        assert kod is None
+        assert oran == 0.0
+
+    def test_jenerik_kelimeler_yanlis_pozitif_uretmez(self):
+        """'Satislari'/'Urunleri' gibi jenerik ekler tek basina eslesme
+        SAYMAMALI - aksi halde her kalem her 600 alt kodu ile eslesirdi."""
+        kod, oran = single._kalem_fuzzy_esles(["GENEL SATIŞ HİZMETİ"], self.ALT_600)
+        assert kod is None
+
+    def test_bos_girdi_guvenli(self):
+        assert single._kalem_fuzzy_esles([], self.ALT_600) == (None, 0.0)
+        assert single._kalem_fuzzy_esles(["Ekmek"], []) == (None, 0.0)
+        assert single._kalem_fuzzy_esles(None, self.ALT_600) == (None, 0.0)
+
+
 class TestKdvOraniDuzelt:
     """KDV alt kirilim ORAN duzeltmesi (2026-07-27, kullanici karari: LLM turu
     secer, kod yalnizca orani faturaya gore duzeltir - bkz. core/single.py::

@@ -60,8 +60,13 @@ def validate_prediction(prediction: dict, invoice: dict, own_vkn: str) -> dict:
     if abs(borc - alacak) > MONEY_TOLERANCE:
         errors.append({"code": "UNBALANCED", "message": "Borc ve alacak toplamlari esit degil."})
 
-    payable = _money(to_float(invoice.get("header", {}).get("payable")))
-    if payable is not None and payable > 0 and abs(borc - payable) > MONEY_TOLERANCE:
+    header = invoice.get("header", {})
+    payable = _money(to_float(header.get("payable")))
+    # Tevkifatlı alışta tam KDV Borç'a yazıldığı için borç toplamı ödenecek
+    # tutar değil KDV dahil toplamdır; tevkifatsız faturada ikisi zaten eşit.
+    tax_inclusive = _money(to_float(header.get("tax_inclusive")))
+    kabul_edilen_toplamlar = [t for t in (payable, tax_inclusive) if t is not None and t > 0]
+    if kabul_edilen_toplamlar and all(abs(borc - t) > MONEY_TOLERANCE for t in kabul_edilen_toplamlar):
         errors.append({
             "code": "PAYABLE_MISMATCH",
             "message": f"Kayit toplami ({borc}) fatura odenecek tutariyla ({payable}) uyusmuyor.",
