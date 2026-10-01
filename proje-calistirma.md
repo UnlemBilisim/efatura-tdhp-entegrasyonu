@@ -18,10 +18,14 @@
 ```bash
 cd docker/
 cp ../.env.example ../.env
-# .env içindeki sırları (POSTGRES_PASSWORD, EFATURA_API_TOKEN,
-# MCP_INTERNAL_API_TOKEN) güçlü ve benzersiz değerlerle değiştirin
-POSTGRES_PASSWORD="<parola>" EFATURA_API_TOKEN="<token>" \
-MCP_INTERNAL_API_TOKEN="<token>" docker compose up -d
+# .env içindeki sırları (POSTGRES_PASSWORD, MCP_INTERNAL_API_TOKEN)
+# güçlü ve benzersiz değerlerle değiştirin
+POSTGRES_PASSWORD="<parola>" MCP_INTERNAL_API_TOKEN="<token>" docker compose up -d
+
+# İlk kurulumda arayüz/istemci için bir API anahtarı üretin
+# (değer yalnızca bir kez gösterilir, arayüzdeki "API anahtarı" alanına girin):
+docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py \
+  olustur --etiket yerel-demo --tum-sirketler
 ```
 
 Ayrıntılı adımlar (registry'den image çekme, PostgreSQL/ChromaDB verisini
@@ -109,15 +113,16 @@ http://localhost:8100
 ```
 
 Adımlar:
+
 1. Bir UBL-TR XML fatura dosyası seç (örn. `Mcp_mimarisi/ubls/` altındaki
    `*-outbox.xml` dosyalarından biri — bunlar gerçek, kestiğimiz faturalar).
 2. Satıcının VKN'sini gir (şirketin kendi VKN'si, örn. `0460351893`).
 3. Satıcının NACE kod(lar)ını gir (virgülle ayrılmış, örn. `251106`).
 4. "Ön Filtreden Geçir"e bas.
 5. Sonuç `uygun` ise otomatik olarak TDHP tahmini (hesap kodu + Borç/Alacak
-   + tutar tablosu) gösterilir. `insan_incelemesi_gerekli` ise bir uyarı
-   çıkar — "yine de devam et" ile onaylayıp TDHP tahminine geçebilir ya da
-   iptal edebilirsin.
+   - tutar tablosu) gösterilir. `insan_incelemesi_gerekli` ise bir uyarı
+     çıkar — "yine de devam et" ile onaylayıp TDHP tahminine geçebilir ya da
+     iptal edebilirsin.
 
 ### Toplu (çoklu) fatura işlemek
 
@@ -138,14 +143,14 @@ Arayüzün üstündeki **"Toplu İşlem"** sekmesine geç (2026-07-27 eklendi):
 
 ## Sık karşılaşılan sorunlar
 
-| Belirti | Muhtemel sebep | Çözüm |
-|---|---|---|
-| `entegrasyon`'da `/fatura/isle` → 502 | Mcp_mimarisi API (port 8000) çalışmıyor | `docker compose ps` ile container durumunu kontrol et |
-| `/fatura/isle` → 500, TDHP tahmini adımında | Ollama çalışmıyor / model indirilmemiş | `docker exec <ollama-container> ollama pull embeddinggemma` |
-| `tdhp_tahmini.error`: `401 Kimlik dogrulama hatasi` | `gemma4:31b-cloud` bulut modeli, SSH tüneli kapalı/uzak sunucuya bağlı değil | `ssh -N -L 11435:localhost:11434 unlem-gx10-01@10.34.10.112` tünelini aç |
-| `/durum` → `model_eval_hazir: false` | `entegrasyon` image'ında model_eval'ın bağımlılıkları eksik | Image'ı yeniden build et (`docker compose build`) |
-| Mcp_mimarisi API başlarken `RuntimeError` | `DATABASE_URL` set değil / PostgreSQL'de veri yok | [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md) §5-6 |
-| `docker compose up` → "address already in use" | Port 5434/8000/8100/11434 başka bir şey tarafından kullanılıyor | Çakışan süreci durdur ya da `docker/docker-compose.yml`'deki host portunu değiştir |
+| Belirti                                             | Muhtemel sebep                                                               | Çözüm                                                                               |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `entegrasyon`'da `/fatura/isle` → 502               | Mcp_mimarisi API (port 8000) çalışmıyor                                      | `docker compose ps` ile container durumunu kontrol et                               |
+| `/fatura/isle` → 500, TDHP tahmini adımında         | Ollama çalışmıyor / model indirilmemiş                                       | `docker exec <ollama-container> ollama pull embeddinggemma`                         |
+| `tdhp_tahmini.error`: `401 Kimlik dogrulama hatasi` | `gemma4:31b-cloud` bulut modeli, SSH tüneli kapalı/uzak sunucuya bağlı değil | `ssh -N -L 11435:localhost:11434 unlem-gx10-01@10.34.10.112` tünelini aç            |
+| `/durum` → `model_eval_hazir: false`                | `entegrasyon` image'ında model_eval'ın bağımlılıkları eksik                  | Image'ı yeniden build et (`docker compose build`)                                   |
+| Mcp_mimarisi API başlarken `RuntimeError`           | `DATABASE_URL` set değil / PostgreSQL'de veri yok                            | [`docs/how-to/docker-ile-calistirma.md`](docs/how-to/docker-ile-calistirma.md) §5-6 |
+| `docker compose up` → "address already in use"      | Port 5434/8000/8100/11434 başka bir şey tarafından kullanılıyor              | Çakışan süreci durdur ya da `docker/docker-compose.yml`'deki host portunu değiştir  |
 
 ---
 

@@ -21,13 +21,20 @@ ollama pull embeddinggemma
 ## 2. Vektor veritabanini olustur (bir kere, sonra guncelleme icin tekrar calistirilabilir)
 
 ```bash
-python3 build_vector_db.py
+python3 build_vector_db.py --own-vkn 0460351893
 ```
 
-Cikis, kac faturanin indekslendigini ve ground-truth kaydi olmadigi icin kac
-tanesinin atlandigini gosterir. Sonuc `vector_db/` altina yazilir.
+`--own-vkn` ZORUNLUDUR (2026-09-29'dan itibaren, cok sirketli onboarding
+hazirligi) — hangi sirketin RAG koleksiyonuna yazildigini belirler
+(`rag_common.koleksiyon_adi_coz`). **Yanlis VKN verirseniz faturalar BASKA
+bir sirketin emsal havuzuna karisir** — onceden bu parametre yoktu ve script
+her zaman sabit koleksiyona yaziyordu, bu riskliydi.
 
-Kucuk bir alt kumeyle denemek icin: `python3 build_vector_db.py --limit 20`.
+Cikis, hangi koleksiyona yazildigini, kac faturanin indekslendigini ve
+ground-truth kaydi olmadigi icin kac tanesinin atlandigini gosterir. Sonuc
+`vector_db/` altina yazilir.
+
+Kucuk bir alt kumeyle denemek icin: `python3 build_vector_db.py --own-vkn 0460351893 --limit 20`.
 
 **Yeni fatura eklendiginde** (prod akisinda faturalastirma kesinlestiginde):
 `build_vector_db.py`'yi tekrar calistirin - `invoice_id`'ye gore upsert

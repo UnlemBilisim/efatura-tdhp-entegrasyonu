@@ -2,8 +2,9 @@
 
 ## Sorun
 
-`RESULTS.md`'de olculdugu gibi, referanssiz test edilen en iyi model
-(`gemma4:31b-cloud`) 100 faturadan sadece %60.6'sinda tam dogru hesap kodu +
+Olculdugu gibi (bkz. `CLAUDE.md` "Kritik gercekler"), referanssiz test
+edilen en iyi model (`gemma4:31b-cloud`) 100 faturadan sadece %60.6'sinda
+tam dogru hesap kodu +
 Borc/Alacak cikarabiliyor. En sik karistirilan kod ciftleri (`320`/`329`,
 `150`/`153`, `730`/`770`/`760`) TDHP'nin resmi tanimindan cikarilamaz - ayrim
 **sirketin kendi muhasebe aliskanligina** bagli. Modele TDHP'nin tam

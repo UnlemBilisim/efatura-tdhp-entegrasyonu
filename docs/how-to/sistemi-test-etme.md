@@ -34,16 +34,15 @@ Her bileşen kendi `sys.path` düzenini kurduğu için üç paket **ayrı ayrı*
 çalıştırılır (proje kökünden):
 
 ```bash
-python3 -m pytest Mcp_mimarisi/test -q          # 28 passed, 1 skipped
-python3 -m pytest entegrasyon/tests -q          # 4 passed, 2 skipped
-(cd model_eval && python3 -m pytest tests -q)   # 226 passed (PostgreSQL varsa)
+python3 -m pytest Mcp_mimarisi/test -q          # 32 passed, 1 skipped (PostgreSQL varsa)
+python3 -m pytest entegrasyon/tests -q          # 21 passed (PostgreSQL varsa)
+(cd model_eval && python3 -m pytest tests -q)   # 242 passed (PostgreSQL varsa)
 ```
 
 | Durum | Anlamı |
 |---|---|
 | Mcp_mimarisi `1 skipped` | `test/test_kalem_nace.py` gerçek DB + fatura dosyası isteyen manuel bir script'tir, pytest altında bilerek atlanır (`python3 test/test_kalem_nace.py` ile elle çalıştırılır) |
-| entegrasyon `2 skipped` | Auth 3 endpoint'te geçici olarak kapalı olduğu için iki auth testi bilerek skip'li (bkz. kök `CLAUDE.md` 🔴 notu) |
-| model_eval `200 passed, 26 skipped` | PostgreSQL'e (`TEST_DATABASE_URL`) bağlanılamıyor — **hata değil**, `requires_postgres` marker'ı atlıyor |
+| Mcp_mimarisi `28 passed, 5 skipped` / entegrasyon `12 passed, 9 skipped` / model_eval `211 passed, 31 skipped` | PostgreSQL'e (`TEST_DATABASE_URL`) bağlanılamıyor — **hata değil**, veritabanı isteyen testler atlanıyor (Mcp_mimarisi: tenant izolasyonu — 2026-10-01'de eklendi; entegrasyon: API anahtar deposu + tenant izolasyonu; model_eval: tenant izolasyonu + sonuç deposu) |
 | `No module named pytest` | Yanlış venv aktif; `/usr/bin/python3 -m pytest` ile sistem python'unu kullanın |
 
 Prod veritabanına (`DATABASE_URL`) test verisi yazmayın; testler
@@ -63,6 +62,14 @@ Prod veritabanına (`DATABASE_URL`) test verisi yazmayın; testler
 > katmanı — dahili token 401/503, DTD reddi, boyut sınırı, request-id).
 > Adımların tamamı yerelde geçici bir `python:3.11-slim` container'ında
 > birebir çalıştırılarak doğrulandı.
+
+> ✅ **Uygulandı** (2026-10-01): Mcp_mimarisi'ye İLK DB'li testi eklendi —
+> `test/test_gecmis_kontrol_tenant_db.py` (tenant izolasyonu düzeltmesi,
+> bkz. kök `CLAUDE.md` "şirket izolasyonu" notu). Yukarıdaki satır artık
+> tam doğru değil ("DB'siz" yalnızca 2026-09-28'de eklenen iki dosya için
+> geçerliydi) — bu dosya PostgreSQL gerektirir, yoksa 4 test `skip` edilir.
+> entegrasyon'a da aynı gün `vkn-ekle` için 4 yeni DB'li test eklendi
+> (`tests/test_api_anahtarlari_db.py`).
 
 ## 2. Arayüzden manuel test (en pratik yol)
 

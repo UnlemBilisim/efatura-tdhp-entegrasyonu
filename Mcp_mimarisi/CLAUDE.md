@@ -105,6 +105,68 @@ faturalarla (kod 701, kod 235 → uygun) test edildi.
 > bildirimi üzerine eklendi. Kullanım: `proje-calistirma.md` "Her adımı
 > canlı terminalde izlemek" bölümü.
 
+> ✅ **Uygulandı (2026-09-29, kullanıcı kararı — canlıya çıkış hazırlığı):**
+> **NACE kodları artık onboarding'de kaydediliyor, dış ekip her istekte
+> göndermek zorunda değil.** Önceden `POST /fatura/kontrol-et`'e
+> `satici_nace_kodlari` boş gelirse (unutulursa) outbox faturada KDV ön
+> filtresi hiç çalışmazdı — havuz boş kalır, tüm kalemler sessizce
+> `insan_incelemesi_gerekli`'ye düşerdi. Fatura XML'i zaten NACE taşımadığı
+> için (yukarıdaki "Kritik gerçekler") bu bilgi ayrı bir kaynaktan gelmek
+> zorundaydı; artık bu kaynak "her istekte dış ekip" yerine "onboarding'de
+> bir kere biz" oluyor — mimariyle ÇELİŞMEZ, sadece kaynağın teslim şeklini
+> değiştirir.
+>
+> Yeni tablo `public.sirket_bilgileri` (VKN → NACE kod listesi, migration
+> `56d739edb09d`) — `nace_oranlari` ile aynı desen: SADECE `public`'te
+> yaşar, tenant şemasında değil (`ALEMBIC_TENANT_SCHEMA` kontrolüyle
+> atlanır). **İlk denemede bu kontrol unutulmuştu ve tablo yanlışlıkla
+> `tenant_<vkn>` şemasında oluşmuştu** — gerçek bir Postgres'te test
+> edilirken fark edildi, düzeltildi, hem sıfır public kurulumu hem
+> tenant onboarding senaryosu ayrı ayrı yeniden doğrulandı.
+>
+> `scripts/tenant_onboarding.py --nace <kod>` (tekrarlanabilir) ile
+> kaydedilir (`src/efatura_kdv/sirket_bilgileri.py::nace_kodlarini_kaydet`,
+> upsert). `api.py::_tek_fatura_kontrol_et`, istekteki `satici_nace_kodlari`
+> BOŞSA kayıtlı NACE'ye düşer (`nace_kodlarini_getir`); istek AÇIKÇA NACE
+> gönderdiyse override eder, kayıtlı değer sessizce ezilmez. Gerçek
+> Postgres'e karşı `TestClient` ile uçtan uca doğrulandı: (1) boş istek →
+> log'da "onboarding'de kayitli olan kullaniliyor" + doğru `uygun` kararı,
+> (2) açık farklı NACE → o kullanılır, kayıtlı değer yok sayılmaz. Şirket
+> hiç onboard edilmemişse (kayıt yok) exception FIRLATMAZ, boş listeye
+> düşer — havuz boş kalır, mevcut "NACE bulunamadı → insan incelemesi"
+> davranışı değişmeden çalışır.
+>
+> `scripts/musteri_onboard_toplu.py` da güncellendi: müşteri klasöründe
+> opsiyonel `nace.txt` (her satırda bir kod) varsa okuyup onboarding'e
+> geçiriyor. Dış ekip API sözleşmesindeki `satici_nace_kodlari` alanı hâlâ
+> var (override için) ama artık **opsiyonel, pratikte hiç gönderilmese de
+> sistem çalışır** — bkz. `teslim/API-ENTEGRASYON-KILAVUZU.md` (henüz
+> güncellenmedi, dış ekibe gönderilmeden önce güncellenmeli).
+
+> ✅ **Uygulandı (2026-10-01, kullanıcı kararıyla ele alınan TODO maddesi)
+> — tenant izolasyonu:** `gecmis_kontrol.py::GecmisFaturaDeposu.
+> _tenant_baglantisi`, onboard edilmemiş bir VKN için artık sessizce
+> `public`'e (Akyüzlü'nün verisine) düşmüyor. `SET search_path TO
+> tenant_<vkn>, public` var olmayan şemayı atladığı için bu açık vardı —
+> model_eval tarafı aynısını 2026-09-28'de `core.db.tenant_kayitli_mi` ile
+> kapatmıştı. Artık Mcp_mimarisi de (üst dizin CLAUDE.md "Değişmez
+> kurallar" #2'de izin verilen Mcp_mimarisi→model_eval import deseniyle,
+> yeni `model_eval_yolu.py`) aynı tek kaynağı kullanıyor — iki ayrı
+> `DEFAULT_OWN_VKN` kopyası tutmak yerine. Kayıtsız VKN artık
+> `TenantKayitliDegilHatasi` ile reddediliyor; `api.py`'deki yeni
+> `@app.exception_handler(TenantKayitliDegilHatasi)` bunu
+> `/fatura/gecmis-kontrol` ve `/fatura/coklu-kontrol`'da `404`'e çeviriyor
+> (entegrasyon'un "ŞİRKET KAYITLI DEĞİL" davranışıyla tutarlı). Gerçek
+> PostgreSQL ile doğrulandı: `test/test_gecmis_kontrol_tenant_db.py` (4
+> yeni test), tüm paket (32/32 PostgreSQL varken) regresyonsuz geçti. Bu
+> sırada `docs/explanation/guvenlik-durumu-2026-07-27.md`'deki
+> "`islenmis_faturalar` tenant-scoped değil" bulgusunun da 2026-07-30'daki
+> tenant mimarisinden ÖNCE yazıldığı için bayat olduğu fark edildi,
+> düzeltildi. **Kapsam dışı kalan, hâlâ açık (TODO.md):**
+> `/fatura/gecmis-kontrol`/`/fatura/coklu-kontrol`'ün kendisi hâlâ
+> VKN-bazlı yetkilendirme YAPMIYOR — tek bir dahili token (`MCP_INTERNAL_
+> API_TOKEN`) herhangi bir VKN'yi sorgulayabiliyor; bu ayrı bir karar.
+
 > ⚠️ Bu bölüm en hızlı bayatlayan bölümdür. Kodla çelişen bir cümle görürsen
 > düzelt, ayrı onay bekleme.
 

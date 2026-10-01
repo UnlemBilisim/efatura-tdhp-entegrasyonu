@@ -614,8 +614,8 @@ exception'ı fırlatıyor. Sekme geçişi saf CSS+JS ile (harici kütüphane yok
 Bu repo (Mcp_mimarisi) kendi başına bağımsız ama gerçek amacı, aynı
 `AıData2/` çalışma alanındaki ayrı bir "ana proje"nin — TDHP (Tek Düzen
 Hesap Planı) hesap kodu tahmin pipeline'ının (`~/Desktop/AıData2/model_eval/`,
-RAG + ChromaDB + çoklu-model karşılaştırma, bkz. `model_eval/RESULTS.md`,
-`model_eval/core/parsing.py`) **önüne** eklenmek. Kullanıcı netleştirdi
+RAG + ChromaDB + çoklu-model karşılaştırma, bkz. `model_eval/CLAUDE.md`
+"Kritik gerçekler", `model_eval/core/parsing.py`) **önüne** eklenmek. Kullanıcı netleştirdi
 (2026-07-22): entegrasyon **HTTP API üzerinden, ayrık** olacak — iki proje
 ayrı süreç olarak kalır, sadece ağ üzerinden konuşur (kod tabanı
 birleştirilmez, monorepo yapılmaz).

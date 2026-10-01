@@ -1,0 +1,51 @@
+{
+  "header": {
+    "account_title": "BİM BİRLEŞİK MAĞAZALAR A.Ş.",
+    "account_tax_number": "1234509876",
+    "invoice_id": "AFU2026000000001",
+    "issue_date": "2026-09-15",
+    "currency": "TRY",
+    "invoice_type": "SATIS",
+    "allowance_total": "0.00 TRY",
+    "tax_exclusive": "10000.00 TRY",
+    "tax_inclusive": "10100.00 TRY",
+    "payable": "10100.00 TRY"
+  },
+  "taxes": [
+    {
+      "name": "KDV",
+      "code": "0015",
+      "percent": "1.00",
+      "tax": "100.00 TRY",
+      "exemption": {}
+    }
+  ],
+  "accounting_entries": [
+    {
+      "account_code": "120.01.00003",
+      "account_name": "Bim Birleşik Mağazalar A.Ş.",
+      "amount": "10100",
+      "dc": "Borç"
+    },
+    {
+      "account_code": "600.01.00001",
+      "account_name": "Ekmek Satışları",
+      "amount": "10000",
+      "dc": "Alacak"
+    },
+    {
+      "account_code": "391.01.00001",
+      "account_name": "%1 Hesaplanan KDV",
+      "amount": "100",
+      "dc": "Alacak"
+    }
+  ],
+  "lines": [
+    {
+      "product_name": "EKMEK (TAZE, 350 GR)",
+      "quantity": "2000.000000 C62",
+      "total": "10000.00 TRY"
+    }
+  ],
+  "notes": []
+}

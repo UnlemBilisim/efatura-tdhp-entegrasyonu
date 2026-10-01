@@ -19,7 +19,7 @@ Isim/tip/varsayilan degistiginde bu dosya AYNI COMMIT'te guncellenmelidir.
 | `DEFAULT_EMBED_MODEL` | `embeddinggemma` | Ollama embedding modeli. Once `ollama pull embeddinggemma` calistirilmali. |
 | `DEFAULT_PERSIST_DIR` | `vector_db/` | ChromaDB'nin diske yazdigi klasor (git'e eklenmez, `.gitignore`'da). |
 | `COLLECTION_NAME` | `tdhp_invoices` | Chroma koleksiyon adi. |
-| `STRONG_MATCH_MAX_DISTANCE` | `0.15` | Bu mesafenin altindaki emsaller "GUCLU ESLESME" sayilir (few-shot'ta zorlayici dil + self-correct tetikleyicisi). RESULTS.md 6.1'deki gozlemsel dagilima gore secildi - degistirilirse RESULTS.md'deki analiz de guncellenmeli. |
+| `STRONG_MATCH_MAX_DISTANCE` | `0.15` | Bu mesafenin altindaki emsaller "GUCLU ESLESME" sayilir (few-shot'ta zorlayici dil + self-correct tetikleyicisi). Gecmis bir gozlemsel dagilim analizine gore secildi (bkz. `rag_common.py` yorumu) - esik degistirilirse o analiz de gozden gecirilmeli. |
 
 **Onemli:** embedding modeli degistirilirse (`--rag-embed-model`), eski
 koleksiyondaki vektorler YENI modelle uyumsuz olur - ayni `--persist-dir`
@@ -48,6 +48,7 @@ olusur — tutar ve hesap kodu **icermez** (bkz.
 
 ```
 python3 build_vector_db.py \
+  --own-vkn <sirketin_vkni> \
   [--data-dir ../Archive2/jsons] \
   [--persist-dir vector_db] \
   [--embed-model embeddinggemma] \
@@ -55,8 +56,11 @@ python3 build_vector_db.py \
   [--limit N]
 ```
 
-Idempotenttir (invoice_id'ye gore upsert); yeni fatura eklendiginde tekrar
-calistirilarak veritabani guncellenebilir.
+`--own-vkn` zorunludur (2026-09-29) — hangi RAG koleksiyonuna
+(`tdhp_invoices_<vkn>`, bkz. `rag_common.koleksiyon_adi_coz`) yazılacağını
+belirler; verilmezse script çalışmaz. Idempotenttir (invoice_id'ye gore
+upsert); yeni fatura eklendiginde tekrar calistirilarak veritabani
+guncellenebilir.
 
 ## CLI — `evaluate_models.py --rag`
 
@@ -94,8 +98,8 @@ ekler - RAG'in aksine "hangi hesap" sorusuna karismaz, sadece yon/kod/tutar
 verir. `--rag` ile birlikte kullanilabilir: RAG hangi mal/hizmet hesabinin
 (150/730/770 vb.) kullanilacagina dair emsal gosterir, `--iade-hint` o
 hesabin hangi YONDE (Borc/Alacak) kullanilacagini kesinlestirir. Ayri sonuc
-dosyasina yazar (`+iadehint` son eki). Detay ve gerekce: `RESULTS.md`
-SS6.2 madde 5.
+dosyasina yazar (`+iadehint` son eki). Detay ve gerekce:
+`core/prompting.py::compute_iade_hint` docstring'i.
 
 ## Bagimliliklar
 

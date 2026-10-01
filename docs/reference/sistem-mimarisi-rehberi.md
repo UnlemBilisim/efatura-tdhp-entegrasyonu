@@ -756,10 +756,19 @@ ground-truth modu ya da `xml` tahmin modu) → `--invoice-type`/
 `get_alt_kirilimlar(tenant_vkn=...)`, ilgili tenant şemasındaki PostgreSQL
 `mizan_alt_kirilim` tablosunu okur. Yalnızca 3-seviyeli kodları
 (`XXX.YY.ZZZZZ`) alıp 3 haneli ana koda göre gruplar:
-`{"191": [("191.05.00005", "%20 5/10 Tevkifatli KDV"), ...]}`. Process-ömrü
-`threading.Lock` korumalı cache (`rag_common.get_collection` ile aynı
-desen) — PostgreSQL her istekte yeniden sorgulanmaz. `TDHP_GLOSSARY`'den
-farkı: her tenant'ın listesi kendine özeldir.
+`{"191": [("191.05.00005", "%20 5/10 Tevkifatli KDV"), ...]}`. Sonuç
+tenant başına `MIZAN_CACHE_SURESI_SANIYE` (300 sn) boyunca `threading.Lock`
+korumalı cache'te tutulur. `TDHP_GLOSSARY`'den farkı: her tenant'ın listesi
+kendine özeldir.
+
+> ✅ **Uygulandı** (2026-09-28, `core/mizan.py::get_alt_kirilimlar`):
+> Cache önceden süreç ömrü boyunca tutuluyordu ve boş sonuç ile DB
+> hatası da cache'e yazılıyordu. Bu yüzden onboarding sonrası mizan
+> yüklenmeden gelen ilk fatura "mizan yok" sonucunu kalıcılaştırıyor,
+> anlık bir DB hatası da servis yeniden başlatılana kadar alt kırılımı
+> kapatıyordu. Artık yalnızca dolu sonuç ve en fazla 5 dakika cache'leniyor;
+> `mizan_excel_yukle.py` ile güncellenen mizan servis yeniden başlatılmadan
+> devreye giriyor. Test: `tests/test_mizan.py::TestMizanCacheDavranisi`.
 
 ### 4.12 `core/disa_aktarim.py` — İç Şema ↔ Dış Şema Dönüşümü
 

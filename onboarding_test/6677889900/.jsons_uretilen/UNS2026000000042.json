@@ -1,0 +1,51 @@
+{
+  "header": {
+    "account_title": "UN SANAYİ VE TİCARET A.Ş.",
+    "account_tax_number": "5544332211",
+    "invoice_id": "UNS2026000000042",
+    "issue_date": "2026-09-10",
+    "currency": "TRY",
+    "invoice_type": "SATIS",
+    "allowance_total": "0.00 TRY",
+    "tax_exclusive": "25000.00 TRY",
+    "tax_inclusive": "25250.00 TRY",
+    "payable": "25250.00 TRY"
+  },
+  "taxes": [
+    {
+      "name": "KDV",
+      "code": "0015",
+      "percent": "1.00",
+      "tax": "250.00 TRY",
+      "exemption": {}
+    }
+  ],
+  "accounting_entries": [
+    {
+      "account_code": "150.01.00001",
+      "account_name": "Buğday Unu",
+      "amount": "25000",
+      "dc": "Borç"
+    },
+    {
+      "account_code": "191.01.00001",
+      "account_name": "%1 İndirilecek KDV",
+      "amount": "250",
+      "dc": "Borç"
+    },
+    {
+      "account_code": "320.01.00001",
+      "account_name": "Un Sanayi Ve Ticaret A.Ş.",
+      "amount": "25250",
+      "dc": "Alacak"
+    }
+  ],
+  "lines": [
+    {
+      "product_name": "BUĞDAY UNU (TİP 550, 50 KG ÇUVAL)",
+      "quantity": "5000.000000 C62",
+      "total": "25000.00 TRY"
+    }
+  ],
+  "notes": []
+}

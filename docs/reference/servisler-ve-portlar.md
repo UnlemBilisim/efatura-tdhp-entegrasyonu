@@ -11,8 +11,8 @@
 
 | Port | Servis | Kim başlatır | Zorunlu mu |
 |---|---|---|---|
-| **8000** | Mcp_mimarisi API (FastAPI) | `docker compose up` (`app` container, supervisord) | Outbox faturalar için evet |
-| **8100** | entegrasyon servisi (FastAPI) | `docker compose up` (`app` container, supervisord) | Evet — dış API bu |
+| **8000** | Mcp_mimarisi API (FastAPI) | `docker compose up` (`app` container, supervisord) | Outbox faturalar için evet — ama sadece `127.0.0.1`'den (içeride entegrasyon kullanır) |
+| **8100** | entegrasyon servisi (FastAPI) | `docker compose up` (`app` container, supervisord) | Evet — dış API bu, `0.0.0.0`'a açık |
 | **5434** | PostgreSQL (Docker, iç port 5432) | `docker compose up` (`postgres` container) | Evet |
 | **11434** | Ollama (embedding) | `docker compose up` (`ollama` container) | RAG için evet |
 | **11435** | SSH tüneli → uzak GPU'daki Ollama | **Kullanıcı elle açar / systemd servisi** (container dışı, host seviyesinde) | LLM için evet |
@@ -31,9 +31,25 @@
 > çalıştırma yolu artık `docker compose up` (detay:
 > [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md)).
 
-Docker container içinde servisler `0.0.0.0` dinler, ancak Compose portları
-host'un `127.0.0.1` adresine yayınlar (`docker/docker-compose.yml`). Dış
-erişim reverse proxy üzerinden HTTPS ile verilmelidir.
+Docker container içinde servisler `0.0.0.0` dinler. Host'a yayınlanan adres
+porta göre değişir (`docker/docker-compose.yml`): **8100** dış ekibin kendi
+makinelerinden erişebilmesi için `0.0.0.0`'a (tüm arayüzler), **8000**
+`127.0.0.1`'e (sadece bu makine) yayınlanır — Postgres (5434) ve Ollama
+(11434) de aynı şekilde `127.0.0.1`'de. Dış erişim reverse proxy üzerinden
+HTTPS ile verilmelidir.
+
+> ✅ **Düzeltildi** (2026-10-01, kullanıcı kararı — TODO.md "/fatura/
+> gecmis-kontrol keyfi VKN sorgusu"): Bu bölüm 2026-07-27'den beri "Compose
+> portları host'un 127.0.0.1 adresine yayınlar" diyordu — bu, 2026-09-30'da
+> 8100'ün (ve yanlışlıkla 8000'in de) `0.0.0.0`'a açılmasıyla BAYATLAMIŞTI,
+> fark edilmemişti. Şimdi hem kod (`docker/docker-compose.yml`) hem bu
+> paragraf düzeltildi: 8000 `entegrasyon`'un aynı container içinde
+> `localhost:8000` ile zaten eriştiği, dış ekibin hiç çağırmadığı bir port
+> olduğu için tekrar `127.0.0.1`'e alındı — `MCP_INTERNAL_API_TOKEN`'ın
+> (VKN-bazlı yetki kontrolü olmayan tek bir dahili token) LAN'a maruz
+> kalması engellendi. Gerçek ortamda doğrulandı: `docker compose up -d
+> --no-deps app` sonrası `docker ps` → `127.0.0.1:8000->8000` /
+> `0.0.0.0:8100->8100`, her iki servis de `/saglik` ve `/durum` ile sağlıklı.
 
 ## Ortam değişkenleri
 
@@ -43,9 +59,15 @@ erişim reverse proxy üzerinden HTTPS ile verilmelidir.
 | `MCP_MIMARISI_BASE_URL` | `http://localhost:8000` | `entegrasyon/mcp_mimarisi_istemcisi.py:17` | Varsayılana düşer |
 | `MODEL_EVAL_OLLAMA_HOST` | `http://localhost:11435` | `entegrasyon/model_eval_koprusu.py:37` | Varsayılana düşer (tünel portu) |
 | `OLLAMA_HOST` | `http://localhost:11434` | `model_eval/core/constants.py:10` | Varsayılana düşer (yerel) |
-| `EFATURA_API_TOKEN` | **yok** | `entegrasyon/auth.py` | İş endpoint'leri 503 ile kapalı kalır |
 | `MCP_INTERNAL_API_TOKEN` | **yok** | `Mcp_mimarisi/.../auth.py`, MCP istemcisi | Dahili endpoint'ler kapalı kalır |
 | `MAX_REQUEST_BYTES` | `10485760` | iki HTTP middleware'i | 10 MB toplam istek sınırı uygulanır |
+
+> ✅ **Uygulandı** (2026-09-28): `EFATURA_API_TOKEN` env değişkeni
+> **kaldırıldı**. Dış API anahtarları artık `public.api_anahtarlari`
+> tablosunda şirkete bağlı olarak tutuluyor
+> (`entegrasyon/api_anahtarlari.py`, `entegrasyon/auth.py::require_api_key`).
+> Üretme/iptal: `entegrasyon/api_anahtari_yonet.py`, bkz.
+> [`docker-ile-calistirma.md`](../how-to/docker-ile-calistirma.md) §2.1.
 
 ### Neden iki farklı Ollama portu?
 
@@ -83,6 +105,7 @@ tablosuna dokunmazlar:
 | `islenmis_faturalar` | Mcp_mimarisi | Claim tablosu (aynı fatura iki kez işlenmesin) |
 | `model_eval_sonuclar` | model_eval | Tahmin sonuçları + onay kayıtları |
 | `model_eval_bekleyen_tahminler` | model_eval | Süreli, sunucu taraflı onay kayıtları |
+| `api_anahtarlari` | entegrasyon | Şirkete bağlı API anahtarlarının sha256 özeti + izinli VKN listesi (her zaman `public` şemada) |
 
 > ✅ **Uygulandı** (2026-07-28): Bu tabloların tam yedeği `pg_dump -F c` ile
 > alınıp `db-yedek/efatura_kdv_yedek.dump`'a kaydedildi (2138 + 1120 + 1

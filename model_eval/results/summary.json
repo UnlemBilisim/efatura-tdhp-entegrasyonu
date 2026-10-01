@@ -1,0 +1,104 @@
+[
+  {
+    "model": "ollama:gemma4:31b-cloud+tevkifathint+iadehint+selfcorrect+rag",
+    "n_total": 1646,
+    "n_scored": 1635,
+    "n_hard_errors": 11,
+    "code_mistake_count": 551,
+    "invoices_with_mistake": 304,
+    "pair_precision": 0.9471,
+    "pair_recall": 0.9462,
+    "pair_f1": 0.9466,
+    "code_precision": 0.9473,
+    "code_recall": 0.9513,
+    "code_f1": 0.9493,
+    "exact_pair_match_rate": 0.8141,
+    "exact_code_match_rate": 0.8141,
+    "balanced_entry_rate": 0.9896,
+    "avg_latency_s": 1.526,
+    "most_missed_codes": [
+      [
+        "730",
+        77
+      ],
+      [
+        "689",
+        36
+      ],
+      [
+        "320",
+        25
+      ],
+      [
+        "150",
+        24
+      ],
+      [
+        "770",
+        21
+      ],
+      [
+        "329",
+        20
+      ],
+      [
+        "309",
+        20
+      ],
+      [
+        "100",
+        5
+      ],
+      [
+        "253",
+        5
+      ],
+      [
+        "120",
+        4
+      ]
+    ],
+    "most_hallucinated_codes": [
+      [
+        "360",
+        112
+      ],
+      [
+        "770",
+        35
+      ],
+      [
+        "150",
+        28
+      ],
+      [
+        "730",
+        26
+      ],
+      [
+        "320",
+        24
+      ],
+      [
+        "120",
+        24
+      ],
+      [
+        "600",
+        5
+      ],
+      [
+        "760",
+        3
+      ],
+      [
+        "601",
+        2
+      ],
+      [
+        "610",
+        2
+      ]
+    ]
+  }
+]

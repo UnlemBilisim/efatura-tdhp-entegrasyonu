@@ -1,0 +1,1388 @@
+{
+  "toplam": 1646,
+  "reddedilen_sayisi": 153,
+  "reddedilen_oran": 9.3,
+  "kur_farki_supheli": 85,
+  "mukerrer_supheli": 26,
+  "yuvarlama": 8,
+  "aciklanamayan": 34,
+  "reddedilen_detay": [
+    {
+      "dosya": "0012025081792260-eb742d20-e551-466f-af26-659f61418cbb-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 703.0,
+      "payable": 351.5,
+      "tax_inclusive": 351.5,
+      "fark_payable": 351.5,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "01S2025000317644-26114bdc-e484-48a2-bc25-b6c5817a43b8-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 69.16,
+      "payable": 69.2,
+      "tax_inclusive": 69.2,
+      "fark_payable": -0.04000000000000625,
+      "fark_oran": -0.05780346820810152
+    },
+    {
+      "dosya": "01S2025000974993-73b9d9aa-1805-4852-8635-bb4aef100e17-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 69.16,
+      "payable": 69.2,
+      "tax_inclusive": 69.2,
+      "fark_payable": -0.04000000000000625,
+      "fark_oran": -0.05780346820810152
+    },
+    {
+      "dosya": "AAA2025001571287-6a00a2da-76c2-44b3-9f8b-4268e0f8d6ec-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4689.74,
+      "payable": 2344.87,
+      "tax_inclusive": 2344.87,
+      "fark_payable": 2344.87,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "AAB2025000003056-db4d2903-951c-4a4b-9261-9cfcc612edc8-inbox.json",
+      "invoice_type": "TEVKIFAT",
+      "borc": 663410.97,
+      "payable": 608126.71,
+      "tax_inclusive": 608126.71,
+      "fark_payable": 55284.26000000001,
+      "fark_oran": 9.090911333264742
+    },
+    {
+      "dosya": "AKA2025000000007-6b653f15-fd17-421a-a9ab-9b45e662afe8-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 7682.13,
+      "payable": 7655.79,
+      "tax_inclusive": 7655.79,
+      "fark_payable": 26.340000000000146,
+      "fark_oran": 0.34405332434667285
+    },
+    {
+      "dosya": "AKC2025000003775-811f29b3-65bb-428c-982d-bd0ec2c81e12-inbox.json",
+      "invoice_type": "TEVKIFAT",
+      "borc": 1136507.98,
+      "payable": 892970.56,
+      "tax_inclusive": 974149.7,
+      "fark_payable": 243537.41999999993,
+      "fark_oran": 27.272726661895764
+    },
+    {
+      "dosya": "AKC2025000003776-4bce414c-c59d-47e0-babc-927e787288bb-inbox.json",
+      "invoice_type": "TEVKIFAT",
+      "borc": 1616052.02,
+      "payable": 1269755.15,
+      "tax_inclusive": 1385187.44,
+      "fark_payable": 346296.8700000001,
+      "fark_oran": 27.272728131876462
+    },
+    {
+      "dosya": "AKK2025000000001-442d447c-32c2-4d7c-91b7-3491d617305c-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 53796.08,
+      "payable": 53427.59,
+      "tax_inclusive": 53427.59,
+      "fark_payable": 368.49000000000524,
+      "fark_oran": 0.6896998348606128
+    },
+    {
+      "dosya": "AKK2025000000002-1ae3b573-2399-4b8d-bbf0-863f9f9f827c-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 2730478.89,
+      "payable": 2722156.98,
+      "tax_inclusive": 2722156.98,
+      "fark_payable": 8321.910000000149,
+      "fark_oran": 0.30571014313804007
+    },
+    {
+      "dosya": "AKK2025000000003-988e5bd8-cc92-468f-8058-816d8a9e89a5-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 306659.56,
+      "payable": 306403.36,
+      "tax_inclusive": 306403.36,
+      "fark_payable": 256.20000000001164,
+      "fark_oran": 0.08361527105969453
+    },
+    {
+      "dosya": "AKK2025000000004-eeb872e0-64ee-4b4c-ba2b-c0da3a0172ab-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1403725.4,
+      "payable": 1399732.95,
+      "tax_inclusive": 1399732.95,
+      "fark_payable": 3992.4499999999534,
+      "fark_oran": 0.2852294075094791
+    },
+    {
+      "dosya": "AKK2025000000005-572a1f75-d3ac-42d7-9e50-807c0fcb0b72-outbox.json",
+      "invoice_type": "IHRACKAYITLI",
+      "borc": 2582779.97,
+      "payable": 2109270.31,
+      "tax_inclusive": 2539733.64,
+      "fark_payable": 473509.66000000015,
+      "fark_oran": 22.448979524108513
+    },
+    {
+      "dosya": "AKK2025000000007-35d53f61-ea4e-4ec2-ac8c-18e1503c7588-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 525181.19,
+      "payable": 520095.33,
+      "tax_inclusive": 520095.33,
+      "fark_payable": 5085.859999999928,
+      "fark_oran": 0.977870729967894
+    },
+    {
+      "dosya": "AKK2025000000008-bcaa94b5-b97f-4a08-9b8d-4db6193cc56d-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 28043.63,
+      "payable": 27772.05,
+      "tax_inclusive": 27772.05,
+      "fark_payable": 271.58000000000175,
+      "fark_oran": 0.9778896408439484
+    },
+    {
+      "dosya": "AKK2025000000009-92c8c77b-f873-4e8e-84eb-2f998eb24df5-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 249176.96,
+      "payable": 246763.92,
+      "tax_inclusive": 246763.92,
+      "fark_payable": 2413.039999999979,
+      "fark_oran": 0.9778739128475423
+    },
+    {
+      "dosya": "AKK2025000000010-c342b5e2-70c3-459c-bebf-0dee76ffa586-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 592917.02,
+      "payable": 587175.2,
+      "tax_inclusive": 587175.2,
+      "fark_payable": 5741.820000000065,
+      "fark_oran": 0.9778716812290549
+    },
+    {
+      "dosya": "AKK2025000000011-ed13605c-5325-44a6-94b9-c1e1a03a392a-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 640523.6,
+      "payable": 638158.67,
+      "tax_inclusive": 638158.67,
+      "fark_payable": 2364.929999999935,
+      "fark_oran": 0.37058651886684146
+    },
+    {
+      "dosya": "AKK2025000000012-28a42fe4-460d-48f5-aec7-d132207512ba-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 293815.26,
+      "payable": 292752.45,
+      "tax_inclusive": 292752.45,
+      "fark_payable": 1062.8099999999977,
+      "fark_oran": 0.36304051426384226
+    },
+    {
+      "dosya": "AKK2025000000013-536e3b19-93fd-4b12-a382-68bffc7f15b4-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 999116.41,
+      "payable": 1000645.99,
+      "tax_inclusive": 1000645.99,
+      "fark_payable": -1529.579999999958,
+      "fark_oran": -0.15285925445021353
+    },
+    {
+      "dosya": "AKK2025000000014-818b328c-fb42-4190-b3a3-0e99cd12a5d3-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 831703.02,
+      "payable": 822173.56,
+      "tax_inclusive": 822173.56,
+      "fark_payable": 9529.459999999963,
+      "fark_oran": 1.15905697575582
+    },
+    {
+      "dosya": "AKK2025000000015-140fd784-b4d0-4308-9c5c-8f2c5175bccd-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 404645.79,
+      "payable": 402033.77,
+      "tax_inclusive": 402033.77,
+      "fark_payable": 2612.0199999999604,
+      "fark_oran": 0.6497016407352946
+    },
+    {
+      "dosya": "AKK2025000000016-81ce7eef-4fb7-455d-b61c-670ed686e431-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 2173057.08,
+      "payable": 2165676.27,
+      "tax_inclusive": 2165676.27,
+      "fark_payable": 7380.810000000056,
+      "fark_oran": 0.3408085549185085
+    },
+    {
+      "dosya": "AKK2025000000018-5f05ace4-3781-4dd1-85ce-fae9708fd6b1-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 2026020.89,
+      "payable": 2034204.9,
+      "tax_inclusive": 2034204.9,
+      "fark_payable": -8184.010000000009,
+      "fark_oran": -0.4023198449674371
+    },
+    {
+      "dosya": "AKK2025000000019-146df007-7a57-4561-9985-7c3296be4ba6-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 643518.63,
+      "payable": 648292.69,
+      "tax_inclusive": 648292.69,
+      "fark_payable": -4774.0599999999395,
+      "fark_oran": -0.7364050333499734
+    },
+    {
+      "dosya": "AKK2025000000020-984a1d9c-4d76-4297-ac86-12dec5e5ad06-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 812571.76,
+      "payable": 815976.9,
+      "tax_inclusive": 815976.9,
+      "fark_payable": -3405.140000000014,
+      "fark_oran": -0.4173083821367999
+    },
+    {
+      "dosya": "AKK2025000000021-09198b32-278c-4caa-b83a-1b582320acf3-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1714943.26,
+      "payable": 1722134.23,
+      "tax_inclusive": 1722134.23,
+      "fark_payable": -7190.969999999972,
+      "fark_oran": -0.41756152770971705
+    },
+    {
+      "dosya": "AKK2025000000022-42c1a45a-2b50-4231-b2fe-a68708c8ccad-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 738035.34,
+      "payable": 744166.01,
+      "tax_inclusive": 744166.01,
+      "fark_payable": -6130.670000000042,
+      "fark_oran": -0.8238309621263193
+    },
+    {
+      "dosya": "AKK2025000000023-9e84bd21-a4ce-4876-ad5e-6ee49cf72008-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 154158.55,
+      "payable": 154377.3,
+      "tax_inclusive": 154377.3,
+      "fark_payable": -218.75,
+      "fark_oran": -0.14169829372582626
+    },
+    {
+      "dosya": "AKK2025000000024-f0fc370d-88ae-453e-9764-d1dd8f561bdc-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1547893.26,
+      "payable": 1554438.22,
+      "tax_inclusive": 1554438.22,
+      "fark_payable": -6544.959999999963,
+      "fark_oran": -0.4210498632747182
+    },
+    {
+      "dosya": "AKK2025000000025-c30665c8-0668-4659-9fd7-4504673226de-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 290123.14,
+      "payable": 291349.87,
+      "tax_inclusive": 291349.87,
+      "fark_payable": -1226.7299999999814,
+      "fark_oran": -0.42105047103675775
+    },
+    {
+      "dosya": "AKK2025000000026-51a1887a-dfef-4a83-a8c6-0fc58d2fda55-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 953143.07,
+      "payable": 926529.91,
+      "tax_inclusive": 926529.91,
+      "fark_payable": 26613.159999999916,
+      "fark_oran": 2.8723476395921117
+    },
+    {
+      "dosya": "AKK2025000000027-1333a871-e8c6-427e-8600-808e0610cf7b-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 353963.79,
+      "payable": 346861.86,
+      "tax_inclusive": 346861.86,
+      "fark_payable": 7101.929999999993,
+      "fark_oran": 2.0474808040295907
+    },
+    {
+      "dosya": "AKK2025000000028-f42eb4bc-7f73-4f5f-94b7-ad0a8815d266-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 69391.25,
+      "payable": 67998.98,
+      "tax_inclusive": 67998.98,
+      "fark_payable": 1392.270000000004,
+      "fark_oran": 2.047486594651867
+    },
+    {
+      "dosya": "AKK2025000000029-093503e0-1d87-4f9c-9519-15ff1040a956-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 352932.1,
+      "payable": 343342.2,
+      "tax_inclusive": 343342.2,
+      "fark_payable": 9589.899999999965,
+      "fark_oran": 2.7931026247283217
+    },
+    {
+      "dosya": "AKK2025000000030-3d5c8f9c-3a49-40dd-8969-f60194fabe90-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 604546.86,
+      "payable": 588120.07,
+      "tax_inclusive": 588120.07,
+      "fark_payable": 16426.790000000037,
+      "fark_oran": 2.7931014154983758
+    },
+    {
+      "dosya": "AKK2025000000031-710d72c1-eea0-46cc-8944-4ddf14b8c03a-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 2856460.26,
+      "payable": 2775014.92,
+      "tax_inclusive": 2775014.92,
+      "fark_payable": 81445.33999999985,
+      "fark_oran": 2.934951427216105
+    },
+    {
+      "dosya": "AKK2025000000032-b4e58ca7-e206-4942-a0e4-086d9ac22065-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 387522.03,
+      "payable": 376472.74,
+      "tax_inclusive": 376472.74,
+      "fark_payable": 11049.290000000037,
+      "fark_oran": 2.9349508811713796
+    },
+    {
+      "dosya": "AKK2025000000033-a589a3d8-8186-46f2-918b-46bc88f7c51f-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 490944.16,
+      "payable": 484351.84,
+      "tax_inclusive": 484351.84,
+      "fark_payable": 6592.319999999949,
+      "fark_oran": 1.3610601747688102
+    },
+    {
+      "dosya": "AKK2025000000034-481bbe58-d2d4-4db0-9e28-7b89a510728c-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 3053409.67,
+      "payable": 3013711.58,
+      "tax_inclusive": 3013711.58,
+      "fark_payable": 39698.08999999985,
+      "fark_oran": 1.3172491443258765
+    },
+    {
+      "dosya": "AKK2025000000035-df3d0be4-2059-4d9c-b976-ff4f9647169a-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 345714.4,
+      "payable": 346115.2,
+      "tax_inclusive": 346115.2,
+      "fark_payable": -400.79999999998836,
+      "fark_oran": -0.11579959504811933
+    },
+    {
+      "dosya": "AKK2025000000036-6d5fc3d3-a943-4d42-95fc-3113f8381d89-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 278496.55,
+      "payable": 278957.14,
+      "tax_inclusive": 278957.14,
+      "fark_payable": -460.5900000000256,
+      "fark_oran": -0.16511138592832778
+    },
+    {
+      "dosya": "AKK2025000000037-bb2e3412-3b2b-46c5-a0c1-1635c16e4bd3-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1300660.89,
+      "payable": 1298184.92,
+      "tax_inclusive": 1298184.92,
+      "fark_payable": 2475.969999999972,
+      "fark_oran": 0.19072552468102713
+    },
+    {
+      "dosya": "AKK2025000000038-428ae678-9439-4021-ab10-c57b7a74f73f-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 239383.1,
+      "payable": 239998.55,
+      "tax_inclusive": 239998.55,
+      "fark_payable": -615.4499999999825,
+      "fark_oran": -0.25643904931924905
+    },
+    {
+      "dosya": "AKK2025000000039-0ebb0585-9316-4ee2-8b25-61ff14248daf-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 641790.44,
+      "payable": 643440.48,
+      "tax_inclusive": 643440.48,
+      "fark_payable": -1650.0400000000373,
+      "fark_oran": -0.2564401916397982
+    },
+    {
+      "dosya": "AKK2025000000040-143a0eec-1875-490b-8ea7-b5ad84dc6ffc-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 180595.39,
+      "payable": 181177.09,
+      "tax_inclusive": 181177.09,
+      "fark_payable": -581.6999999999825,
+      "fark_oran": -0.32106708414401763
+    },
+    {
+      "dosya": "AKK2025000000041-ffda102b-850b-4e06-9af4-3ffe902076fb-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 477527.56,
+      "payable": 478989.04,
+      "tax_inclusive": 478989.04,
+      "fark_payable": -1461.4799999999814,
+      "fark_oran": -0.30511762857872105
+    },
+    {
+      "dosya": "AKK2025000000042-255ad413-d51d-493f-9a19-a5ab63ace50a-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 601611.88,
+      "payable": 604940.68,
+      "tax_inclusive": 604940.68,
+      "fark_payable": -3328.8000000000466,
+      "fark_oran": -0.5502688296644304
+    },
+    {
+      "dosya": "AKK2025000000043-bb796d07-52f2-4a44-957c-799db5b07544-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 664570.9,
+      "payable": 665397.95,
+      "tax_inclusive": 665397.95,
+      "fark_payable": -827.0499999999302,
+      "fark_oran": -0.12429404088184073
+    },
+    {
+      "dosya": "AKK2025000000046-8ae5468b-d8f5-466c-90f4-20110aaf05ae-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 45014.86,
+      "payable": 44225.21,
+      "tax_inclusive": 44225.21,
+      "fark_payable": 789.6500000000015,
+      "fark_oran": 1.7855200687571668
+    },
+    {
+      "dosya": "AKK2025000000047-3e0e4db1-7301-4efc-bb5d-883eab267c23-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1736277.88,
+      "payable": 1705819.98,
+      "tax_inclusive": 1705819.98,
+      "fark_payable": 30457.899999999907,
+      "fark_oran": 1.7855283885231492
+    },
+    {
+      "dosya": "AKK2025000000048-cbcfd5ac-9988-4a34-8ec7-cdaf50a86eb1-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 660354.42,
+      "payable": 648770.44,
+      "tax_inclusive": 648770.44,
+      "fark_payable": 11583.980000000098,
+      "fark_oran": 1.7855283295583102
+    },
+    {
+      "dosya": "AKK2025000000049-476efde4-29af-490d-aa5b-3ebf26b86231-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 635283.51,
+      "payable": 631350.04,
+      "tax_inclusive": 631350.04,
+      "fark_payable": 3933.469999999972,
+      "fark_oran": 0.6230252238520444
+    },
+    {
+      "dosya": "AKK2025000000050-0497d6b8-c1fe-4ed2-b319-4ef33d3e9662-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 78170.97,
+      "payable": 77929.01,
+      "tax_inclusive": 77929.01,
+      "fark_payable": 241.9600000000064,
+      "fark_oran": 0.31048771182901774
+    },
+    {
+      "dosya": "AKK2025000000052-d1dded70-431c-4af9-b04e-1b21901284fb-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 289322.34,
+      "payable": 285073.41,
+      "tax_inclusive": 285073.41,
+      "fark_payable": 4248.930000000051,
+      "fark_oran": 1.490468718215442
+    },
+    {
+      "dosya": "AKK2025000000055-7b7c6771-026d-4ef5-bb0b-54ac58d7a252-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 570656.18,
+      "payable": 571747.33,
+      "tax_inclusive": 571747.33,
+      "fark_payable": -1091.1499999999069,
+      "fark_oran": -0.19084479152703815
+    },
+    {
+      "dosya": "AKK2025000000056-5a16fb8e-556a-4926-b941-78cafce2eb3c-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 5639675.13,
+      "payable": 5615187.53,
+      "tax_inclusive": 5615187.53,
+      "fark_payable": 24487.599999999627,
+      "fark_oran": 0.43609585377462234
+    },
+    {
+      "dosya": "AKK2025000000057-d2dc391e-7f7a-49f7-aee5-d842804fbe9d-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 976358.72,
+      "payable": 970766.95,
+      "tax_inclusive": 970766.95,
+      "fark_payable": 5591.770000000019,
+      "fark_oran": 0.5760156956311727
+    },
+    {
+      "dosya": "AKK2025000000058-8e295575-aaca-4ed6-8750-e4069830c076-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 713580.13,
+      "payable": 605169.53,
+      "tax_inclusive": 605169.53,
+      "fark_payable": 108410.59999999998,
+      "fark_oran": 17.91408764416807
+    },
+    {
+      "dosya": "AKK2025000000059-402bd224-ec49-4f45-8c64-a5a9485aed25-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 3071365.98,
+      "payable": 3027115.7,
+      "tax_inclusive": 3027115.7,
+      "fark_payable": 44250.279999999795,
+      "fark_oran": 1.4617967856332612
+    },
+    {
+      "dosya": "AKK2025000000060-292d317f-e9bb-4e5a-96db-149019c204ab-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 758865.57,
+      "payable": 749769.47,
+      "tax_inclusive": 749769.47,
+      "fark_payable": 9096.099999999977,
+      "fark_oran": 1.2131862344301612
+    },
+    {
+      "dosya": "AKK2025000000061-c1b1612d-d47e-4f81-9838-8fa039f1fe08-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 46830.2,
+      "payable": 46760.6,
+      "tax_inclusive": 46760.6,
+      "fark_payable": 69.59999999999854,
+      "fark_oran": 0.1488432569299764
+    },
+    {
+      "dosya": "AKK2025000000062-81f0c544-e0ec-4ff0-be88-02a23b576d05-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1202617.75,
+      "payable": 1203606.15,
+      "tax_inclusive": 1203606.15,
+      "fark_payable": -988.3999999999069,
+      "fark_oran": -0.082119886143811
+    },
+    {
+      "dosya": "AKK2025000000063-d036a838-6ea6-41e2-b76c-51571b779463-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 28130.16,
+      "payable": 28056.36,
+      "tax_inclusive": 28056.36,
+      "fark_payable": 73.79999999999927,
+      "fark_oran": 0.26304196267797847
+    },
+    {
+      "dosya": "AKK2025000000064-a7c31b75-4b43-4ee1-a19e-255f8deb4268-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 123113.0,
+      "payable": 123214.18,
+      "tax_inclusive": 123214.18,
+      "fark_payable": -101.17999999999302,
+      "fark_oran": -0.08211717190342298
+    },
+    {
+      "dosya": "AKK2025000000065-89766557-208a-4165-a350-0bbc26536bfd-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1184939.87,
+      "payable": 1184185.84,
+      "tax_inclusive": 1184185.84,
+      "fark_payable": 754.0300000000279,
+      "fark_oran": 0.0636749718270595
+    },
+    {
+      "dosya": "AKK2025000000066-ee48a6f9-e92f-4de8-a8ac-9dcdadfa1675-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 470877.19,
+      "payable": 469493.74,
+      "tax_inclusive": 469493.74,
+      "fark_payable": 1383.4500000000116,
+      "fark_oran": 0.29466846565409194
+    },
+    {
+      "dosya": "AKK2025000000067-35aef636-f015-4ca0-a917-2340f50c8e0e-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 61899.42,
+      "payable": 61717.56,
+      "tax_inclusive": 61717.56,
+      "fark_payable": 181.86000000000058,
+      "fark_oran": 0.29466492194442
+    },
+    {
+      "dosya": "AKK2025000000068-7e146d76-4760-45de-bfc3-0c1cd7b72efb-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1072971.95,
+      "payable": 1068031.22,
+      "tax_inclusive": 1068031.22,
+      "fark_payable": 4940.729999999981,
+      "fark_oran": 0.46260164567099277
+    },
+    {
+      "dosya": "AKK2025000000069-29ad072d-cbfc-4147-8951-b38e9be79c85-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 204244.25,
+      "payable": 202642.14,
+      "tax_inclusive": 202642.14,
+      "fark_payable": 1602.109999999986,
+      "fark_oran": 0.7906104821040607
+    },
+    {
+      "dosya": "AKK2025000000070-2546e6b4-22f1-4f70-9905-4aab1f4d657f-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 2657986.88,
+      "payable": 2653998.75,
+      "tax_inclusive": 2653998.75,
+      "fark_payable": 3988.1299999998882,
+      "fark_oran": 0.15026872186732898
+    },
+    {
+      "dosya": "AKK2025000000071-4835c90e-4de8-461a-aca8-68d8cfab64c2-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 876846.2,
+      "payable": 875875.46,
+      "tax_inclusive": 875875.46,
+      "fark_payable": 970.7399999999907,
+      "fark_oran": 0.11083082519516994
+    },
+    {
+      "dosya": "AKK2025000000072-9d70b14a-4ebe-440a-a37b-923331cf302d-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 337176.82,
+      "payable": 337621.92,
+      "tax_inclusive": 337621.92,
+      "fark_payable": -445.0999999999767,
+      "fark_oran": -0.1318338572329595
+    },
+    {
+      "dosya": "AKK2025000000073-6ef626fb-4a45-4926-ad96-0edfa81b0247-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 5164.98,
+      "payable": 5101.14,
+      "tax_inclusive": 5101.14,
+      "fark_payable": 63.839999999999236,
+      "fark_oran": 1.2514849621849082
+    },
+    {
+      "dosya": "AKK2025000000074-eab11b69-29d9-4851-8d61-b7cc0c0ad770-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 178744.13,
+      "payable": 176027.25,
+      "tax_inclusive": 176027.25,
+      "fark_payable": 2716.8800000000047,
+      "fark_oran": 1.5434428476272877
+    },
+    {
+      "dosya": "AKK2025000000075-7547f622-26c0-4044-94cc-a4fa24b5514d-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 176699.91,
+      "payable": 175369.36,
+      "tax_inclusive": 175369.36,
+      "fark_payable": 1330.5500000000175,
+      "fark_oran": 0.7587129245382531
+    },
+    {
+      "dosya": "AKK2025000000076-c319a552-3f56-439d-97b5-fab25ef8ddbe-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 223641.06,
+      "payable": 221957.05,
+      "tax_inclusive": 221957.05,
+      "fark_payable": 1684.0100000000093,
+      "fark_oran": 0.7587098494956612
+    },
+    {
+      "dosya": "AKK2025000000077-3067c6f8-b10b-40bb-898e-df4a1686f3d4-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 28513.77,
+      "payable": 28535.22,
+      "tax_inclusive": 28535.22,
+      "fark_payable": -21.450000000000728,
+      "fark_oran": -0.07517026327465051
+    },
+    {
+      "dosya": "AKK2025000000078-c6deb135-bfef-4671-94d7-83c14f7969ab-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1270513.88,
+      "payable": 1263349.04,
+      "tax_inclusive": 1263349.04,
+      "fark_payable": 7164.839999999851,
+      "fark_oran": 0.5671306798950708
+    },
+    {
+      "dosya": "AKK2025000000079-b1b1f7a3-fc4c-4745-a5e4-8c6ca3b774a5-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 676738.32,
+      "payable": 673059.95,
+      "tax_inclusive": 673059.95,
+      "fark_payable": 3678.3699999999953,
+      "fark_oran": 0.5465144672476792
+    },
+    {
+      "dosya": "AKK2025000000080-72770add-45c0-4d7a-8276-e11d23624f12-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 3158779.8,
+      "payable": 3159901.8,
+      "tax_inclusive": 3159901.8,
+      "fark_payable": -1122.0,
+      "fark_oran": -0.03550743254109985
+    },
+    {
+      "dosya": "AKK2025000000081-19311c20-705e-4331-85b0-74afd8d45861-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 820575.49,
+      "payable": 812417.51,
+      "tax_inclusive": 812417.51,
+      "fark_payable": 8157.979999999981,
+      "fark_oran": 1.004161025529839
+    },
+    {
+      "dosya": "AKK2025000000082-1b6bf716-6e40-4f72-b09c-9b5b5e6a4570-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1256063.3,
+      "payable": 1243575.8,
+      "tax_inclusive": 1243575.8,
+      "fark_payable": 12487.5,
+      "fark_oran": 1.0041607435590174
+    },
+    {
+      "dosya": "AKK2025000000083-f30fa735-accb-4312-bad3-0b1b6fbf5c98-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 4225865.73,
+      "payable": 4200431.35,
+      "tax_inclusive": 4200431.35,
+      "fark_payable": 25434.38000000082,
+      "fark_oran": 0.6055182880206058
+    },
+    {
+      "dosya": "AKK2025000000084-68f98f77-9546-4dbf-a0a2-8f085be80a34-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 165604.59,
+      "payable": 164345.77,
+      "tax_inclusive": 164345.77,
+      "fark_payable": 1258.820000000007,
+      "fark_oran": 0.7659582598323078
+    },
+    {
+      "dosya": "AKK2025000000085-70032058-b4fb-424c-ab0f-002756599060-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1015754.97,
+      "payable": 1012731.82,
+      "tax_inclusive": 1012731.82,
+      "fark_payable": 3023.1500000000233,
+      "fark_oran": 0.2985143687891651
+    },
+    {
+      "dosya": "AKK2025000000087-dcdc4743-fdc5-4f8a-baf9-361819ca7716-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 189128.51,
+      "payable": 189647.99,
+      "tax_inclusive": 189647.99,
+      "fark_payable": -519.4799999999814,
+      "fark_oran": -0.2739180098876774
+    },
+    {
+      "dosya": "AKK2025000000088-ef3e0865-fc2c-4879-8f8b-07a197813653-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 3488106.36,
+      "payable": 3479547.58,
+      "tax_inclusive": 3479547.58,
+      "fark_payable": 8558.779999999795,
+      "fark_oran": 0.2459739320477921
+    },
+    {
+      "dosya": "AKK2025000000089-47e99c46-5c9a-4d49-9aa9-817d4db2e06a-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 243222.22,
+      "payable": 242377.35,
+      "tax_inclusive": 242377.35,
+      "fark_payable": 844.8699999999953,
+      "fark_oran": 0.34857630054953376
+    },
+    {
+      "dosya": "AKK2025000000090-34124e15-021a-4c70-ae20-16c3a359da23-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 626702.21,
+      "payable": 621106.03,
+      "tax_inclusive": 621106.03,
+      "fark_payable": 5596.179999999935,
+      "fark_oran": 0.9010023618672539
+    },
+    {
+      "dosya": "AKK2025000000091-2f90eeb9-9b3d-4747-a4a6-d24dbb639c1f-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 11637.34,
+      "payable": 11600.42,
+      "tax_inclusive": 11600.42,
+      "fark_payable": 36.92000000000007,
+      "fark_oran": 0.31826433870497856
+    },
+    {
+      "dosya": "AKL2025000000071-afca8d98-699e-4319-9444-c7e926c8a2b8-outbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 1100297.22,
+      "payable": 1101228.82,
+      "tax_inclusive": 1101228.82,
+      "fark_payable": -931.6000000000931,
+      "fark_oran": -0.08459640567707745
+    },
+    {
+      "dosya": "AKL2025000000132-eb90476e-64f9-45c0-8267-900e7caf51fa-outbox.json",
+      "invoice_type": "SATIS",
+      "borc": 90599.86,
+      "payable": 90539.86,
+      "tax_inclusive": 90539.86,
+      "fark_payable": 60.0,
+      "fark_oran": 0.06626915482308013
+    },
+    {
+      "dosya": "AKL2025000000179-33babe15-48e3-4baf-aa30-ac1f5455c080-outbox.json",
+      "invoice_type": "IHRACKAYITLI",
+      "borc": 763774.37,
+      "payable": 636478.64,
+      "tax_inclusive": 636478.64,
+      "fark_payable": 127295.72999999998,
+      "fark_oran": 20.000000314228924
+    },
+    {
+      "dosya": "ASY2025000000187-379812a6-6f8c-4ab9-a29b-8afa818a886c-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 24981.0,
+      "payable": 24981.2,
+      "tax_inclusive": 24981.2,
+      "fark_payable": -0.2000000000007276,
+      "fark_oran": -0.0008006020527465759
+    },
+    {
+      "dosya": "AVT2025000002566-e8e5d023-01da-478e-bb8e-8a8744578ee1-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 167896.2,
+      "payable": 83948.1,
+      "tax_inclusive": 83948.1,
+      "fark_payable": 83948.1,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "BEF2025000003767-db72dd57-80c2-4e2e-ab1c-2830803469fe-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 722.57,
+      "payable": 28511.17,
+      "tax_inclusive": 28511.17,
+      "fark_payable": -27788.6,
+      "fark_oran": -97.4656599501178
+    },
+    {
+      "dosya": "BEF2025000005912-0fae4017-f675-496e-9123-fef0b72742f7-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 78.4,
+      "payable": 3454.7,
+      "tax_inclusive": 3454.7,
+      "fark_payable": -3376.2999999999997,
+      "fark_oran": -97.73062784033345
+    },
+    {
+      "dosya": "BEF2025000012414-d1075a9a-20f1-4976-8020-ecdf93caa4a6-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4979.2,
+      "payable": 238820.36,
+      "tax_inclusive": 238820.36,
+      "fark_payable": -233841.15999999997,
+      "fark_oran": -97.91508563172754
+    },
+    {
+      "dosya": "BMF2025000001255-019633f8-3591-7b7e-b601-acf17e983031-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 18316.8,
+      "payable": 9158.4,
+      "tax_inclusive": 9158.4,
+      "fark_payable": 9158.4,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "BTE2025000000199-cd2bac19-0bec-472d-ba57-7c3702e1a156-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 164337.67,
+      "payable": 164337.5,
+      "tax_inclusive": 164337.5,
+      "fark_payable": 0.17000000001280569,
+      "fark_oran": 0.00010344565300847688
+    },
+    {
+      "dosya": "BTE2025000000218-27de9f8f-f5c5-4361-b668-85e6e045c822-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 487697.44,
+      "payable": 487697.41,
+      "tax_inclusive": 487697.41,
+      "fark_payable": 0.030000000027939677,
+      "fark_oran": 6.151355207717769e-06
+    },
+    {
+      "dosya": "BTE2025000000233-5c12bbfd-394c-4d53-bf66-1bca6b3b2ad1-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 85608.19,
+      "payable": 85608.0,
+      "tax_inclusive": 85608.0,
+      "fark_payable": 0.1900000000023283,
+      "fark_oran": 0.0002219418745938794
+    },
+    {
+      "dosya": "ESB2025000001332-91107665-e614-48d9-8fb1-3d3a64594157-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 800.0,
+      "payable": 400.0,
+      "tax_inclusive": 400.0,
+      "fark_payable": 400.0,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "FNR2025000000612-05fdc779-ff51-4473-bf8a-32398a2bdada-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4770.5,
+      "payable": 4404.0,
+      "tax_inclusive": 4404.0,
+      "fark_payable": 366.5,
+      "fark_oran": 8.321980018165304
+    },
+    {
+      "dosya": "FNR2025000001036-b7050c68-efcd-450b-9311-c0bc80b0c8db-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4620.6,
+      "payable": 4617.6,
+      "tax_inclusive": 4617.6,
+      "fark_payable": 3.0,
+      "fark_oran": 0.06496881496881496
+    },
+    {
+      "dosya": "FNR2025000001040-9d2de18f-58fa-4c7f-90e0-33438429d95d-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4714.6,
+      "payable": 4617.6,
+      "tax_inclusive": 4617.6,
+      "fark_payable": 97.0,
+      "fark_oran": 2.1006583506583505
+    },
+    {
+      "dosya": "FNR2025000001064-349e8b27-0d55-4e22-a588-8f72cdd04644-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4725.4,
+      "payable": 4628.4,
+      "tax_inclusive": 4628.4,
+      "fark_payable": 97.0,
+      "fark_oran": 2.0957566329617148
+    },
+    {
+      "dosya": "FNR2025000001065-67ba746e-2162-4ff6-8ccb-cd816c68f44b-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4750.4,
+      "payable": 4628.4,
+      "tax_inclusive": 4628.4,
+      "fark_payable": 122.0,
+      "fark_oran": 2.6359000950652494
+    },
+    {
+      "dosya": "FNR2025000001091-00a468d6-8b48-4179-bc85-2c5a097417b4-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 3676.5,
+      "payable": 3660.0,
+      "tax_inclusive": 3660.0,
+      "fark_payable": 16.5,
+      "fark_oran": 0.4508196721311476
+    },
+    {
+      "dosya": "FNR2025000001111-d32170b8-1826-46f3-b458-72519205d038-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5026.5,
+      "payable": 4656.0,
+      "tax_inclusive": 4656.0,
+      "fark_payable": 370.5,
+      "fark_oran": 7.957474226804123
+    },
+    {
+      "dosya": "FNR2025000001112-caf0077b-1ae0-4de1-bf74-45bb9b5cf198-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4344.5,
+      "payable": 3678.0,
+      "tax_inclusive": 3678.0,
+      "fark_payable": 666.5,
+      "fark_oran": 18.121261555193037
+    },
+    {
+      "dosya": "FNR2025000001120-56ee1c9d-0dd3-4e69-8f29-4c5a8e822882-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5422.0,
+      "payable": 3684.0,
+      "tax_inclusive": 3684.0,
+      "fark_payable": 1738.0,
+      "fark_oran": 47.17698154180239
+    },
+    {
+      "dosya": "FNR2025000001167-ffaa1b8c-f06b-4210-a261-579ecd9df6c9-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5352.5,
+      "payable": 4668.0,
+      "tax_inclusive": 4668.0,
+      "fark_payable": 684.5,
+      "fark_oran": 14.663667523564698
+    },
+    {
+      "dosya": "FNR2025000001168-45a0ceda-5e78-490b-a35f-4f454e5b31ed-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5115.5,
+      "payable": 4668.0,
+      "tax_inclusive": 4668.0,
+      "fark_payable": 447.5,
+      "fark_oran": 9.586546700942588
+    },
+    {
+      "dosya": "FNR2025000001169-9b90df33-2be5-422a-a20a-8a1e10a6acd1-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5995.0,
+      "payable": 3684.0,
+      "tax_inclusive": 3684.0,
+      "fark_payable": 2311.0,
+      "fark_oran": 62.73072747014115
+    },
+    {
+      "dosya": "FNR2025000001170-3cace17e-4fca-4059-97fc-c8d4a0bdcd4d-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 4759.0,
+      "payable": 4668.0,
+      "tax_inclusive": 4668.0,
+      "fark_payable": 91.0,
+      "fark_oran": 1.9494430162810625
+    },
+    {
+      "dosya": "FNR2025000001276-a2f69ad7-3b2b-438e-8832-4ac880561f21-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 13923.5,
+      "payable": 6222.0,
+      "tax_inclusive": 6222.0,
+      "fark_payable": 7701.5,
+      "fark_oran": 123.77852780456445
+    },
+    {
+      "dosya": "FNR2025000001329-4f59e4cc-c617-42cc-a315-2be283dd7d6a-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 6222.0,
+      "payable": 3726.0,
+      "tax_inclusive": 3726.0,
+      "fark_payable": 2496.0,
+      "fark_oran": 66.98872785829307
+    },
+    {
+      "dosya": "FNR2025000001359-0d19f469-84eb-4efb-a408-9b9d99a03bdd-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 6502.5,
+      "payable": 4728.0,
+      "tax_inclusive": 4728.0,
+      "fark_payable": 1774.5,
+      "fark_oran": 37.53172588832487
+    },
+    {
+      "dosya": "GIB2025000000004-8fc576b0-7740-4a16-bbad-aa8d293f5087-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 39547.5,
+      "payable": 3547.5,
+      "tax_inclusive": 3547.5,
+      "fark_payable": 36000.0,
+      "fark_oran": 1014.799154334038
+    },
+    {
+      "dosya": "GIB2025000000011-ff065892-d448-4cb2-8e5b-d81427797b85-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 229025.5,
+      "payable": 4625.5,
+      "tax_inclusive": 4625.5,
+      "fark_payable": 224400.0,
+      "fark_oran": 4851.367419738407
+    },
+    {
+      "dosya": "GIB2025000000015-06e46115-dd0c-41a1-b7fb-94cd884846fa-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 9873.4,
+      "payable": 2365.0,
+      "tax_inclusive": 2365.0,
+      "fark_payable": 7508.4,
+      "fark_oran": 317.4799154334038
+    },
+    {
+      "dosya": "HEI2025000006670-1b700e4e-0716-4450-8f9a-d72be957ce5d-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 165538.02,
+      "payable": 82769.01,
+      "tax_inclusive": 82769.01,
+      "fark_payable": 82769.01,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "IST2025000002739-366dec54-9858-4215-a2e5-e8ab00dc000a-inbox.json",
+      "invoice_type": "TEVKIFAT",
+      "borc": 11316.08,
+      "payable": 9996.22,
+      "tax_inclusive": 11316.48,
+      "fark_payable": 1319.8600000000006,
+      "fark_oran": 13.203590957381897
+    },
+    {
+      "dosya": "KE12025000415273-b7922e08-a281-45b3-94a8-5e12026c0b14-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 120.0,
+      "payable": 60.0,
+      "tax_inclusive": 60.0,
+      "fark_payable": 60.0,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "KE12025000457068-7142c80f-f014-4f7a-86c9-309f07c08d74-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 120.0,
+      "payable": 60.0,
+      "tax_inclusive": 60.0,
+      "fark_payable": 60.0,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "KIW2025000000008-3220dbcd-e49f-40e6-bb5e-11f97463e430-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 63377.1,
+      "payable": 63377.08,
+      "tax_inclusive": 63377.08,
+      "fark_payable": 0.01999999999679858,
+      "fark_oran": 3.155714967745213e-05
+    },
+    {
+      "dosya": "OPM2025000000068-5a42011c-cc67-466f-9a54-fb48713bc913-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 44407.66,
+      "payable": 22203.84,
+      "tax_inclusive": 22203.84,
+      "fark_payable": 22203.820000000003,
+      "fark_oran": 99.99990992549039
+    },
+    {
+      "dosya": "OPM2025000001925-c94fb9c4-84b4-48df-98a9-958b1d328663-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 62313.96,
+      "payable": 31156.98,
+      "tax_inclusive": 31156.98,
+      "fark_payable": 31156.98,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000007021-d13ae62f-c4a7-4706-a859-c232403ae4d4-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 63259.48,
+      "payable": 31629.74,
+      "tax_inclusive": 31629.74,
+      "fark_payable": 31629.74,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000008734-f64e6a58-e79e-4f06-b7eb-4c5e1588b6fc-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 61366.16,
+      "payable": 30683.09,
+      "tax_inclusive": 30683.09,
+      "fark_payable": 30683.070000000003,
+      "fark_oran": 99.99993481751676
+    },
+    {
+      "dosya": "OPM2025000010473-2023e7c2-4699-485c-91f5-829371713b7a-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 46510.2,
+      "payable": 23255.11,
+      "tax_inclusive": 23255.11,
+      "fark_payable": 23255.089999999997,
+      "fark_oran": 99.99991399739669
+    },
+    {
+      "dosya": "OPM2025000012211-96d21b65-f51a-47dc-b172-5489b11944ed-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 58153.32,
+      "payable": 29076.67,
+      "tax_inclusive": 29076.67,
+      "fark_payable": 29076.65,
+      "fark_oran": 99.99993121633256
+    },
+    {
+      "dosya": "OPM2025000014176-b9db3efb-a996-44f9-b6d8-f5b2a8817840-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 51309.0,
+      "payable": 25654.5,
+      "tax_inclusive": 25654.5,
+      "fark_payable": 25654.5,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000016149-a9e64387-90ba-4bd0-b020-2348528dc849-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 48294.06,
+      "payable": 24147.04,
+      "tax_inclusive": 24147.04,
+      "fark_payable": 24147.019999999997,
+      "fark_oran": 99.99991717411325
+    },
+    {
+      "dosya": "OPM2025000017928-5985e44c-7cd8-49be-be06-af07a05709e4-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 47601.24,
+      "payable": 23800.62,
+      "tax_inclusive": 23800.62,
+      "fark_payable": 23800.62,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000019877-dd948610-2140-4a71-9538-6d4fe263e6c6-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 74119.1,
+      "payable": 37059.55,
+      "tax_inclusive": 37059.55,
+      "fark_payable": 37059.55,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000021664-e6ad58f1-0ec4-4fa7-b05d-051430b4bb30-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 54405.68,
+      "payable": 27202.85,
+      "tax_inclusive": 27202.85,
+      "fark_payable": 27202.83,
+      "fark_oran": 99.99992647829181
+    },
+    {
+      "dosya": "OPM2025000023538-c06f9acb-465b-42ef-a324-60a72310f105-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 78645.84,
+      "payable": 39322.92,
+      "tax_inclusive": 39322.92,
+      "fark_payable": 39322.92,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000025418-335edf23-8be8-4a38-b366-621ea998a4a5-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 64434.98,
+      "payable": 32217.49,
+      "tax_inclusive": 32217.49,
+      "fark_payable": 32217.49,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000027353-bbe07aca-f92f-4772-a009-b3b5f8b94d7c-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 56817.52,
+      "payable": 28408.76,
+      "tax_inclusive": 28408.76,
+      "fark_payable": 28408.76,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000029385-afbe69d3-ffd1-4089-9ed5-df5d8b8f7976-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 69039.02,
+      "payable": 34519.51,
+      "tax_inclusive": 34519.51,
+      "fark_payable": 34519.51,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OPM2025000031484-d5706b6a-6418-4094-bfe8-56c28e779e87-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 71623.72,
+      "payable": 35811.86,
+      "tax_inclusive": 35811.86,
+      "fark_payable": 35811.86,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "OVS2025000001210-a3c9bf45-7cd0-4676-8019-47e71dce26a5-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 2400.0,
+      "payable": 4800.0,
+      "tax_inclusive": 4800.0,
+      "fark_payable": -2400.0,
+      "fark_oran": -50.0
+    },
+    {
+      "dosya": "SSP2025000000092-005056b7-2f64-1edf-b7ad-73c3bf9555b3-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 17028.08,
+      "payable": 8514.04,
+      "tax_inclusive": 8514.04,
+      "fark_payable": 8514.04,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "TEF2025000009060-c4247c8f-b5c4-429b-a398-f591bbb95902-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5977.6,
+      "payable": 2988.8,
+      "tax_inclusive": 2988.8,
+      "fark_payable": 2988.8,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "TEF2025000025083-cc00f955-1a09-4183-b092-758d852e37fc-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5503.68,
+      "payable": 2751.84,
+      "tax_inclusive": 2751.84,
+      "fark_payable": 2751.84,
+      "fark_oran": 100.0
+    },
+    {
+      "dosya": "TTS2025000001448-d1ee5756-c78d-417c-a4dc-10607d7997bd-inbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 54843.93,
+      "payable": 54942.68,
+      "tax_inclusive": 54942.68,
+      "fark_payable": -98.75,
+      "fark_oran": -0.17973276876919728
+    },
+    {
+      "dosya": "TTS2025000001449-93ea54a9-3e13-4b52-a4d7-fa2d4dcb0d1b-inbox.json",
+      "invoice_type": "ISTISNA",
+      "borc": 54843.93,
+      "payable": 54942.68,
+      "tax_inclusive": 54942.68,
+      "fark_payable": -98.75,
+      "fark_oran": -0.17973276876919728
+    },
+    {
+      "dosya": "UYR2025000002496-7f3b4465-d64b-4e82-987a-8df19393aa66-inbox.json",
+      "invoice_type": "TEVKIFAT",
+      "borc": 201876.73,
+      "payable": 185053.56,
+      "tax_inclusive": 201876.3,
+      "fark_payable": 16823.170000000013,
+      "fark_oran": 9.090973445741877
+    },
+    {
+      "dosya": "UYR2025000002518-7baa378e-6e97-4ac7-8c11-dbfe714b63a3-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 445368.65,
+      "payable": 445367.79,
+      "tax_inclusive": 445367.79,
+      "fark_payable": 0.8600000000442378,
+      "fark_oran": 0.0001930988318765122
+    },
+    {
+      "dosya": "ZHL2025000003892-53db8d91-2f4d-45df-bcb9-fabc41f29a2b-inbox.json",
+      "invoice_type": "SATIS",
+      "borc": 5036.8,
+      "payable": 2518.4,
+      "tax_inclusive": 2518.4,
+      "fark_payable": 2518.4,
+      "fark_oran": 100.0
+    }
+  ]
+}

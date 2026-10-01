@@ -18,7 +18,7 @@ Bu klasör, `model_eval/`'a **özgü** belgeleri tutar (üç bileşenin birlikte
 |---|---|---|
 | [`../CLAUDE.md`](../CLAUDE.md) | — | AI ajanları için rehber |
 | [`../project.md`](../project.md) | — | Mimari kararlar, deney sonuçları, faz durumu |
-| `RESULTS.md`, `RAG_MODEL_COMPARISON.md` | — | Deney bulguları (Diátaxis dışı, `CLAUDE.md`/`project.md` içinde referans verilir) — ⚠️ bu dosyalar şu an repoda bulunamıyor, referans tarihsel |
+| *(yok)* | — | Deney bulguları `CLAUDE.md`'nin "Kritik gerçekler" bölümünde tutulur, ayrı dosya yok — ⚠️ 2026-10-01'e kadar `RESULTS.md`/`RAG_MODEL_COMPARISON.md`/`GLM52_vs_GEMMA4_n500.md` adlı dosyalara onlarca yerden referans veriliyordu, hiçbiri hiç yazılmamıştı (ne dosya sisteminde ne git geçmişinde); tüm referanslar kaldırıldı/düzeltildi |
 
 Dış ekibe teslim edilen `records[]` API sözleşmesi burada değil —
 [`../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`](../../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md)'de

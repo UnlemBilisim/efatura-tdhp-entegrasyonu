@@ -39,7 +39,7 @@ değerlerini içerir. Günlük çalışma kuralları için ayrıca [`CLAUDE.md`]
 - **RAG kaynağı:** Aynı şirketin geçmiş faturaları, `build_vector_db.py` ile
   ChromaDB'ye (`vector_db/`, koleksiyon `tdhp_invoices`) indekslenir.
 
-## 2. Deneysel Bulgular (özet — tam detay `RESULTS.md`/`RAG_MODEL_COMPARISON.md`/`GLM52_vs_GEMMA4_n500.md`)
+## 2. Deneysel Bulgular (özet — tam detay `CLAUDE.md`'nin "Kritik gerçekler" bölümünde)
 
 | Deney | Sonuç |
 |---|---|
@@ -149,7 +149,7 @@ def predict_single_invoice(
     ollama_host=None,
     sector=DEFAULT_SECTOR,
     own_vkn=DEFAULT_OWN_VKN,
-    rag=True, self_correct=True, tevkifat_hint=True, iade_hint=True,  # RESULTS.md'deki en iyi kombinasyon
+    rag=True, self_correct=True, tevkifat_hint=True, iade_hint=True,  # en iyi dogrulanmis kombinasyon (bkz. CLAUDE.md "Kritik gercekler")
     with_glossary=False,
     rag_k=3, rag_collection=None, rag_persist_dir=None, rag_embed_model=None, rag_ollama_host=None,
     temperature=0.0, timeout=180.0,

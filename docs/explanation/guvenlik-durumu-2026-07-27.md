@@ -182,5 +182,38 @@ bu soru 2026-07-27 itibarıyla yanıtlanmadı:
   claim tablosu `fatura_no TEXT PRIMARY KEY`, ama koruduğu veri `satici_vkn`
   bazlı. Tek şirkette etki düşük (kaza eseri numara çakışması), çok müşteride
   yüksek (bir müşteri diğerinin geçmiş kontrolünü bozabilir).
+
+  > ✅ **Düzeltildi/bayat çıktı** (2026-10-01): Bu bulgu 2026-07-30'da
+  > eklenen `tenant_<vkn>` şema mimarisinden ÖNCE yazılmış. Artık
+  > `tenant_onboarding.py`'nin her yeni şirkette çalıştırdığı Alembic
+  > migration'ları (`9846b14dc658`, `7ec7f9c705a3`) `islenmis_faturalar`
+  > tablosunu HER tenant şemasında ayrı ayrı oluşturuyor — `fatura_no`
+  > PRIMARY KEY'i artık sadece kendi şeması içinde benzersiz olmak zorunda,
+  > şirketler arası çakışma riski yok. Ayrıca onboard edilmemiş bir VKN
+  > artık şema kontrolü olmadan bu tabloya hiç erişemiyor (bkz. kök
+  > `CLAUDE.md` "şirket izolasyonu" notu, `_tenant_baglantisi` artık
+  > `tenant_kayitli_mi` kontrolü yapıyor). Diğer madde (keyfi VKN sorgusu)
+  > HÂLÂ AÇIK — bu düzeltme sadece "VKN onboard mu" kontrolüdür, "bu
+  > token hangi VKN'leri sorgulayabilir" yetkilendirmesi değildir.
 - **`/fatura/gecmis-kontrol` keyfi VKN sorgusu** (`api.py:308`) — VKN'ler
   Türkiye'de kamuya açık; çok müşterili kurulumda rakip firma verisi okunabilir.
+  Uygulama seviyesinde hâlâ açık — bu uçlar entegrasyon'un VKN-bazlı API
+  anahtarı yetkilendirmesine değil, tek bir dahili token'a (`MCP_INTERNAL_
+  API_TOKEN`) bağlı; o token'ı tutan herkes herhangi bir VKN'yi sorgulayabilir.
+
+  > ✅ **Risk azaltıldı (ağ seviyesinde)** (2026-10-01, kullanıcı kararı):
+  > Uygulama seviyesindeki VKN-bazlı yetki eksikliği DURUYOR (yukarıdaki
+  > paragraf hâlâ doğru), ama bu uca kimin ULAŞABİLECEĞİ daraltıldı. Bu
+  > uç port 8000'de (Mcp_mimarisi); 2026-09-30'da dış ekibin 8100'e
+  > erişebilmesi için port **8000 de yanlışlıkla** `0.0.0.0`'a (LAN'ın
+  > tamamına, dış ekip dahil — onlar zaten bu ağa 8100 için bağlanıyor)
+  > açılmıştı. `entegrasyon` zaten Mcp_mimarisi'ye aynı container içinde
+  > `http://localhost:8000` ile bağlandığı için (`mcp_mimarisi_istemcisi.py`)
+  > bu dışa açıklığın hiçbir işlevsel gerekçesi yoktu. 8000 artık Postgres/
+  > Ollama gibi `127.0.0.1`'e geri alındı (`docker/docker-compose.yml`) —
+  > token sızsa bile artık sadece bu makineden (host'tan) kullanılabilir,
+  > LAN/dış ekip ağından değil. Kalan risk: host'un kendisine erişimi olan
+  > biri (veya ileride port tekrar açılırsa). Uygulama seviyesinde VKN-bazlı
+  > yetkilendirme eklemek (seçenek A, TODO.md'de tartışıldı) hâlâ YAPILMADI —
+  > kullanıcı bu ağ-seviyesi düzeltmeyi yeterli bularak o işi ertelemeyi
+  > tercih etti. Detay: `docs/reference/servisler-ve-portlar.md`.

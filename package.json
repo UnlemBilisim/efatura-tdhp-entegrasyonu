@@ -28,6 +28,8 @@
     "model_eval/rag_common.py",
     "entegrasyon/app.py",
     "entegrasyon/auth.py",
+    "entegrasyon/api_anahtarlari.py",
+    "entegrasyon/api_anahtari_yonet.py",
     "entegrasyon/security.py",
     "entegrasyon/log_ortak.py",
     "entegrasyon/es_zamanli_sinir.py",

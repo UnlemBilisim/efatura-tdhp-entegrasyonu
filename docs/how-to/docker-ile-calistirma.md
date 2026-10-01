@@ -120,12 +120,63 @@ bakın.
 ```bash
 cd System/docker/
 POSTGRES_PASSWORD="<güçlü-parola>" \
-EFATURA_API_TOKEN="<dış-api-tokenı>" \
 MCP_INTERNAL_API_TOKEN="<dahili-api-tokenı>" docker compose up -d
 ```
 
 `POSTGRES_PASSWORD` **zorunludur** — tanımlı değilse `docker compose` açıkça
 hata verip durur, gömülü/varsayılan bir parolaya düşmez.
+
+> ⚠️ **Tuzak** (2026-09-30, mock müşavir onboarding testinde yaşandı):
+> `app` container'ı zaten ayaktayken kod değiştirip `docker compose up -d`
+> tekrar çalıştırmak container'ı **yeniden build ETMEZ** — Compose, image
+> zaten mevcutsa container'ı olduğu gibi bırakır. Kod, imaja `COPY` ile
+> gömülü (bind-mount değil, bkz. yukarısı "Neden bu yapı"), bu yüzden host'ta
+> dosyayı düzenlemek çalışan container'ı etkilemez. Kod değişikliğinden sonra
+> mutlaka önce `docker compose build app`, sonra `docker compose up -d app`
+> çalıştırın (ya da tek adımda `docker compose up -d --build app`) — aksi
+> halde eski kod sessizce çalışmaya devam eder, hata vermez. Bu oturumda
+> `Mcp_mimarisi/src/efatura_kdv/sirket_bilgileri.py`'ye eklenen NACE
+> fallback'in container'a hiç yansımadığı, container içindeki dosya host'takiyle
+> karşılaştırılarak fark edildi.
+
+> ⚠️ **Tuzak** (2026-10-01, RAG embedding bağlantısı yanlışlıkla
+> bozulurken fark edildi): `docker compose` komutunu `-f docker/
+> docker-compose.yml` ile (ör. proje kökünden) çalıştırmak, bu makineye
+> özel `docker-compose.override.yml`'in (yukarıdaki "Neden bu yapı" ve
+> `docker/docker-compose.override.yml`'in kendi başındaki not — native
+> Ollama'ya `host.docker.internal` ile bağlanma, `ollama` servisini
+> kapatma) **sessizce devre dışı kalmasına** yol açar — Compose, `-f`
+> açıkça verildiğinde override dosyasını OTOMATİK BİRLEŞTİRMEZ, bu sadece
+> hiç `-f` verilmeden, dosyaların bulunduğu dizinden (`cd docker/`)
+> çalıştırılırsa olur. Yanlış çalıştırmanın sonucu: `app` container'ı
+> `ollama`'ya (Docker'ın kendi, hiç başlamamış servisi) bağımlı hale
+> gelir, `OLLAMA_HOST` yanlış adrese döner, embedding bağlantısı kopar.
+> Her zaman bu belgedeki gibi **`cd docker/` sonra `docker compose ...`**
+> kullanın; emin olmak için `docker compose config | grep OLLAMA_HOST`
+> ile `host.docker.internal` görmelisiniz.
+
+### 2.1 API anahtarı üretme
+
+`/fatura/isle`, `/fatura/onayla` ve `/kayitli-sirketler` bir API anahtarı
+ister. Anahtarlar veritabanında tutulur (yalnızca sha256 özeti); düz
+metin değer **sadece üretildiği anda bir kez** gösterilir:
+
+```bash
+# Tüm şirketler adına (yerel demo / tek entegratör):
+docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py \
+  olustur --etiket yerel-demo --tum-sirketler
+
+# Belirli şirketler adına (tekrarlanabilir --vkn):
+docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py \
+  olustur --etiket dis-ekip --vkn 0460351893
+
+# Listeleme / iptal:
+docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py listele
+docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py iptal --etiket dis-ekip
+```
+
+Anahtar kaybedilirse geri alınamaz; iptal edip yenisini üretin. Dış ekibe
+güvenli bir kanaldan iletin (e-posta/sohbet düz metni değil).
 
 İlk çalıştırmada `ollama` container'ında embedding modeli **kurulu değildir**
 — RAG kullanmadan önce bir kere çekilmesi gerekir:

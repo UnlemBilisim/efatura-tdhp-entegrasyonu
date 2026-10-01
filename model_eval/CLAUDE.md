@@ -15,7 +15,10 @@ LLM sağlayıcısının (Ollama/OpenAI/Anthropic/Google/OpenAI-uyumlu) Türkiye
 Alacak yönünü **kendi bilgisiyle** (hesap planı listesi verilmeden) üretip
 üretemediğini ölçen bir değerlendirme/karşılaştırma çatısı. İkinci bir mod
 (`--data-format xml`) ham, henüz muhasebeleşmemiş faturalar için ground-truth
-olmadan **tahmin** üretir (bkz. `yeni_faturalar_tdhp.md`).
+olmadan **tahmin** üretir (`generate_report.py` bu modun sonuçlarından
+okunaklı bir `.md` raporu üretir, bkz. "Mimari (özet)" bölümü altta —
+2026-10-01'de fark edildi: önceden burada "yeni_faturalar_tdhp.md" adlı bir
+dosyaya referans vardı, o dosya hiç yazılmamıştı, kaldırıldı).
 
 **Akış:** `fatura (XML/JSON)` → `core/parsing.py` (ayrıştırma) →
 `core/prompting.py` (prompt inşası, opsiyonel RAG/hint blokları) → LLM
@@ -26,8 +29,12 @@ olmadan **tahmin** üretir (bkz. `yeni_faturalar_tdhp.md`).
 ## Durum (2026-07-22 itibarıyla)
 
 Değerlendirme pipeline'ı olgun ve genişletilmiş (RAG, self-correct,
-tevkifat/iade hint'leri) — bkz. `RESULTS.md` §6, `RAG_MODEL_COMPARISON.md`
-için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
+tevkifat/iade hint'leri) — tam bulgu geçmişi bu dosyanın "Kritik gerçekler"
+bölümünde ve altındaki tarihli `✅ Uygulandı` notlarında (bu dosyanın kendisi
+projenin bulgu günlüğüdür; 2026-10-01'de fark edildi: burada önceden ayrı
+`RESULTS.md`/`RAG_MODEL_COMPARISON.md` dosyalarına referans vardı, ikisi de
+hiç yazılmamıştı — git geçmişinde de yoktu, kaldırıldı). **Aynı gün ayrıca
+bir mimari denetim geçirdi:**
 
 > ✅ **Uygulandı (2026-07-22):** Sonuç deposu dosya bazlı `.jsonl`'den
 > **PostgreSQL**'e taşındı (`core/db.py`, `core/reporting.py` —
@@ -51,8 +58,8 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > 701-704 için geçerli, diğer istisna kodlarında (ör. doğrudan mal ihracatı,
 > kod 301) bu aktarım uygulanmaz. `core/single.py::predict_single_invoice`'da
 > varsayılan `True` (entegrasyon'un kullandığı yol). **Dikkat:**
-> `tevkifat_hint`/`iade_hint`'in aksine bu kural henüz `RESULTS.md`'ye
-> benzer n>1 bir deneyle ölçülmedi — kullanıcı onayına dayanan bir kural
+> `tevkifat_hint`/`iade_hint`'in aksine bu kural henüz geniş örneklemli
+> (n>1) bir deneyle ölçülmedi — kullanıcı onayına dayanan bir kural
 > olarak eklendi, yanlış çıktığı gözlenirse gözden geçirilmeli.
 
 > ✅ **Uygulandı (2026-07-23):** `compute_tevkifat_hint()` artık yöne göre
@@ -79,7 +86,7 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > ana kod öneriyor (`SYSTEM_PROMPT` kuralıyla tutarlı); bu, ileride
 > raporlama/detay ihtiyacı doğarsa ayrı bir görev olarak ele alınacak.
 > Detay: `core/prompting.py::compute_tevkifat_hint` docstring'i. Henüz
-> `RESULTS.md`'ye benzer n>1 bir deneyle ölçülmedi.
+> geniş örneklemli (n>1) bir deneyle ölçülmedi.
 
 > ✅ **Uygulandı (2026-07-23):** `rag_common.py`'ye yeni
 > `upsert_approved_invoice()` fonksiyonu eklendi — `entegrasyon/` katmanının
@@ -151,7 +158,7 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > unvanına göre doğru bulundu) ve `391.05.00006` (%20 5/10 Tevkifatlı KDV)
 > olarak günceledi — **`391.05.00006` gerçek muhasebe kaydındaki alt
 > kırılımla karakter karakter birebir eşleşti**. Toplam süre (2 LLM çağrısı
-> dahil): 5.2 saniye. Bu, `RESULTS.md` tarzı bir n>1 deneyle henüz
+> dahil): 5.2 saniye. Bu, geniş örneklemli (n>1) bir deneyle henüz
 > ölçülmedi (tek örnek doğrulaması) — daha geniş bir örneklemle
 > doğruluk oranı ölçülmesi ileride yapılabilir.
 
@@ -190,8 +197,9 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > tekrar test edildi: retry sayesinde birkaç fatura tamamen çözüldü
 > (`AKL2025000000131`, `INM2025000004165`), kalan gerçek "mizanda yok"
 > karşı tarafları (Gümrük Bakanlığı, ZTK Makina) doğru şekilde `uyari` ile
-> işaretlendi. **Açık kalan sorun:** gider/stok hesaplarının (150/730/770)
-> belirsiz semantik eşleşmesi — bu ayrı bir görev olarak bırakıldı.
+> işaretlendi. **Açık kalan sorun (2026-09-30'da kısmen giderildi, aşağıya
+> bakın):** gider/stok hesaplarının (150/730/770) belirsiz semantik
+> eşleşmesi — bu ayrı bir görev olarak bırakıldı.
 
 > ✅ **Uygulandı (2026-07-27) — cari hesap alt kırılımı için deterministik
 > fuzzy (isim benzerliği) eşleme:** Cari hesaplarda (`CARI_HESAP_KODLARI` =
@@ -224,7 +232,7 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > birebir, kısaltma farkı, mizanda-yok eşik-altı, boş-girdi güvenliği); ayrıca
 > mevcut `TestPredictSingleInvoiceAltKirilim` fixture'ında 320'nin adı, fuzzy'yi
 > yanlışlıkla tetiklememesi için bilerek karşı tarafla eşleşmeyen bir isme
-> çevrildi. **Henüz `RESULTS.md` tarzı n>1 bir deneyle ölçülmedi** — mantık
+> çevrildi. **Henüz geniş örneklemli (n>1) bir deneyle ölçülmedi** — mantık
 > unit testlerle ve gerçek mizanla (birebir/kısaltma/yok senaryoları) doğrulandı,
 > geniş örneklemli doğruluk ölçümü ileride yapılabilir. **Not:** Mizan VKN
 > içermediği için eşleme İSİMle yapılıyor, VKN'yle değil (bkz. `core/mizan.py`).
@@ -283,8 +291,8 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > kırılım havuzu 81→96 ana kod, 1207→2769 alt kod büyüdü (ör. cari 120:
 > 102→390, 320: 280→993; tevkifatlı KDV 391: 6→22). Bu, yukarıdaki
 > "karşı taraf mizanda yok → 3 haneli kalıyor + `uyari`" sorununu doğrudan
-> AZALTIR (artık daha çok cari kart tanınıyor); tam etki `RESULTS.md` tarzı
-> n>1 bir deneyle henüz ölçülmedi. **Not:** Hâlâ TEK şirketin mizanı,
+> AZALTIR (artık daha çok cari kart tanınıyor); tam etki geniş örneklemli
+> (n>1) bir deneyle henüz ölçülmedi. **Not:** Hâlâ TEK şirketin mizanı,
 > "her muhasebeci için ayrı liste" ihtiyacı (yukarıda) açık kalmaya devam
 > ediyor.
 
@@ -371,6 +379,196 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
 > metni etiket olarak kabul ettiğini test ediyor, gerçek provider çağrısı
 > yapmıyorlar. Doğrulandı: `pytest tests/` tüm suite yeşil (191 passed).
 
+> ✅ **Uygulandı (2026-09-29) — çok müşterili toplu onboarding (2 gün içinde
+> canlıya çıkış hazırlığı, kullanıcı kararı — "5-10 kullanıcı aynı anda
+> gelecek, fatura geçmişi XML, mizan+yevmiye bizim formatımızda"):**
+>
+> **1. Kritik düzeltme — `build_vector_db.py`'ye `--own-vkn` zorunlu
+> parametresi eklendi.** Önceden bu script HER ZAMAN sabit `tdhp_invoices`
+> koleksiyonuna yazıyordu — yeni bir müşterinin faturaları bu script ile
+> yüklenseydi Akyüzlü'nün emsal havuzuna SESSİZCE karışırdı (RAG izolasyonu
+> canlı akışta `koleksiyon_adi_coz(own_vkn)` ile zaten vardı, ama toplu
+> yükleme script'i bunu hiç kullanmıyordu). Artık `rag_common.koleksiyon_adi_coz`
+> ile aynı kuralı uyguluyor; `own_vkn=DEFAULT_OWN_VKN` (Akyüzlü) verilirse
+> eski sabit isme düşüyor (geriye dönük uyumlu — canlı testte doğrulandı,
+> iki farklı VKN farklı koleksiyona yazdı). Asıl indeksleme mantığı
+> `index_directory()` fonksiyonuna çıkarıldı (`main()`'den ayrı) — başka
+> script'lerin `subprocess`/`sys.argv` olmadan doğrudan import edip
+> çağırabilmesi için.
+>
+> **2. Yeni modül — `model_eval/scripts/yevmiye_fatura_esle.py`:**
+> Dış ekipten/muhasebeciden gelen iki AYRI kaynağı (fatura XML'leri +
+> yevmiye dökümü xlsx/csv) fatura numarasına göre eşleştirip
+> `Archive2/jsons` formatında ground-truth JSON üretir — RAG bir
+> fatura+kayıt ÇİFTİ üzerinden öğrendiği için (bkz.
+> `docs/explanation/rag_retrieval.md`) tek başına yevmiye kaydı RAG'a
+> yazılamaz, mutlaka ilgili XML ile eşleşmesi gerekir. Yevmiye dosyasında
+> zorunlu 5 sütun (`fatura_no, hesap_kodu, hesap_adi, borc_alacak, tutar`,
+> serbest biçimli başlık adları kabul edilir) eksikse **sessizce yanlış
+> okumak yerine acık hatayla durur**. Eşleşmeyen fatura no'lar (iki yönde
+> de) hiçbir veri uydurmadan raporlanır.
+>
+> **Güvenlik davranışı — yön belirsizse RAG'a YAZILMAZ:**
+> `parse_invoice_xml`'in `direction_uncertain=True` işaretlediği faturalar
+> (own_vkn faturanın ne alıcısında ne satıcısında bulunamadı — yanlış VKN
+> girildiğine işaret eder) bu script tarafından ayrıca yakalanıp RAG'a
+> YAZILMADAN atlanır ve ayrı bir uyarı listesinde raporlanır. Toplu onboard
+> testinde gerçekten gözlemlendi: yanlış VKN'yle çalıştırılan bir test,
+> sessizce yanlış yönle (inbox/outbox) RAG'a yazmak yerine 0 kayıt üretip
+> açıkça uyardı — bu davranış olmasaydı emsal havuzu sessizce kirlenirdi.
+>
+> **3. Yeni script — `scripts/musteri_onboard_toplu.py`** (proje kökünde,
+> hem `Mcp_mimarisi` hem `model_eval`'a eriştiği için): `onboarding/<vkn>/`
+> klasör yapısını (`mizan.xlsx`, `faturalar/*.xml`, `yevmiye.xlsx`) tek
+> komutla sırayla işler — şema aç → mizan yükle → yevmiye eşle → RAG
+> indeksle. Bir müşterinin dosyaları eksikse (`OnboardHatasi`) o müşteri
+> atlanır, DİĞER müşterilerin işlenmesi durmaz; özet raporda hangi
+> müşterinin başarılı/başarısız/atlandığı ve `yon_belirsiz` sayısı
+> (yukarıdaki güvenlik kontrolü) ayrı ayrı gösterilir.
+>
+> **Uçtan uca doğrulandı** (geçici PostgreSQL container'ı ile, prod DB'ye
+> dokunulmadan): tam zincir (şema+migration → mizan 2769 satır → 1/1 fatura
+> eşleşme → RAG koleksiyonu) hatasız çalıştı; yanlış-VKN senaryosu hem tek
+> başına `yevmiye_fatura_esle.py`'de hem toplu script üzerinden ayrı ayrı
+> test edildi, ikisinde de veri kirlenmeden doğru uyarıyla durdu.
+>
+> **Kapsam dışı/henüz yapılmadı:** Yevmiye dosyasının gerçek dış ekip
+> formatı henüz netleşmedi (yukarıdaki 5 sütun bir varsayım/öneri) — ilk
+> gerçek dosya geldiğinde `_SUTUN_ESLEMELERI` genişletilmesi gerekebilir.
+> `Archive2/mizan_5.xlsx` gibi tarihsel notlarda geçen dosyalar bu akışla
+> ilgisizdir, karıştırılmamalı.
+
+> ✅ **Düzeltildi** (2026-09-30, mock müşavir onboarding testi sırasında
+> bulundu — **`mizan_excel_yukle.py`'de sessiz veri kaybı bug'ı**):
+> `_mizan_satirlarini_oku()` başlık satırını `min_row=7` ile SABİT
+> varsayıyordu — bu, Akyüzlü'nün orijinal `Archive2/mizan.xlsx`'inin kendi
+> formatına (üstünde 5 boş satır, başlık 6. satırda) özgüydü.
+> `ONBOARDING-VERI-FORMATI.md` dış ekibe "veri, başlık satırından sonraki
+> satırdan itibaren okunur" diyor — bu başlığın herhangi bir satırda
+> olabileceğini ima ediyor, koddaki sabit satır numarasıyla ÇELİŞİYORDU.
+> Standart formatta (1. satır başlık, dış ekibin muhtemelen göndereceği
+> format) bir mizan gönderilseydi sistem SESSİZCE 0 satır okuyordu — hiç
+> hata vermiyordu, `yukle()`'de boş-mizan kontrolü de yoktu (bkz.
+> `test_mizan_excel_yukle.py::test_standart_format_1_satir_baslik` ile
+> tekrar üretildi). Düzeltme: `_baslik_satirini_bul()` artık `HESAP KODU`/
+> `HESAP ADI` başlıklarını taşıyan satırı ilk 20 satır içinde otomatik arar
+> (isme göre, sütun SIRASINA göre değil — belge sırayı belirtmiyor), o
+> satırdan sonrasını veri olarak okur. Başlık hiç bulunamazsa (20 satır
+> sınırı aşılırsa) açık `SystemExit` fırlatır — sessiz 0 satır yerine.
+> Hem standart (1. satır) hem gerçek Akyüzlü formatı (6. satır) hem ters
+> sütun sırası test edildi, 5 yeni test:
+> `tests/test_mizan_excel_yukle.py`.
+
+> ✅ **Düzeltildi** (2026-09-30, teslim paketinin son kontrolünde bulundu —
+> **sessiz veri kaybı, HESAP KODU hücresi sayı biçimindeyse**):
+> `_mizan_satirlarini_oku()` `not kod or not isinstance(kod, str)` tek bir
+> `continue` dalında birleştirmişti — gerçekten boş bir hücre (`None`,
+> normal) ile HESAP KODU'nun Excel'de "sayı" biçiminde girildiği bir hücre
+> (örn. `320` metin değil `int` olarak) aynı şekilde, uyarısız atlanıyordu.
+> Dış ekip mizanı hazırlarken bu sütunu yanlışlıkla sayı biçiminde
+> bırakırsa (Excel'de yaygın bir hata), o hesap kodu hiçbir hata/uyarı
+> vermeden sisteme hiç girmezdi. İki dal ayrıldı: `kod is not None and not
+> isinstance(kod, str)` artık ayrı bir `_logger.warning(...)` ile
+> raporlanıyor (satır no + hücre tipi + değer), gerçek boş hücre (`not
+> kod`) sessiz kalmaya devam ediyor (o gerçekten normal bir durum).
+> `ONBOARDING-VERI-FORMATI.md`'ye "hücre metin biçiminde olmalı" uyarısı
+> eklendi. 3 yeni test: `tests/test_mizan_excel_yukle.py::
+> TestSayisalHesapKoduAtlanir` (sayısal kod atlanır+loglanır, metin kod
+> etkilenmez, gerçek boş satır uyarısız kalır).
+
+> ✅ **Uygulandı (2026-09-30) — cari OLMAYAN (gelir/gider/stok) hesaplarda
+> kalem-adı fuzzy eşlemesi:** Mock müşavir testinde gerçek örnek — fırın
+> mükellefinin "EKMEK (TAZE, 350 GR)" kalemi olan bir satış faturasında,
+> `600` (Ekmek Satışları / Pastane Ürünleri / Kek Ve Tatlı — 3 net seçenek
+> mizanda) ana kodda kaldı, LLM'in ikinci-aşama alt kırılım çağrısı bunu
+> kaçırdı. Bu, 2026-07-24 notundaki "gider/stok hesaplarının belirsiz
+> semantik eşleşmesi" sorununun somut bir örneği.
+>
+> Cari hesap fuzzy'sinin (`_cari_fuzzy_esles`, karşı taraf unvanı ile) aynı
+> deseni burada işe yaramadı — denendi, `SequenceMatcher` (karakter dizisi
+> benzerliği) "EKMEK (TAZE, 350 GR)" ile "Ekmek Satışları" arasında sadece
+> ~0.56 oran üretti (toplam string uzunluğu farklı olduğu için ortak "EKMEK"
+> kelimesi boğuluyor) — herhangi bir makul eşiğin altında kalırdı. Bunun
+> yerine yeni `_kalem_fuzzy_esles()` **anahtar kelime kesişimi** kullanıyor:
+> alt kırılım adındaki jenerik ekler (`KALEM_FUZZY_JENERIK_KELIMELER` —
+> "SATIŞLARI", "ÜRÜNLERİ", "GİDERLERİ" gibi) elenip kalan "ayırt edici"
+> kelimeler (ör. "EKMEK") faturadaki kalem adında (`invoice["lines"][*]
+> ["product_name"]`) geçip geçmediğine bakılır.
+>
+> Kullanıcı kararı (2026-09-30): coklu kalemli faturalarda da denensin —
+> her kalem adı ayrı ayrı tüm seçeneklerle karşılaştırılır (birleştirip tek
+> string yapmak alakasız kelimeleri bir araya getirip yanlış benzerlik
+> üretebilirdi). Güvenlik: TAM OLARAK BİR alt kırılımla kelime kesişimi
+> varsa o kod seçilir; birden fazla seçenekle kesişirse (örn. kalem adında
+> hem "EKMEK" hem "KEK" geçiyorsa, mizanda ikisi de ayrı kod ise) YA DA hiç
+> kesişim yoksa `None` döner, LLM'e bırakılır — yanlış seçim yapmaktansa
+> belirsizliği LLM'e devretmek tercih edildi. KDV kodları (191/391) bu
+> adımdan HARİÇ tutulur (`_kdv_orani_isimden` ile ayırt edilir — alt kırılım
+> adında "%N" deseni varsa o kod KDV grubudur, doğru eşleşmesi zaten
+> `_kdv_oranini_duzelt` ile sağlanıyor, kalem adıyla karıştırmak yanlış
+> olurdu). Cari hesaplar (`CARI_HESAP_KODLARI`) da hariç — onlar zaten kendi
+> fuzzy adımlarında çözülüyor.
+>
+> İz (`kod_kaynagi`) ayrımı: `"fuzzy"` tek bir değerdi, artık `"fuzzy_cari"`/
+> `"fuzzy_kalem"` olarak ikiye ayrıldı — `disa_aktarim.py::_gerekce_uret`
+> ikisi için FARKLI gerekçe metni üretiyor ("aynı cari hesap kullanıldı" vs
+> "anahtar kelime eşleşmesi gösterdi"); önceden `fuzzy_kalem` senaryosu da
+> yanlışlıkla "cari hesap" diye raporlanırdı (dış ekibe giden
+> `account_code_reason` alanı yanlış olurdu — bu, gerçek çağrıyla test
+> edilirken fark edildi, düzeltildi). Gerçek API çağrısıyla doğrulandı
+> (mock fırın faturası, container rebuild edilip canlı LLM ile): `600` artık
+> `600.01.00001` olarak deterministik çözülüyor, doğru gerekçeyle. Testler:
+> `tests/test_single.py::TestKalemFuzzyEsleme` (6 yeni — tek kalem net
+> eşleşme, çoklu kalemde tekli eşleşme, belirsizlikte None, alakasız kalem,
+> jenerik kelime yanlış-pozitif üretmiyor, boş girdi güvenli),
+> `tests/test_disa_aktarim.py::TestGerekce` güncellendi (`fuzzy` →
+> `fuzzy_cari`).
+
+> ✅ **Düzeltildi (2026-10-01) — mizan başlık düzeltmesinin fark edilmeyen
+> yan etkisi:** Önceki gün (`_baslik_satirini_bul` eklenmesi) sonrası
+> `tests/test_tenant_izolasyonu.py::test_mizan_yukleme_kayitsiz_sirkete_yazmaz`
+> başarısız olmaya başlamıştı — test fixture'ı sadece 7. satıra veri yazıyor,
+> hiç `HESAP KODU`/`HESAP ADI` başlığı içermiyordu. Eskiden (`min_row=7`
+> sabitken) bu sorun değildi çünkü format kontrolü yoktu; artık
+> `_baslik_satirini_bul` başlığı bulamayınca kendi `SystemExit`'ini
+> (`"HESAP KODU"/"HESAP ADI" başlıklarını taşıyan bir satır bulunamadı`)
+> `tenant_kayitli_mi` kontrolünden ÖNCE fırlatıyor — `yukle()`'de mizan
+> okuma, tenant kontrolünden önce geliyor (satır sırası değişmedi, sadece
+> mizan okumanın kendisi artık daha erken hata verebiliyor). Test, kayıtsız
+> VKN korumasını izole test etmek istiyordu ama artık format hatasına
+> takılıyordu — fixture'a gerçek başlık satırı eklenerek düzeltildi, mantık
+> değişmedi. Bu, dün (2026-09-30) o düzeltmeyi yaparken test suite'in
+> tamamı çalıştırılmadığı için kaçırılmıştı — bugünkü (`PAYABLE_MISMATCH`
+> ölçümü sırasında) rutin `pytest` koşusunda fark edildi.
+
+> ✅ **Uygulandı (2026-10-01) — `yevmiye_fatura_esle.py` için kalıcı pytest
+> testleri:** TODO.md'de "Detaylı test yazılacak" olarak açık kalan madde
+> kapatıldı — onboarding'in kalbi olan fatura XML + yevmiye eşleştirme akışı
+> (`scripts/yevmiye_fatura_esle.py::esle_ve_uret`) önceden sadece elle,
+> geçici script'lerle doğrulanmıştı, kalıcı test yoktu. 13 yeni test
+> (`tests/test_yevmiye_fatura_esle.py`), TODO'da istenen 4 senaryo + 2 ek
+> güvenlik senaryosu:
+> - **Mutlu yol** (3 test): eşleşen fatura JSON üretir, `Archive2/jsons`
+>   formatına (header/accounting_entries alan adları) birebir uyar, çoklu
+>   fatura hepsi eşleşir.
+> - **Yanlış VKN** (2 test): `own_vkn` ne alıcıda ne satıcıda bulunamazsa
+>   (`direction_uncertain`) fatura RAG'a YAZILMIYOR, sadece o fatura
+>   atlanıyor — diğer doğru VKN'li faturalar etkilenmiyor.
+> - **Eksik sütun** (3 test): zorunlu sütun eksikse açık `SystemExit`
+>   (sessizce yanlış sütun kullanılmıyor), birden fazla eksik sütunun HEPSİ
+>   tek hatada raporlanıyor, serbest biçimli başlık varyantları ("Fatura
+>   No" gibi) tanınıyor.
+> - **Eşleşmeyen fatura no** (3 test): XML var yevmiyede yok / yevmiyede
+>   var XML yok ayrı ayrı raporlanıyor, kısmi eşleşmede sadece eşleşenler
+>   yazılıyor, boş/geçersiz fatura no'lu satırlar veri uydurmadan atlanıyor.
+> - **Boş girdi** (2 test): boş fatura/yevmiye dizini açık hatayla durur.
+>
+> `musteri_onboard_toplu.py`'nin kendisi (şema/migration/Docker gerektiren
+> tam orkestrasyon) kapsam dışı bırakıldı — saf bir fonksiyon değil, izole
+> birim testi pratik değil; bu akış zaten gerçek Docker+PostgreSQL ile
+> canlı test edilmişti (bkz. 2026-09-30 mock çok-müşavirli uçtan uca test
+> notu, kök `CLAUDE.md`).
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),
@@ -402,15 +600,17 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
   noktası.
 - **`build_vector_db.py`** — Archive2/jsons'u ChromaDB'ye indeksler (RAG
   için önkoşul, idempotent upsert).
-- **`generate_report.py`** — sonuç kayıtlarından okunaklı `.md` raporu üretir
-  (`yeni_faturalar_tdhp*.md` bu şekilde üretildi).
+- **`generate_report.py`** — sonuç kayıtlarından okunaklı `.md` raporu
+  üretir (henüz hiç çalıştırılıp çıktısı commit edilmedi — 2026-10-01'de
+  fark edildi: önceki metin "`yeni_faturalar_tdhp*.md` bu şekilde üretildi"
+  diyordu, bu dosya hiç yoktu, yanlıştı).
 
 ## Kritik gerçekler (deney bulgularına dayalı — varsayım yapma)
 
 - **Referanssız en iyi model `gemma4:31b-cloud`** (pair_F1≈0.835). TDHP kod
   glossary'sini system prompt'a eklemek (`--with-glossary`) 4/6 modelde
   işe yaramadı/kötüleşti — sorun modelin bilgi eksikliği değil, doğru kodu
-  **seçme** ayrımıdır. Bkz. `RESULTS.md`.
+  **seçme** ayrımıdır.
 - **En büyük tekil iyileştirme: RAG** (şirketin kendi geçmiş faturalarından
   few-shot örnek) — 0.835→0.935; `--rag --self-correct` (precedent-mismatch
   düzeltmesi) ile 0.961 (n=100). n=500 doğrulamada tüm iyileştirmeler
@@ -475,6 +675,12 @@ için tam bulgu geçmişi. **Aynı gün ayrıca bir mimari denetim geçirdi:**
   `../entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` (§3.1) ile
   birleştirildi — dış ekibe teslim edilen tek dosya orası. Yeni bir
   "nasıl yapılır" ihtiyacı doğarsa `docs/how-to/` oluşturulabilir.
-- `RESULTS.md`, `RAG_MODEL_COMPARISON.md`, `GLM52_vs_GEMMA4_n500.md` —
-  deney bulguları (bunlar Diátaxis'in dışında, projenin kendi bulgu
-  günlüğü formatı).
+- Deney bulguları ayrı dosyalara değil, bu dosyanın yukarısındaki
+  "Kritik gerçekler" bölümüne ve tarihli `✅ Uygulandı` notlarına
+  yazılıyor — Diátaxis'in dışında, projenin kendi bulgu günlüğü formatı.
+  (2026-10-01'de fark edildi: burada önceden `RESULTS.md`,
+  `RAG_MODEL_COMPARISON.md`, `GLM52_vs_GEMMA4_n500.md` diye üç ayrı dosyaya
+  referans vardı — üçü de hiç yazılmamıştı, hem dosya sisteminde hem git
+  geçmişinde yoktu; kaldırıldı. Yeni bir geniş-örneklemli deney yapılırsa
+  sonucu ayrı bir dosyaya değil, doğrudan "Kritik gerçekler" bölümüne
+  eklemek tutarlılığı korur.)
