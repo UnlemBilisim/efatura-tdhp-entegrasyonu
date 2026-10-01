@@ -17,6 +17,13 @@ from psycopg2 import sql
 
 _pool = None
 _pool_lock = threading.Lock()
+# Şemalar silinmediği için sadece "var" sonucu hatırlanır.
+_kayitli_tenant_onbellegi = set()
+
+
+class TenantKayitliDegilHatasi(LookupError):
+    """Onboard edilmemiş (tenant_<vkn> şeması olmayan) bir şirket için
+    veritabanı işlemi istendi."""
 
 
 def _tenant_semasi(tenant_vkn):
@@ -102,13 +109,57 @@ def get_pool():
     return _pool
 
 
+def tenant_kayitli_mi(tenant_vkn, cur=None):
+    """Şirket onboard edilmiş mi: tenant_<vkn> şeması var mı. DEFAULT_OWN_VKN
+    (Akyüzlü) her zaman kayıtlı sayılır - tenant şemasına göç etmediyse
+    verisi public'te durur (bkz. kayitli_tenant_vknleri docstring'i).
+
+    Bu kontrol olmadan `SET search_path TO tenant_<vkn>, public` var olmayan
+    şemayı sessizce atlar ve okuma/yazma public'e (Akyüzlü'nün verisine)
+    gider - 2026-09-28'de geçici bir veritabanında yeniden üretildi.
+
+    `cur` verilirse o cursor kullanılır (kendi bağlantısını açan script'ler
+    için), verilmezse havuzdan bir bağlantı alınır."""
+    from .constants import DEFAULT_OWN_VKN
+
+    if tenant_vkn == DEFAULT_OWN_VKN or tenant_vkn in _kayitli_tenant_onbellegi:
+        return True
+    if not tenant_vkn or not tenant_vkn.isdigit():
+        return False
+
+    sorgu = "SELECT 1 FROM information_schema.schemata WHERE schema_name = %s"
+    parametre = (_tenant_semasi(tenant_vkn),)
+    if cur is not None:
+        cur.execute(sorgu, parametre)
+        var = cur.fetchone() is not None
+    else:
+        pool = get_pool()
+        conn = pool.getconn()
+        try:
+            with conn.cursor() as kendi_cur:
+                kendi_cur.execute(sorgu, parametre)
+                var = kendi_cur.fetchone() is not None
+        finally:
+            pool.putconn(conn)
+    if var:
+        _kayitli_tenant_onbellegi.add(tenant_vkn)
+    return var
+
+
 @contextmanager
 def get_conn(tenant_vkn=None):
     """tenant_vkn verilmezse (varsayılan) davranış DEĞİŞMEZ: public şemaya
     bağlanır (mevcut CLI/test akışı). Verilirse (2026-07-30, çoklu şirket
     geçişi) search_path o şirketin tenant şemasına çevrilir - havuz TEK ve
     bağlantılar şirketler arası yeniden kullanıldığı için search_path
-    DSN'e gömülemez, her ödünç almada yeniden set edilir."""
+    DSN'e gömülemez, her ödünç almada yeniden set edilir.
+
+    Onboard edilmemiş tenant için TenantKayitliDegilHatasi fırlatır; sessizce
+    public'e düşmez (bkz. tenant_kayitli_mi)."""
+    if tenant_vkn and not tenant_kayitli_mi(tenant_vkn):
+        raise TenantKayitliDegilHatasi(
+            f"VKN {tenant_vkn} için onboard edilmiş şirket yok (tenant_{tenant_vkn} şeması bulunamadı)"
+        )
     pool = get_pool()
     conn = pool.getconn()
     try:
@@ -151,3 +202,4 @@ def reset_pool_for_tests():
         if _pool is not None:
             _pool.closeall()
         _pool = None
+        _kayitli_tenant_onbellegi.clear()

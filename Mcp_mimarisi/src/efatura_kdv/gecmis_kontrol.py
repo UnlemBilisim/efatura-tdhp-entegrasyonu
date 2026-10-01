@@ -30,12 +30,15 @@ import re
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-import psycopg2
 from psycopg2 import sql
 from psycopg2.pool import ThreadedConnectionPool
 
 from .kalem_nace_esleme import kalem_istisna_kodlari
+from .model_eval_yolu import model_eval_yolunu_ekle
 from .ubl_parser import Fatura
+
+model_eval_yolunu_ekle()
+from core.db import TenantKayitliDegilHatasi, tenant_kayitli_mi  # noqa: E402
 
 
 def _tenant_semasi(satici_vkn: str) -> str:
@@ -159,10 +162,28 @@ class GecmisFaturaDeposu:
         Şema henüz yoksa (yeni şirket onboard edilmemiş) burada
         OLUŞTURULMAZ — bu, scripts/tenant_onboarding.py'nin sorumluluğu;
         burada sessizce şema oluşturmak, yanlış yazılmış bir VKN'nin fark
-        edilmeden yeni bir boş şema açmasına yol açar."""
+        edilmeden yeni bir boş şema açmasına yol açar.
+
+        Onboard edilmemiş bir VKN için de artık sessizce `public`'e
+        düşülmez (2026-10-01, bkz. TODO.md "Mcp_mimarisi'de onboard
+        edilmemiş VKN hâlâ public'e düşüyor"): `SET search_path TO
+        tenant_<vkn>, public`, şema yoksa Postgres'i hatalandırmaz, sadece
+        sorguları/yazmaları sessizce `public`'e (başka şirketin — ör.
+        Akyüzlü'nün — verisine) yönlendirir. model_eval'daki tek kaynak
+        kontrol (`core.db.tenant_kayitli_mi`, DEFAULT_OWN_VKN istisnası
+        dahil) burada da kullanılıyor — iki ayrı kopya (ve ayrı ayrı
+        bayatlayabilecek bir DEFAULT_OWN_VKN sabiti) tutmak yerine
+        entegrasyon/model_eval'ın 2026-09-28'de kapattığı açığın aynısı
+        tek kaynaktan kapatıldı (bkz. kök CLAUDE.md "Değişmez kurallar" #2
+        — bu iki bileşen arasındaki import artık izinli)."""
         conn = self._pool.getconn()
         try:
             with conn.cursor() as cur:
+                if not tenant_kayitli_mi(satici_vkn, cur=cur):
+                    raise TenantKayitliDegilHatasi(
+                        f"VKN {satici_vkn} için onboard edilmiş şirket yok "
+                        f"(tenant_{satici_vkn} şeması bulunamadı)"
+                    )
                 cur.execute(
                     sql.SQL("SET search_path TO {}, public").format(
                         sql.Identifier(_tenant_semasi(satici_vkn))

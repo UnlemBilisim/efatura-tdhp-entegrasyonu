@@ -49,7 +49,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from auth import require_api_token  # noqa: F401 — auth geçici kaldırıldı, geri eklenirken hazır dursun
+from api_anahtarlari import IstemciKimligi
+from auth import require_api_key, vkn_yetkisini_dogrula
 from security import SecurityMiddleware
 from log_ortak import RequestIdMiddleware, loglamayi_kur
 from es_zamanli_sinir import fatura_isle_sirasi
@@ -61,6 +62,7 @@ from model_eval_koprusu import (
     bekleyen_tahmini_onayla,
     fatura_kur_bilgisi,
     model_eval_hazir_mi,
+    sirket_kayitli_mi,
     tdhp_tahmini_yap,
 )
 from yon_tespiti import FaturaYonuBelirsizHatasi, faturayi_parse_et_ve_yonu_dogrula
@@ -258,36 +260,43 @@ def durum():
     }
 
 
-@app.get("/kayitli-sirketler")  # ⚠️ auth GEÇİCİ kaldırıldı, bkz. fatura_isle() notu
-def kayitli_sirketler():
+@app.get("/kayitli-sirketler")
+def kayitli_sirketler(kimlik: IstemciKimligi = Depends(require_api_key)):
     """Arayüzdeki VKN input'una (own_vkn — kullanıcının KENDİ şirketi) yazı
     yazılırken öneri göstermek için (2026-07-30, çoklu şirket geçişi).
     Sadece VKN listesi döner — şirket adı ayrıca tutulmuyor (kullanıcı
     kararı). model_eval hazır değilse boş liste döner (arayüz sessizce
     öneri göstermez, hata da fırlatmaz — bu, ana akışı bloklamayan bir
-    yardımcı özellik)."""
+    yardımcı özellik). Yalnızca anahtarın yetkili olduğu şirketler döner."""
     hazir, _mesaj = model_eval_hazir_mi()
     if not hazir:
         return {"vkn_listesi": []}
 
     from model_eval_koprusu import kayitli_vknleri_getir
 
-    return {"vkn_listesi": kayitli_vknleri_getir()}
+    return {"vkn_listesi": [v for v in kayitli_vknleri_getir() if kimlik.vkn_izinli_mi(v)]}
 
 
-@app.post("/fatura/onayla", response_model=FaturaOnaylaCevabi)  # ⚠️ auth GEÇİCİ kaldırıldı, bkz. fatura_isle() notu
-def fatura_onayla(istek: FaturaOnaylaIstegi, request: Request) -> FaturaOnaylaCevabi:
-    """Yalniz sunucuda saklanan, dogrulanmis bir prediction_id'yi onaylar."""
+@app.post("/fatura/onayla", response_model=FaturaOnaylaCevabi)
+def fatura_onayla(
+    istek: FaturaOnaylaIstegi,
+    request: Request,
+    kimlik: IstemciKimligi = Depends(require_api_key),
+) -> FaturaOnaylaCevabi:
+    """Yalniz sunucuda saklanan, dogrulanmis bir prediction_id'yi onaylar.
+    Anahtarın yetkisi olmayan bir şirketin tahmini "bulunamadı" (404)
+    döner — başka şirketin prediction_id'lerinin varlığı bile sızdırılmaz."""
     prediction_id = str(istek.prediction_id)
     istemci_ip = request.client.host if request.client else "bilinmiyor"
     _logger.info("[ONAY] ISTEK — prediction_id=%s", prediction_id)
     try:
-        invoice_id = bekleyen_tahmini_onayla(prediction_id)
+        invoice_id = bekleyen_tahmini_onayla(prediction_id, kimlik)
     except BekleyenTahminHatasi as exc:
         _audit_logger.info(
             json.dumps(
                 {
                     "olay": "fatura_onayla_basarisiz",
+                    "istemci": kimlik.etiket,
                     "istemci_ip": istemci_ip,
                     "prediction_id": prediction_id,
                     "hata": str(exc),
@@ -305,6 +314,7 @@ def fatura_onayla(istek: FaturaOnaylaIstegi, request: Request) -> FaturaOnaylaCe
         json.dumps(
             {
                 "olay": "fatura_onayla",
+                "istemci": kimlik.etiket,
                 "istemci_ip": istemci_ip,
                 "prediction_id": prediction_id,
                 "invoice_id": invoice_id,
@@ -320,7 +330,11 @@ def fatura_onayla(istek: FaturaOnaylaIstegi, request: Request) -> FaturaOnaylaCe
 
 
 @app.post("/fatura/isle", response_model=FaturaIsleCevabi)
-def fatura_isle(istek: FaturaIsleIstegi, request: Request) -> FaturaIsleCevabi:
+def fatura_isle(
+    istek: FaturaIsleIstegi,
+    request: Request,
+    kimlik: IstemciKimligi = Depends(require_api_key),
+) -> FaturaIsleCevabi:
     """Gerçek işleme mantığı `_fatura_isle_ic()`'te — bu dış katman SADECE
     sonucu (onaylansın/onaylanmasın, her çağrı) test-kayıtları dosyasına
     loglar (2026-07-31, kullanıcı isteği: arayüzden test edilen her fatura
@@ -334,23 +348,23 @@ def fatura_isle(istek: FaturaIsleIstegi, request: Request) -> FaturaIsleCevabi:
     çalıştırabilir — fazlası burada, semaphore serbest kalana kadar bekler
     (istek REDDEDİLMEZ, sadece kuyruğa girer).
 
-    ⚠️ **Auth GEÇİCİ olarak kaldırıldı** (2026-09-11, kullanıcı kararı —
-    yerel ağda demo.html ile test ederken 401 alınması istenmedi, "token
-    kısmını şimdilik aktif etme"). `Depends(require_api_token)` bu ve
-    `/fatura/onayla`, `/kayitli-sirketler` endpoint'lerinden kaldırıldı —
-    artık BU AĞDAKİ HERKES (token bilmeden) istek atabilir. Tekrar aktif
-    etmek için üç endpoint'e de `dependencies=[Depends(require_api_token)]`
-    geri eklenmeli (import zaten yerinde duruyor). Mcp_mimarisi tarafındaki
-    `MCP_INTERNAL_API_TOKEN` kontrolü (entegrasyon→Mcp_mimarisi iç çağrısı)
-    bu karardan ETKİLENMEDİ, hâlâ zorunlu."""
+    Anahtarın `satici_vkn` adına yetkisi yoksa istek kuyruğa girmeden 403
+    ile reddedilir; şirketin kayıtlı olup olmadığı (404) ancak yetki
+    doğrulandıktan sonra söylenir."""
+    vkn_yetkisini_dogrula(kimlik, istek.satici_vkn)
     with fatura_isle_sirasi():
         cevap = _fatura_isle_ic(istek)
     _test_kaydini_logla(istek, cevap)
-    _audit_logla(istek, cevap, request)
+    _audit_logla(istek, cevap, request, kimlik)
     return cevap
 
 
-def _audit_logla(istek: "FaturaIsleIstegi", cevap: "FaturaIsleCevabi", request: Request) -> None:
+def _audit_logla(
+    istek: "FaturaIsleIstegi",
+    cevap: "FaturaIsleCevabi",
+    request: Request,
+    kimlik: IstemciKimligi,
+) -> None:
     """Canliya cikis hazirligi (2026-09-11, kullanici istegi — 'onemli
     yerleri loglamak istiyorum'): kim/hangi fatura/ne zaman/ne sonucla
     islendi bilgisini ayri, yapilandirilmis (JSON) bir audit satiri olarak
@@ -365,19 +379,36 @@ def _audit_logla(istek: "FaturaIsleIstegi", cevap: "FaturaIsleCevabi", request: 
     sonra bu alani doldurup gonderecek (henuz aktif kullanilmiyor, sadece
     alan/loglama hazir). Bos gelirse 'bilinmiyor' loglanir.
 
-    `dosya_adi` (2026-09-28 eklendi, kullanici karari — auth 3 endpoint'te
-    GECICI kapaliyken IP+dosya izlenebilirligini guclendirmek icin):
-    onceden SADECE `_test_kaydini_logla`'nin yazdigi Excel test-kayit
-    dosyasinda vardi, asil JSON audit satirinda YOKTU — "hangi dosya
-    islendi" sorusu audit log'dan tek basina cevaplanamiyordu. Bos gelirse
-    'bilinmiyor' loglanir (alan optional, dis ekip her zaman doldurmayabilir)."""
+    `dosya_adi` (2026-09-28 eklendi): onceden SADECE `_test_kaydini_logla`'nin
+    yazdigi Excel test-kayit dosyasinda vardi, asil JSON audit satirinda
+    YOKTU — "hangi dosya islendi" sorusu audit log'dan tek basina
+    cevaplanamiyordu. Bos gelirse 'bilinmiyor' loglanir.
+
+    `istemci` (2026-09-28): isteği yapan API anahtarının etiketi — DOĞRULANMIŞ
+    kimliktir (gonderen_kullanici'nin aksine).
+
+    `approvable`/`red_kodlari` (2026-10-01, kullanıcı isteği — "bu tür
+    hatalı şeyleri bizim fark edebilmemiz gerek"): `PAYABLE_MISMATCH` gibi
+    deterministik doğrulama hatalarının hangi faturada, ne sıklıkta
+    çıktığı önceden audit log'dan ÇIKARILAMIYORDU — sadece `asama` alanı
+    "başarısız oldu" diyordu, NEDEN'i (hangi kural) kayıtlı değildi. Sadece
+    hata KODU yazılır (`PAYABLE_MISMATCH`, `UNBALANCED` vb.) — mesaj metni
+    DEĞİL, çünkü mesaj tutar/hesap kodu gibi detay içerebilir ve audit log
+    hassas veri taşımamalı (bkz. modül docstring'i: "ham fatura XML'i veya
+    token ASLA buraya yazılmaz" ilkesiyle tutarlı)."""
     invoice_id = cevap.tdhp_tahmini.invoice_id if cevap.tdhp_tahmini else None
     on_filtre_karari = cevap.on_filtre_sonucu.get("genel_karar") if cevap.on_filtre_sonucu else None
     istemci_ip = request.client.host if request.client else "bilinmiyor"
+    approvable = cevap.tdhp_tahmini.approvable if cevap.tdhp_tahmini else None
+    red_kodlari = (
+        sorted({e.get("code") for e in cevap.tdhp_tahmini.validation_errors if e.get("code")})
+        if cevap.tdhp_tahmini else []
+    )
     _audit_logger.info(
         json.dumps(
             {
                 "olay": "fatura_isle",
+                "istemci": kimlik.etiket,
                 "istemci_ip": istemci_ip,
                 "gonderen_kullanici": istek.gonderen_kullanici or "bilinmiyor",
                 "dosya_adi": istek.dosya_adi or "bilinmiyor",
@@ -386,6 +417,8 @@ def _audit_logla(istek: "FaturaIsleIstegi", cevap: "FaturaIsleCevabi", request: 
                 "yon": cevap.yon,
                 "asama": cevap.asama,
                 "on_filtre_karari": on_filtre_karari,
+                "approvable": approvable,
+                "red_kodlari": red_kodlari,
             },
             ensure_ascii=False,
         )
@@ -399,6 +432,20 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
         "[1/5] İSTEK ALINDI — own_vkn=%s, nace_kodlari=%s, xml_boyutu=%d byte, onay=%s",
         istek.satici_vkn, istek.satici_nace_kodlari, fatura_boyutu, istek.onay,
     )
+
+    # Onboard edilmemiş şirket reddedilir (2026-09-28): önceden kabul
+    # ediliyor, kayıtları sessizce public şemaya (Akyüzlü'nün verisine)
+    # yazılıyordu. model_eval hazır değilse bu kontrol yapılamaz; o durumda
+    # akış zaten tahmin/kayıt üretmeden "model_eval_hazir_degil" ile biter.
+    if model_eval_hazir_mi()[0] and not sirket_kayitli_mi(istek.satici_vkn):
+        _logger.warning("[1/5] ŞİRKET KAYITLI DEĞİL — own_vkn=%s", istek.satici_vkn)
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"VKN {istek.satici_vkn} için kayıtlı şirket yok — önce onboard "
+                "edilmesi gerekiyor (bkz. GET /kayitli-sirketler)."
+            ),
+        )
 
     _logger.info("[2/5] YÖN TESPİTİ — fatura kendi VKN'imizin satıcı/alıcı tarafında olduğu tespit ediliyor")
     try:

@@ -288,11 +288,15 @@ class BekleyenTahminHatasi(Exception):
         self.status_code = status_code
 
 
-def bekleyen_tahmini_onayla(prediction_id: str) -> str:
-    """Tahmini atomik olarak sahiplenir; yalniz dogrulanmis sunucu kaydini onaylar."""
+def bekleyen_tahmini_onayla(prediction_id: str, kimlik) -> str:
+    """Tahmini atomik olarak sahiplenir; yalniz dogrulanmis sunucu kaydini onaylar.
+
+    `kimlik` (api_anahtarlari.IstemciKimligi): yalnızca yetkili olduğu
+    şirketlerin tahminlerini görebilir; diğerleri "bulunamadı" sayılır."""
     model_eval_yolunu_ekle()
     from core.db import get_conn
 
+    tenant_filtresi = (kimlik.tum_sirketler, list(kimlik.izinli_vknler))
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -300,15 +304,17 @@ def bekleyen_tahmini_onayla(prediction_id: str) -> str:
                    SET status = 'approving'
                    WHERE prediction_id = %s AND status = 'pending'
                      AND approvable = TRUE AND expires_at > now()
+                     AND (%s OR tenant_vkn = ANY(%s))
                    RETURNING invoice_xml, tenant_vkn, prediction, invoice_id""",
-                (prediction_id,),
+                (prediction_id, *tenant_filtresi),
             )
             row = cur.fetchone()
             if row is None:
                 cur.execute(
                     """SELECT status, approvable, expires_at <= now()
-                       FROM model_eval_bekleyen_tahminler WHERE prediction_id = %s""",
-                    (prediction_id,),
+                       FROM model_eval_bekleyen_tahminler
+                       WHERE prediction_id = %s AND (%s OR tenant_vkn = ANY(%s))""",
+                    (prediction_id, *tenant_filtresi),
                 )
                 state = cur.fetchone()
                 conn.rollback()
@@ -371,6 +377,16 @@ def kayitli_vknleri_getir() -> list[str]:
     if DEFAULT_OWN_VKN not in vknler:
         vknler = [DEFAULT_OWN_VKN] + vknler
     return vknler
+
+
+def sirket_kayitli_mi(own_vkn: str) -> bool:
+    """Şirket onboard edilmiş mi — tek kaynak core.db.tenant_kayitli_mi
+    (kayitli_vknleri_getir ile aynı kural: tenant şeması + DEFAULT_OWN_VKN)."""
+    model_eval_yolunu_ekle()
+
+    from core.db import tenant_kayitli_mi
+
+    return tenant_kayitli_mi(own_vkn)
 
 
 def fatura_kur_bilgisi(fatura_xml: str, own_vkn: str) -> dict:
