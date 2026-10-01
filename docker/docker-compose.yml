@@ -82,11 +82,38 @@ services:
       # Uzak GPU'daki LLM'e giden SSH tüneli host makinede systemd servisi
       # olarak çalışıyor — container'dan host'a bu şekilde erişilir.
       MODEL_EVAL_OLLAMA_HOST: http://host.docker.internal:11435
-      EFATURA_API_TOKEN: ${EFATURA_API_TOKEN:?EFATURA_API_TOKEN env var tanımlı olmalı}
+      # Dış API anahtarları veritabanında (api_anahtarlari tablosu) tutulur:
+      #   docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py
       MCP_INTERNAL_API_TOKEN: ${MCP_INTERNAL_API_TOKEN:?MCP_INTERNAL_API_TOKEN env var tanımlı olmalı}
+      # İstek boyutu sınırı (entegrasyon/security.py) — varsayılan 10 MB,
+      # dış ekip isteğiyle 30 MB'a yükseltildi (2026-09-30). .env'de yoksa
+      # kod kendi varsayılanına (10 MB) düşer.
+      MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-10485760}
+    # ⚠️ 2026-09-30, kullanıcı kararı: dış ekibin gerçekten dışarıdan (kendi
+    # makinelerinden) istek atabilmesi için 8100 tüm arayüzlere açıldı
+    # (önceden 127.0.0.1 — sadece bu makineden erişilebiliyordu, dış ekibe
+    # verilen 10.38.20.146:8100 adresi FİİLEN ÇALIŞMIYORDU, LAN IP'si bile
+    # loopback bind yüzünden reddediliyordu — gerçek istekle doğrulandı).
+    # API anahtarı auth'u (entegrasyon/auth.py) hâlâ zorunlu — bu değişiklik
+    # sadece TCP seviyesinde kimin bağlanabileceğini genişletiyor, kimlik
+    # doğrulamayı KALDIRMIYOR. Postgres (5434) ve Ollama (11434) portları
+    # bilerek 127.0.0.1'de BIRAKILDI — dışarıya sadece 8100 açılıyor.
+    #
+    # ✅ Düzeltildi (2026-10-01, kullanıcı kararı — TODO.md "/fatura/
+    # gecmis-kontrol keyfi VKN sorgusu"): 8000 (Mcp_mimarisi) yukarıdaki
+    # 2026-09-30 değişikliğinde YANLIŞLIKLA 8100'le birlikte 0.0.0.0'a
+    # açılmıştı — entegrasyon zaten Mcp_mimarisi'ye aynı container içinde
+    # `http://localhost:8000` ile bağlanıyor (mcp_mimarisi_istemcisi.py),
+    # bu çağrı host'un port eşlemesinden tamamen bağımsız. Dış ekibin
+    # hiçbir belgesinde 8000'e dışarıdan erişim yok, hepsi 8100 kullanıyor.
+    # 8000 dışarıya açık kalması `MCP_INTERNAL_API_TOKEN`'ı (VKN-bazlı
+    # yetki kontrolü OLMAYAN tek bir dahili token) LAN'daki herkese
+    # (dış ekip dahil, 8100 onlar için açıldığı için aynı ağdalar) maruz
+    # bırakıyordu — bkz. docs/explanation/guvenlik-durumu-2026-07-27.md.
+    # Şimdi 8000 de Postgres/Ollama gibi 127.0.0.1'e geri alındı.
     ports:
       - "127.0.0.1:8000:8000"
-      - "127.0.0.1:8100:8100"
+      - "8100:8100"
     volumes:
       # ChromaDB (RAG) verisi — rag_common.py::DEFAULT_PERSIST_DIR burayı
       # kullanır. Volume olmadan container her yeniden oluşturulduğunda

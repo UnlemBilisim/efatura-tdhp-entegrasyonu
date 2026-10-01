@@ -17,7 +17,6 @@ Authorization: Bearer <token>
 {
   "fatura_xml": "<?xml version=\"1.0\"?><Invoice>...</Invoice>",
   "satici_vkn": "0460351893",
-  "satici_nace_kodlari": ["25.40.04"],
   "onay": true
 }
 ```
@@ -26,7 +25,7 @@ Authorization: Bearer <token>
 |---|:---:|---|
 | `fatura_xml` | ✅ | UBL-TR fatura XML'inin tamamı, ham metin |
 | `satici_vkn` | ✅ | **Kendi şirketinizin VKN'si** (fatura üzerindeki satıcının değil) |
-| `satici_nace_kodlari` | ❌ | Satıcının NACE kodları — noktalı/noktasız fark etmez |
+| `satici_nace_kodlari` | ❌ | **Normalde göndermenize gerek yok** — şirketin NACE kodları onboarding sırasında bizim tarafımızda bir kere kaydedilir, sistem otomatik kullanır. Sadece kayıtlı NACE'yi override etmek isterseniz doldurun. |
 | `onay` | ❌ | KDV uyarısına rağmen devam et |
 | `kur_secimi` | ❌ | `"orijinal"` \| `"tl"` — döviz faturasında |
 
@@ -69,13 +68,12 @@ import json
 json.dump({
   'fatura_xml': open('fatura.xml', encoding='utf-8').read(),
   'satici_vkn': '0460351893',
-  'satici_nace_kodlari': ['25.40.04'],
   'onay': True
 }, open('istek.json', 'w'), ensure_ascii=False)"
 
 curl -s --max-time 600 -X POST http://10.38.20.146:8100/fatura/isle \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $EFATURA_API_TOKEN" \
+  -H "Authorization: Bearer $API_ANAHTARI" \
   -d @istek.json | jq '.tdhp_tahmini.dis_sema'
 ```
 
@@ -83,6 +81,10 @@ curl -s --max-time 600 -X POST http://10.38.20.146:8100/fatura/isle \
 
 - **Timeout ≥ 600 saniye** — işlem 5-90 saniye sürebilir (yapay zekâ modeli çalışıyor)
 - **Sağlık kontrolü:** `GET http://10.38.20.146:8100/durum` → `{"model_eval_hazir": true}`
-- **Kimlik doğrulama zorunlu** — token `EFATURA_API_TOKEN` olarak ayrı kanaldan verilir
-- Onay için `/fatura/isle` cevabındaki `prediction_id`, Bearer token ile `/fatura/onayla` endpoint'ine gönderilir
+- **API anahtarı zorunlu** — `efk_` ile başlayan anahtar size ayrı ve güvenli bir kanaldan verilir; yalnızca sunucu tarafınızda saklayın
+- Anahtar belirli şirket(ler) adına yetkilidir — yetkisiz `satici_vkn` **`403`**, geçersiz/iptal edilmiş anahtar **`401`** döner
+- Onay için `/fatura/isle` cevabındaki `prediction_id`, aynı anahtarla `/fatura/onayla` endpoint'ine gönderilir
 - Boş `records[]` görürseniz önce `success` alanına bakın — `false` ise teknik hata var, "kayıt yok" değil
+- **`404`** — `satici_vkn` için sistemde kayıtlı şirket yok; önce şirketin onboard edilmesi gerekir. Hazır VKN'ler: `GET /kayitli-sirketler`
+- **NACE kodlarını her istekte göndermenize gerek yok** — onboarding sırasında (bkz. `ONBOARDING-VERI-FORMATI.md`) şirketin NACE kodlarını bizim tarafımıza bir kere bildirirsiniz, sistem her istekte otomatik kullanır
+- **`413`** — istek gövdesi izin verilen boyutu aşıyor. Sınır **30 MB** — çok büyük/çok kalemli bir fatura XML'i bu sınıra takılırsa bize bildirin

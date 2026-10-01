@@ -67,8 +67,9 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 > model_eval) destekliyordu. `yon_tespiti.py` (yeni) faturayı Mcp_mimarisi'ne
 > göndermeden ÖNCE yönünü tespit eder; `app.py::fatura_isle()` buna göre
 > dallanır. model_eval'ın kendisi zaten hem inbox hem outbox faturalar için
-> TDHP tahmini üretebiliyordu (bkz. `model_eval/RESULTS.md` §7 — inbox
-> %16.2 hatalı, outbox %7.8 hatalı, ayrı ayrı ölçülmüş) — bu değişiklik
+> TDHP tahmini üretebiliyordu (bkz. `model_eval/CLAUDE.md` "Kritik
+> gerçekler" — inbox %16.2 hatalı, outbox %7.8 hatalı, ayrı ayrı ölçülmüş)
+> — bu değişiklik
 > sadece entegrasyon katmanının bu tahmin yeteneğine dış-fatura senaryosunda
 > da erişmesini sağladı, model_eval'ın kendi koduna dokunulmadı. Gerçek bir
 > inbox faturasıyla (`Mcp_mimarisi/ubls/VM02025000000346-*-inbox.xml`,
@@ -105,10 +106,19 @@ geçilir. `satici_nace_kodlari` alanı bu durumda kullanılmaz/boş bırakılabi
 > arayüzü (`static/index.html`) yazıldı. Mcp_mimarisi bağlantısı
 > (`mcp_mimarisi_istemcisi.py`) gerçek HTTP çağrısı yapar.
 >
-> ✅ **Güvenlik güncellemesi (2026-09-11):** Dış API `EFATURA_API_TOKEN`,
-> dahili MCP servisi ayrı `MCP_INTERNAL_API_TOKEN` Bearer token'ı ister.
-> Onay akışı istemci tahminini kabul etmez; `/fatura/isle` cevabındaki
-> süreli `prediction_id` sunucu tarafı kaydı onaylamak için kullanılır.
+> ✅ **Güvenlik güncellemesi (2026-09-11):** Dahili MCP servisi ayrı
+> `MCP_INTERNAL_API_TOKEN` Bearer token'ı ister. Onay akışı istemci
+> tahminini kabul etmez; `/fatura/isle` cevabındaki süreli `prediction_id`
+> sunucu tarafı kaydı onaylamak için kullanılır.
+>
+> ✅ **Uygulandı (2026-09-28) — şirkete bağlı API anahtarları:** Tek
+> paylaşılan `EFATURA_API_TOKEN` kaldırıldı. `/fatura/isle`,
+> `/fatura/onayla`, `/kayitli-sirketler` artık veritabanındaki bir API
+> anahtarı ister (`api_anahtarlari.py`, `auth.py::require_api_key`). Her
+> anahtar ya tüm şirketler ya da belirli VKN'ler adına işlem yapabilir;
+> yetkisiz VKN `403`, başka şirketin `prediction_id`'si `404` döner. Anahtar
+> üretme/iptal: `python3 api_anahtari_yonet.py olustur|listele|iptal`.
+> Anahtarın kendisi saklanmaz, yalnızca sha256 özeti tutulur.
 >
 > ✅ **model_eval bağlantısı tamamlandı (2026-07-22, aynı gün):**
 > `model_eval/core/single.py::predict_single_invoice` eklendi (kod+yön+tutar
