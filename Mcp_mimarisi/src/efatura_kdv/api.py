@@ -36,6 +36,7 @@ from pydantic import BaseModel, Field
 from .gecmis_kontrol import (
     GecmisFaturaDeposu,
     GecmisKontrolSonucu,
+    TenantKayitliDegilHatasi,
     fatura_kalemlerini_kayit_icin_hazirla,
     faturayi_gecmise_kaydet,
     gecmis_kontrol_et,
@@ -51,6 +52,7 @@ from .kalem_nace_esleme import (
     satir_bazli_kontrol_et,
 )
 from .nace_kural_kontrolu import NaceOranTablosu
+from .sirket_bilgileri import nace_kodlarini_getir
 from .ubl_parser import parse_ubl_invoice_from_string
 
 _state: dict = {}
@@ -109,6 +111,16 @@ async def _pool_exhausted_handler(request: Request, exc: PoolError):
         status_code=503,
         content={"detail": "Sunucu şu an yoğun, lütfen kısa bir süre sonra tekrar deneyin."},
     )
+
+
+@app.exception_handler(TenantKayitliDegilHatasi)
+async def _tenant_kayitli_degil_handler(request: Request, exc: TenantKayitliDegilHatasi):
+    """`/fatura/gecmis-kontrol` ve `/fatura/coklu-kontrol` onboard edilmemiş
+    bir VKN için artık sessizce `public`'e düşmez (2026-10-01, bkz. TODO.md
+    + gecmis_kontrol.py::_tenant_baglantisi) — entegrasyon/model_eval
+    tarafındaki aynı durumla (`app.py` "ŞİRKET KAYITLI DEĞİL") tutarlı
+    şekilde 404 döner, 500 değil."""
+    return JSONResponse(status_code=404, content={"detail": str(exc)})
 
 
 @app.exception_handler(Exception)
@@ -265,6 +277,25 @@ def _tek_fatura_kontrol_et(fatura_xml: str, satici_vkn: str, satici_nace_kodlari
         "[MCP 1/3] AYRIŞTIRILDI — fatura_no=%s, satici_vkn(fatura)=%s, kalem_sayisi=%d",
         fatura.fatura_no, fatura.satici.vkn if fatura.satici else None, len(fatura.kalemler),
     )
+
+    # 2026-09-29 (kullanici karari): satici_nace_kodlari bos gelirse (dis
+    # ekip her istekte doldurmak zorunda kalmasin diye) onboarding'de
+    # kaydedilen NACE'ye dusulur (bkz. sirket_bilgileri.py). Istek
+    # ACIKCA NACE gonderdiyse (override) o kullanilir - kayitli deger
+    # SESSIZCE EZILMEZ, sadece bos oldugunda devreye girer.
+    if not satici_nace_kodlari:
+        kayitli_nace = nace_kodlarini_getir(satici_vkn)
+        if kayitli_nace:
+            _logger.info(
+                "[MCP 1/3] NACE istekte bos geldi, onboarding'de kayitli olan kullaniliyor: %s",
+                kayitli_nace,
+            )
+            satici_nace_kodlari = kayitli_nace
+        else:
+            _logger.warning(
+                "[MCP 1/3] NACE ne istekte ne kayitli (satici_vkn=%s) — havuz bos kalacak, "
+                "kalemler insan incelemesine dusecek.", satici_vkn,
+            )
 
     satici_nace = SaticiNaceBilgisi(vkn=satici_vkn, nace_kodlari=satici_nace_kodlari)
 

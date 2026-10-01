@@ -126,6 +126,82 @@ class TestGetAltKirilimlarGecersizTenant:
         assert mizan.get_alt_kirilimlar("kisa") == {}
 
 
+class _SahteBaglanti:
+    """get_conn() yerine gecer; her cagrida `sonuclar` listesindeki siradaki
+    ogeyi doner (Exception ise firlatir) ve cagri sayisini tutar."""
+
+    def __init__(self, sonuclar):
+        self.sonuclar = list(sonuclar)
+        self.cagri_sayisi = 0
+
+    def __call__(self, tenant_vkn=None):
+        from contextlib import contextmanager
+
+        self.cagri_sayisi += 1
+        sonuc = self.sonuclar.pop(0)
+
+        @contextmanager
+        def _baglanti():
+            if isinstance(sonuc, Exception):
+                raise sonuc
+
+            class _Cursor:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return False
+
+                def execute(self, *args):
+                    pass
+
+                def fetchall(self):
+                    return sonuc
+
+            class _Conn:
+                def cursor(self):
+                    return _Cursor()
+
+            yield _Conn()
+
+        return _baglanti()
+
+
+DOLU_MIZAN = [("191.01.00020", "191", "%20 Indirilecek KDV")]
+
+
+class TestMizanCacheDavranisi:
+    def test_dolu_sonuc_cachelenir(self, monkeypatch):
+        sahte = _SahteBaglanti([DOLU_MIZAN])
+        monkeypatch.setattr(mizan, "get_conn", sahte)
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN)["191"]
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN)["191"]
+        assert sahte.cagri_sayisi == 1
+
+    def test_bos_sonuc_cachelenmez(self, monkeypatch):
+        """Onboarding sonrasi mizan yuklenmeden gelen ilk fatura, sonradan
+        yuklenen mizanin kullanilmasini engellememeli."""
+        sahte = _SahteBaglanti([[], DOLU_MIZAN])
+        monkeypatch.setattr(mizan, "get_conn", sahte)
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN) == {}
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN)["191"]
+
+    def test_db_hatasi_cachelenmez(self, monkeypatch):
+        sahte = _SahteBaglanti([RuntimeError("anlik baglanti hatasi"), DOLU_MIZAN])
+        monkeypatch.setattr(mizan, "get_conn", sahte)
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN) == {}
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN)["191"]
+
+    def test_sure_dolunca_yeniden_okunur(self, monkeypatch):
+        guncel = [("191.01.00020", "191", "Guncellenmis ad")]
+        sahte = _SahteBaglanti([DOLU_MIZAN, guncel])
+        monkeypatch.setattr(mizan, "get_conn", sahte)
+        monkeypatch.setattr(mizan, "MIZAN_CACHE_SURESI_SANIYE", 0)
+        mizan.get_alt_kirilimlar(TEST_TENANT_VKN)
+        assert mizan.get_alt_kirilimlar(TEST_TENANT_VKN)["191"] == [("191.01.00020", "Guncellenmis ad")]
+        assert sahte.cagri_sayisi == 2
+
+
 @requires_postgres
 class TestGetAltKirilimlarDB:
     def test_dosya_yoksa_bos_dict_doner_exception_firlamaz(self, tenant_mizan_db):
