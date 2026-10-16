@@ -1,39 +1,5 @@
 # Dış Ekip API Kullanımı — `POST /fatura/isle`
 
-> **Tür:** reference — kesin teknik başvuru, kodla birebir senkron olmalı.
-> **Uygulayan:** [`entegrasyon/app.py`](../../app.py) (`FaturaIsleIstegi`,
-> `FaturaIsleCevabi`), çıktı şeması
-> [`model_eval/core/disa_aktarim.py`](../../../model_eval/core/disa_aktarim.py)
->
-> ✅ **Uygulandı** (2026-09-30, dış ekip isteğiyle): İstek boyutu sınırı
-> 10 MB'dan **30 MB**'a yükseltildi (`docker/docker-compose.yml`'de
-> `MAX_REQUEST_BYTES` env var'ı eklendi, `.env`'e `MAX_REQUEST_BYTES=31457280`
-> yazıldı — container rebuild gerektirmez, sadece yeniden başlatma; gerçek
-> istekle doğrulandı: 20 MB geçti, 35 MB `413` ile reddedildi). `413` satırı
-> güncellendi.
->
-> ✅ **Düzeltildi** (2026-09-30, teslim paketi son kontrolünde bulundu): `413`
-> satırına sayısal limit eklendi — önceden sadece "boyut sınırı aşıldı"
-> yazıyordu, dış ekip hangi boyuttan sonra reddedileceğini bilmiyordu.
->
-> ✅ **Doğrulandı** (2026-08-05): Bu belge, önceden ayrı duran
-> `model_eval/docs/reference/dis-ekip-kayit-semasi.md`'nin içeriğiyle
-> BİRLEŞTİRİLDİ (dış ekibe tek dosya olarak teslim edilmesi için, kullanıcı
-> kararı) — `records[]` şemasının tam detayı ve `account_code_reason` üretim
-> kuralları artık §3.1'de. İki belge de `entegrasyon/app.py`'nin bu tarihteki
-> hâliyle satır satır karşılaştırılıp güncellendi.
->
-> ✅ **Uygulandı** (2026-09-28): Onboard edilmemiş `satici_vkn` artık `404`
-> ile reddediliyor (`entegrasyon/app.py::_fatura_isle_ic`,
-> `model_eval/core/db.py::tenant_kayitli_mi`). §2.1 ve hata tablosu
-> güncellendi.
->
-> ✅ **Doğrulandı** (2026-08-04): `GET /durum`, `GET /kayitli-sirketler`,
-> `POST /fatura/onayla` eklendi, `dosya_adi` alanı ve VKN-onboarding notu
-> eklendi. Önceki "2026-07-27 Doğrulandı" damgası bu tarihe kadar bayat
-> kalmıştı (kod 4 gün içinde değişti, belge değişmedi) — bkz. kök CLAUDE.MD
-> §1 "kritik değişiklik sonrası docs güncelleme aynı görevin parçasıdır" kuralı.
-
 Bu belge, muhasebe kaydı üretmek isteyen dış ekibin bilmesi gereken **tek
 kaynaktır** — API sözleşmesi ve çıktı şemasının tam detayı bir aradadır.
 Servis, e-fatura XML'ini alıp muhasebe kayıtlarını (`records[]`) döner.
@@ -47,24 +13,17 @@ Servis, e-fatura XML'ini alıp muhasebe kayıtlarını (`records[]`) döner.
 | **Biz (backend)** | `POST /fatura/isle` — fatura XML → muhasebe kaydı (`dis_sema`) |
 | **Dış ekip (frontend)** | Kullanıcı arayüzü, dosya yükleme, sonucun gösterimi |
 
-> ✅ **Netleştirildi** (2026-07-27, kullanıcı kararı): Arayüzü dış ekip
-> yazacak; biz yalnızca backend'i teslim ediyoruz.
-
 **Çağrı şekli: sunucu-sunucu.** Dış ekibin backend'i bizim API'yi çağırır;
 istek tarayıcıdan **gelmez**. Bu yüzden CORS yapılandırması **bilinçli olarak
 yapılmamıştır** — tarayıcıdan doğrudan `fetch` denenirse preflight `405` döner
 ve istek başarısız olur. Mimari değişip tarayıcıdan çağrı gerekirse haber
 verin; `CORSMiddleware` eklenmesi gerekir.
 
-`entegrasyon/static/index.html` bizim **kendi manuel test arayüzümüzdür** —
-teslim kapsamında değildir, referans olarak kullanılmamalıdır.
-
 > ⚠️ **Arayüzü yazarken:** Fatura alanları (kalem adı, tedarikçi unvanı, not
 > alanı) **güvenilmeyen veridir** — faturayı gönderen dış taraf yazmıştır ve
 > HTML/script içerebilir. Bunları DOM'a basarken escape edin (`textContent`,
 > React/Vue'nun varsayılan escape'i) — `innerHTML` ile ham basmak XSS'e yol
-> açar. Bizim test arayüzümüzde bu açık **mevcuttur** (yalnızca yerel
-> kullanım olduğu için kabul edilmiştir); onu kopyalamayın.
+> açar.
 
 ## 1. Endpoint'ler
 
@@ -73,6 +32,8 @@ GET  http://<host>:8100/durum              — sağlık kontrolü
 GET  http://<host>:8100/kayitli-sirketler  — bilinen VKN listesi (bkz. §2.1)
 POST http://<host>:8100/fatura/isle        — asıl tahmin (bu belgenin konusu)
 POST http://<host>:8100/fatura/onayla      — tahmini kalıcı kayıt/RAG'a al (§7)
+POST http://<host>:8100/musteri/onboard    — çok şirketli zip ile yeni şirket kur (§9, ayrı yetki ister)
+GET  http://<host>:8100/musteri/isler/{id} — onboarding ilerlemesi (§9)
 ```
 
 > ⚠️ **Gerçek adres henüz iletilmedi.** `<host>` bir yer tutucudur — dağıtım
@@ -99,25 +60,11 @@ Her anahtar belirli şirket(ler) adına işlem yapmaya yetkilidir:
 Anahtar iptal edilirse istekler `401` döner; yeni anahtar için bizimle
 iletişime geçin.
 
-> ✅ **Uygulandı** (2026-09-28): Önceki tek paylaşılan token
-> (`EFATURA_API_TOKEN`) ve onun geçici olarak devre dışı bırakılması
-> kaldırıldı; yerine şirkete bağlı API anahtarları geldi
-> (`entegrasyon/auth.py::require_api_key`, `entegrasyon/api_anahtarlari.py`).
-> İstek/cevap gövdeleri değişmedi — sadece başlıktaki değer ve yeni `403`.
->
-> ✅ **Uygulandı** (2026-10-01, kullanıcı kararı — TODO'daki açık soru
-> netleşti): Anahtarı **biz üretiriz**, dış ekip kendi anahtarını üretip
-> bize bildirmez. Kapsam birimi tek bir şirket değil, **mali müşavirdir**:
-> her müşaviri temsil eden istemciye BİR anahtar üretilir ve o müşavirin
-> yönettiği tüm VKN'ler o anahtara yetkili kılınır. Müşavirin yeni bir
-> müşterisi (şirketi) bize onboard edildiğinde anahtar iptal edilip yeniden
-> üretilmez — `entegrasyon/api_anahtari_yonet.py vkn-ekle --etiket <müşavir>
-> --vkn <yeni-vkn>` (`api_anahtarlari.py::anahtar_vkn_ekle`) ile mevcut
-> anahtarın VKN listesi genişletilir, **anahtarın kendi değeri değişmez** —
-> dış ekip zaten sakladığı anahtarı güncellemek zorunda kalmaz. Her yeni
-> kurulumda (yeni müşavir ya da müşavirin yeni müşterisi) ilgili anahtar
-> değeri dış ekibe ayrı/güvenli bir kanaldan iletilir/teyit edilir. Test:
-> `entegrasyon/tests/test_api_anahtarlari_db.py::test_vkn_ekle_*`.
+**Anahtar modeli:** Anahtarı **biz üretiriz** (kendi anahtarınızı üretip bize bildirmezsiniz). Kapsam birimi tek bir şirket
+değil, **mali müşavirdir**: her müşaviri temsil eden istemciye bir anahtar verilir ve o müşavirin yönettiği tüm VKN'ler o
+anahtara yetkili olur. Müşavirin yeni bir müşterisi sisteme eklendiğinde anahtar iptal edilip yeniden üretilmez; mevcut
+anahtarın VKN listesi genişletilir ve **anahtarın değeri değişmez** — elinizdeki anahtarı güncellemeniz gerekmez. Anahtar
+değerleri size her zaman ayrı ve güvenli bir kanaldan iletilir.
 
 ## 2. İstek gövdesi
 
@@ -125,7 +72,7 @@ iletişime geçin.
 |---|---|---|---|
 | `fatura_xml` | string | **Evet** | UBL-TR fatura XML'inin tamamı (ham metin) |
 | `satici_vkn` | string | **Evet** | **Kendi şirketinizin VKN'si** — aşağıya bakın |
-| `satici_nace_kodlari` | string[] | Hayır | Satıcının NACE kodları; yalnızca outbox'ta kullanılır. Noktalı (`"25.40.04"`) veya noktasız (`"254004"`) gönderilebilir — Mcp_mimarisi 2026-07-28'den beri ikisini de aynı koda normalize ediyor (bkz. `Mcp_mimarisi/docs/reference/nace-kdv-excel-yapisi.md`) |
+| `satici_nace_kodlari` | string[] | Hayır | Satıcının NACE kodları; yalnızca outbox'ta kullanılır. Noktalı (`"25.40.04"`) veya noktasız (`"254004"`) gönderilebilir — sistem ikisini de aynı koda normalize eder |
 | `onay` | boolean | Hayır | Uyarıya rağmen devam; **outbox'ta gerekebilir** (§4) |
 | `kur_secimi` | string | Hayır | `"orijinal"` \| `"tl"` — TL dışı faturalarda (§5) |
 | `dosya_adi` | string | Hayır | Yüklenen XML dosyasının orijinal adı. Sadece izleme/loglama amaçlı — işleme mantığını etkilemez, boş bırakılabilir |
@@ -146,10 +93,6 @@ VKN'lerin bizim tarafımızda önceden onboard edildiğini gösterir.**
 > iletişime geçip onboard edilmesini isteyin; hangi VKN'lerin hazır
 > olduğunu bu endpoint'ten görebilirsiniz.
 >
-> Önceden bu durumda hata dönmüyordu, ama şirketin kayıtları kendi izole
-> alanı yerine ortak bir alana yazılabiliyordu. Bu yüzden istek artık
-> baştan reddediliyor.
->
 > Onboard edilmiş ama **mizanı henüz yüklenmemiş** bir şirket ise hata
 > almaz, sonuç kalitesi düşer: sistem sadece 3 haneli TDHP ana kodunu
 > üretir, alt kırılım (muavin hesap) çözülemez ve `account_code_reason` bunu
@@ -165,7 +108,7 @@ VKN'lerin bizim tarafımızda önceden onboard edildiğini gösterir.**
 ### En basit istek
 
 ```bash
-curl -X POST http://localhost:8100/fatura/isle \
+curl -X POST http://<host>:8100/fatura/isle \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $API_ANAHTARI" \
   -d '{
@@ -183,7 +126,7 @@ with open("fatura.xml", encoding="utf-8") as f:
     xml = f.read()
 
 r = requests.post(
-    "http://localhost:8100/fatura/isle",
+    "http://<host>:8100/fatura/isle",
     headers={"Authorization": f"Bearer {os.environ['API_ANAHTARI']}"},
     json={"fatura_xml": xml, "satici_vkn": "0460351893", "onay": True},
     timeout=600,          # LLM çağrısı 10-30 sn sürer, cömert timeout verin
@@ -213,7 +156,8 @@ kayitlar = cevap["tdhp_tahmini"]["dis_sema"]   # ← istediğiniz JSON
       "account_description": "TİMSAN VINÇ VE MÜHENDISLIK SANAYİ TİCARET LTD",
       "account_code_reason": "Karşı taraf unvanı mizandaki '...' kaydıyla eşleşti (isim benzerliği %100); aynı cari hesap kullanıldı.",
       "amount": 58319.2,
-      "debit_credit": "BORÇ"
+      "debit_credit": "BORÇ",
+      "onerilen_yeni_kod": null
     }
   ],
   "success": true,
@@ -238,7 +182,7 @@ kayitlar = cevap["tdhp_tahmini"]["dis_sema"]   # ← istediğiniz JSON
 
 - `customer` / `supplier` — **yöne göre** yerleşir. outbox'ta karşı taraf
   `customer`, inbox'ta `supplier` olur. Kendi tarafınızda yalnızca `id` dolu,
-  `name` boş string (fatura XML'i kendi unvanınızı taşımıyor — parser yalnızca
+  `name` boş string (fatura XML'i kendi unvanınızı taşımıyor — sistem yalnızca
   karşı tarafı tutuyor).
 - `success` — tahmin hatasız tamamlandıysa `true`.
 - `file_path` — şu an **her zaman boş string**; servis ham XML alıyor, dosya
@@ -247,33 +191,22 @@ kayitlar = cevap["tdhp_tahmini"]["dis_sema"]   # ← istediğiniz JSON
 
 ### 3.1 `records[]` — tam şema ve üretim kuralları
 
-> **Uygulayan:** [`model_eval/core/disa_aktarim.py`](../../../model_eval/core/disa_aktarim.py),
-> [`model_eval/core/single.py::_entry_dicts_uygula`](../../../model_eval/core/single.py)
->
-> ✅ **Uygulandı** (2026-07-27): Sözleşme kodda uygulandı ve test edildi
-> (`model_eval/tests/test_disa_aktarim.py`, 21 test). **Canlı doğrulama:**
-> gerçek bir fatura (`AKA2025000000001`) `POST /fatura/isle` ile işlendi;
-> `records[]` alan kümesi karşı tarafın örnek JSON'uyla birebir eşleşti.
+Bu bölüm, cevabınızdaki `records[]` öğelerinin tam şemasını ve alanların nasıl üretildiğini tanımlar.
 
-Dış ekip, muhasebe kayıtlarını kendi alan adlarıyla istiyor. `model_eval`'ın
-iç şeması (`entries[]`) farklı — bu bölüm iki şema arasındaki **tek yönlü**
-dönüşümü tanımlar.
+> **Not:** `onerilen_yeni_kod` (7. alan) sonradan eklendi. Mevcut 6 alan değişmedi — bu **geriye dönük uyumlu bir
+> ekleme**dir; bilinmeyen alanları yok sayan bir entegrasyon çalışmaya devam eder.
 
-**İç şema neden değişmedi:** `entries[]` ve `dc="Borc"/"Alacak"` değerlerine
-200+ test, ChromaDB RAG kayıtları ve `model_eval_sonuclar` tablosu bağlı. İç
-şemayı değiştirmek bunların hepsini kırardı. Bunun yerine dışa aktarımda tek
-yönlü dönüşüm yapılır: **iç şema serbest kalır, dış sözleşme sabitlenir.**
-
-Her `records[]` öğesi **tam olarak** şu 6 alanı taşır — eksik veya fazla alan yok:
+Her `records[]` öğesi **tam olarak** şu 7 alanı taşır — eksik veya fazla alan yok:
 
 | Alan | Tip | Açıklama |
 |---|---|---|
 | `account_code` | string | TDHP hesap kodu, alt kırılımlı (`"191.01.00020"`). Alt kırılım çözülemezse 3 haneli kalır (`"320"`). |
-| `account_code_type` | string | `"C"` = cari hesap, `"G"` = diğer. Ana kod `CARI_HESAP_KODLARI` (120/320/340/440/159/420) içindeyse `C`. |
+| `account_code_type` | string | `"C"` = cari hesap, `"G"` = diğer. Ana kod 120/320/340/440/159/420'den biriyse `C`. |
 | `account_description` | string | Mizandaki HESAP ADI (`"%20 İndirilecek KDV"`). Bilinmiyorsa **boş string** — `null` değil. |
 | `account_code_reason` | string | Kodun neden seçildiği. **Asla boş kalmaz.** |
 | `amount` | number | Tutar — dönüşümde değiştirilmez. |
 | `debit_credit` | string | `"BORÇ"` / `"ALACAK"` (iç şemadaki `"Borc"`/`"Alacak"`ın karşılığı). |
+| `onerilen_yeni_kod` | string veya `null` | Alt kırılım hiç çözülemediğinde (`account_code` 3 haneli kaldığında) mizanla **çakışmayan** yeni bir alt kod önerisi (ör. `"320.01.00967"`). Çözülemediyse veya çözüldüyse `null`. **Bu bir öneridir, mizana hiçbir şey yazılmaz** — kullanılıp kullanılmayacağına her zaman muhasebeci karar vermeli (`success`/`account_code_reason` zaten bu kayıtların kontrol gerektirdiğini işaret eder). |
 
 Örnek:
 
@@ -290,54 +223,44 @@ Her `records[]` öğesi **tam olarak** şu 6 alanı taşır — eksik veya fazla
 
 #### `account_code_reason` nasıl üretilir?
 
-**Deterministik üretilir — LLM'e sorulmaz** (kullanıcı kararı, 2026-07-27).
-Modele "bu kodu neden seçtin" diye sormak *post-hoc rasyonalizasyon* riski
-taşır — model kodu bir sebeple seçip tamamen başka bir sebep yazabilir.
-Gerekçe, kodun gerçekten nereden geldiğinin izinden (`secim_kaynagi`) türetilir:
+**Deterministik üretilir — yapay zekâ modeline sorulmaz.** Modele "bu kodu neden seçtin" diye sormak
+*sonradan gerekçe uydurma* riski taşır — model bir kodu bir sebeple seçip tamamen başka bir sebep yazabilir.
+Gerekçe, kodun gerçekte nasıl seçildiğinden türetilir:
 
-| Durum (`secim_kaynagi.kaynak`) | Üretilen gerekçe |
+| Durum | Üretilen gerekçe |
 |---|---|
-| `"fuzzy"` | "Karşı taraf unvanı mizandaki '…' kaydıyla eşleşti (isim benzerliği %N); aynı cari hesap kullanıldı." |
-| `"llm"` + `oran_duzeltildi=True` | "Hesap türü geçmiş emsal faturalara göre seçildi; alt kırılım, faturadaki gerçek KDV oranına göre … olarak düzeltildi." |
-| `"llm"` + `emsal_sayisi>0` | "Aynı tedarikçi/müşteri ile yapılan N geçmiş benzer faturada kullanılan hesap kırılımı esas alındı." |
-| `"llm"` (emsalsiz) | "Faturadaki kalem açıklaması ve mizandaki alt kırılım adları eşleştirilerek seçildi." |
-| Kod 3 hanede kaldı + `uyari` var | "… için mizanda eşleşen alt kırılım (cari kart) bulunamadı; ana hesap kodunda bırakıldı — yeni müşteri/tedarikçi olabilir." |
-| Kod 3 hanede kaldı, uyarı yok | "… ana hesap kodu kullanıldı; mizanda bu kod için seçilebilecek bir alt kırılım bulunamadı." |
-| İz yok | "Faturadaki kalem bilgisi ile mizandaki hesap planı eşleştirilerek seçildi." |
+| Karşı taraf adı mizandaki bir kayıtla eşleşti | "Karşı taraf unvanı mizandaki '…' kaydıyla eşleşti (isim benzerliği %N); aynı cari hesap kullanıldı." |
+| Alt kırılım, faturadaki gerçek KDV oranına göre düzeltildi | "Hesap türü geçmiş emsal faturalara göre seçildi; alt kırılım, faturadaki gerçek KDV oranına göre … olarak düzeltildi." |
+| Aynı tedarikçi/müşteriyle geçmiş benzer faturalar esas alındı | "Aynı tedarikçi/müşteri ile yapılan N geçmiş benzer faturada kullanılan hesap kırılımı esas alındı." |
+| Kalem açıklaması mizandaki alt kırılım adlarıyla eşleştirildi | "Faturadaki kalem açıklaması ve mizandaki alt kırılım adları eşleştirilerek seçildi." |
+| Kod 3 hanede kaldı, karşı taraf mizanda bulunamadı | "… için mizanda eşleşen alt kırılım (cari kart) bulunamadı; ana hesap kodunda bırakıldı — yeni müşteri/tedarikçi olabilir." |
+| Kod 3 hanede kaldı, başka uyarı yok | "… ana hesap kodu kullanıldı; mizanda bu kod için seçilebilecek bir alt kırılım bulunamadı." |
+| Başka bilgi yok | "Faturadaki kalem bilgisi ile mizandaki hesap planı eşleştirilerek seçildi." |
 
 #### `uyari` alanının dış şemadaki karşılığı
 
-Dış şemada ayrı bir uyarı alanı **yok**. İç şemadaki `uyari` (karşı taraf
-mizanda bulunamadı) bilgisi kaybolmasın diye gerekçenin sonuna `UYARI: …`
-olarak eklenir. Gerekçe zaten bu durumu anlatıyorsa (3 hanede kalma
+Cevapta ayrı bir uyarı alanı **yok**. Uyarılar (örn. karşı taraf mizanda bulunamadı) kaybolmasın diye
+gerekçenin sonuna `UYARI: …` olarak eklenir. Gerekçe zaten bu durumu anlatıyorsa (3 hanede kalma
 senaryosu) **tekrar eklenmez.**
 
-#### Değişmez kurallar (backend tarafında — bilgi amaçlı)
+#### Garantiler
 
-1. İç şema (`entries[]`, `dc="Borc"/"Alacak"`) değiştirilmez; dönüşüm yalnızca
-   `core/disa_aktarim.py`'de yapılır.
-2. Dönüşüm `amount` ve `account_code` değerlerini değiştirmez — sadece alan
-   adlarını çevirir ve türetilmiş alanları ekler.
-3. `account_description` bilinmiyorsa boş string döner, `null` değil — tip
-   tutarlılığına güvenebilirsiniz.
+1. Her kayıtta yukarıdaki 7 alan **her zaman** bulunur.
+2. `amount` ve `account_code` değerleri, hesaplanan muhasebe kaydıyla birebir aynıdır; yalnızca alan adları sizin
+   sözleşmenize çevrilir.
+3. `account_description` bilinmiyorsa boş string döner, `null` değil — tip tutarlılığına güvenebilirsiniz.
 
 #### Bilinen sınır
 
-`emsal_sayisi` parametresi şu an backend'den **geçirilmiyor** (varsayılan
-`0`), çünkü RAG'ın kaç emsal kullandığı bilgisi tahmin çıktısında dönmüyor.
-Bu yüzden "N geçmiş benzer faturada kullanılan…" gerekçesi henüz üretilmiyor;
-onun yerine emsalsiz LLM gerekçesi yazılıyor.
+"Aynı tedarikçi/müşteriyle N geçmiş benzer faturada kullanılan…" gerekçesi şu an üretilmiyor
+(kaç emsal kullanıldığı bilgisi tahmin çıktısında bulunmuyor); onun yerine "kalem açıklaması mizandaki alt kırılım
+adlarıyla eşleştirildi" gerekçesi yazılır.
 
 ## 4. Önemli: outbox faturalarda iki adımlı akış
 
-> ✅ **Uygulandı** (2026-07-28): Aşağıdaki akış `entegrasyon/app.py::fatura_isle`
-> ile birebir doğrulandı. `devam_etsin` koşulu tam olarak burada anlatılan iki
-> dalı üretir; `genel_karar` değeri
-> `Mcp_mimarisi/src/efatura_kdv/kalem_nace_esleme.py::SatirKararTuru`'dan gelir
-> ve Faz 1'de **bilerek sadece iki değer** vardır (`uygun` /
-> `insan_incelemesi_gerekli`) — kesin `uyumsuz` bu fazda hiç üretilmez.
-> İnbox faturalarda `asama` doğrudan `tdhp_tahmini_tamamlandi` döner (ayrı bir
-> "atlandı" aşama değeri **yoktur**, sadece `mesaj` alanı farklılaşır).
+Ön filtre kararı (`on_filtre_sonucu.genel_karar`) şimdilik yalnızca iki değer alır: `uygun` ve
+`insan_incelemesi_gerekli`; kesin "uyumsuz" kararı üretilmez. İnbox faturalarda `asama` doğrudan
+`tdhp_tahmini_tamamlandi` döner (ayrı bir "atlandı" aşaması **yoktur**, yalnızca `mesaj` alanı farklıdır).
 
 Bu, entegrasyonda en çok kafa karıştıran davranıştır.
 
@@ -400,11 +323,11 @@ davranışı §7'de).**
 | 401 | API anahtarı yok, geçersiz veya iptal edilmiş |
 | 403 | Anahtarın `satici_vkn` adına işlem yetkisi yok |
 | 404 | `satici_vkn` için onboard edilmiş şirket yok (bkz. §2.1) |
-| 413 | İstek/XML boyut sınırı aşıldı — **30 MB** (`MAX_REQUEST_BYTES`, `entegrasyon/security.py`; dış ekip isteğiyle 2026-09-30'da 10 MB'dan yükseltildi) |
+| 413 | İstek/XML boyut sınırı aşıldı — **30 MB** |
 | 422 | İstek şeması geçersiz veya tahmin onaylanabilir değil |
-| 502 | Ön filtreleme servisi (Mcp_mimarisi) erişilemiyor |
+| 502 | Ön filtreleme servisi erişilemiyor |
 
-`model_eval` hazır değilse `/fatura/isle` **200 döner**, `asama` alanı
+Hesaplama modülü hazır değilse `/fatura/isle` **200 döner**, `asama` alanı
 `"model_eval_hazir_degil"` olur (bkz. §4 karar ağacı) — bu, `/fatura/onayla`
 davranışından farklıdır, o gerçek bir `501` döner (§7).
 
@@ -458,8 +381,85 @@ Cevap:
 Bulunmayan tahmin `404`; süresi dolan, daha önce onaylanan veya eş zamanlı
 onaylanan tahmin `409`; doğrulamadan geçmeyen tahmin `422` döner.
 
-## 8. İlgili belgeler
+## 9. `POST /musteri/onboard` — çok şirketli zip ile yeni şirket kurma
 
-- Sistem mimarisi (neden iki aşamalı):
-  [`../../../../mimari.md`](../../../../mimari.md)
-- Canlı OpenAPI şeması: `http://localhost:8100/openapi.json`
+**Yetki:** Yalnızca **onboard yetkisi** verilmiş anahtarlar kullanabilir; yetkisiz anahtar `403` alır.
+Yetkiyi sizin vermeniz mümkün değildir, bizden talep edilir: mevcut anahtarınıza yetki eklenir (anahtarınız
+**değişmez**) ya da size yetkili yeni bir anahtar ayrı ve güvenli bir kanaldan iletilir. Anahtarınızda yetki
+olup olmadığını zip göndermeden test edebilirsiniz — yanlış gövdeyle çağırın: `400` ("Gövde bir zip dosyası
+değil") yetkiniz var, `403` yetkiniz yok demektir. Başarılı kurulumda yeni şirketin VKN'si anahtarınızın
+kapsamına **otomatik eklenir**.
+
+**İstek:** gövde, ham zip (`Content-Type: application/zip`). Boyut sınırı **200 MB**
+(`ONBOARD_MAX_ZIP_BYTES`; bu uç nokta için genel 30 MB sınırından bağımsız).
+
+```bash
+curl -X POST http://<host>:8100/musteri/onboard \
+  -H "Authorization: Bearer $API_ANAHTARI" -H "Content-Type: application/zip" \
+  --data-binary @yukleme.zip
+```
+
+**Zip yapısı** — kökte her şirket için bir klasör (klasör adı = 10 haneli VKN). Tek bir
+sarmalayıcı klasör (macOS "Sıkıştır" gibi) tolere edilir:
+
+```
+yukleme.zip
+├── 6677889900/
+│   ├── mizan.xlsx            (zorunlu)
+│   ├── faturalar/*.xml       (zorunlu — dosya adı önemsiz, fatura no XML'den okunur)
+│   ├── yevmiye.xlsx          (zorunlu — ya da yevmiye.csv)
+│   └── nace.txt              (opsiyonel)
+└── 1122334455/ ...
+```
+
+Dosya adları **tam olarak** böyle olmalı (büyük/küçük harf fark etmez). Formatlar:
+[`ONBOARDING-VERI-FORMATI.md`](ONBOARDING-VERI-FORMATI.md). Başka dosyalar
+yok sayılır (cevapta `atlanan_dosya` olarak sayılır); `<10 haneli VKN>` olmayan klasörler
+`gecersiz_klasorler`'de listelenir.
+
+**Cevap `202`** (işlem arka planda, şirketler sırayla kurulur):
+
+```json
+{"is_id": "bb45...", "durum": "kuyrukta", "sirketler": ["1122334455", "6677889900"],
+ "atlanan_dosya": 0, "gecersiz_klasorler": []}
+```
+
+**İlerleme:** `GET /musteri/isler/{is_id}` (aynı anahtar; başka anahtarın işi `404` döner):
+
+```json
+{"is_id": "bb45...", "durum": "calisiyor", "yuzde": 63,
+ "sirketler": {
+   "6677889900": {"durum": "kuruldu", "yuzde": 100, "adim": "rag", "ayrinti": null,
+                  "ozet": {"mizan_satir_sayisi": 21, "fatura_eslesme": "2/2", "yon_belirsiz": 0}},
+   "1122334455": {"durum": "calisiyor", "yuzde": 25, "adim": "sema", "ayrinti": null, "ozet": null}}}
+```
+
+`durum` (iş): `kuyrukta` → `calisiyor` → `bitti`. Şirket durumları: `bekliyor`, `calisiyor`,
+`kuruldu`, `atlandi` (zaten kurulu), `hata` (nedeni `ayrinti`'de; diğer şirketler yine işlenir).
+
+**İlerleme yüzdesi:** `yuzde` (0–100) işin genel ilerlemesidir; şirketlerin yüzdelerinin ortalamasıdır. Her şirketin
+kendi `yuzde` ve `adim` değeri vardır: `sema` (25) → `mizan` (50) → `eslestirme` (75) → `rag` (100). Yüzde **basamaklıdır**
+(adımlar bitince artar); özellikle `eslestirme`'den `rag`'a geçerken fatura sayısı çoksa uzun süre aynı değerde kalabilir,
+bu takılma değildir. `kuruldu` ve `atlandi` şirketler 100'dür; `hata` veren şirketin `yuzde`/`adim` değeri **hatanın hangi
+adımda olduğunu** gösterir (iş genel yüzdesinde o şirket işlenmiş sayılır). İş `bitti` olunca `yuzde` 100'dür.
+
+**Kurallar:**
+- **Mevcut şirket atlanır, üzerine yazılmaz.** Güncelleme bu uç noktadan yapılamaz.
+  Tek istisna: aynı anahtarın daha önce başlatıp **yarım bıraktığı** kurulum yeniden yüklenince tamamlanır.
+- Şirket başına hata diğerlerini durdurmaz. `kuruldu` ama `ayrinti` doluysa şirket kuruldu
+  fakat anahtar kapsamına eklenemedi — bize bildirin.
+- Gönderdiğiniz ham veri iş bitince **sunucudan silinir**; yalnızca kurulum sonucu kalır.
+- Aynı anda en fazla 5 bekleyen iş; fazlası `429`.
+
+| Kod | Anlamı |
+|---|---|
+| 400 | Zip değil/bozuk, güvensiz yol (`../`), zip bomb şüphesi, parola korumalı, işlenecek şirket klasörü yok |
+| 401 | Anahtar yok/geçersiz |
+| 403 | Anahtarın onboard yetkisi yok |
+| 404 | (`/musteri/isler/…`) iş yok ya da başka anahtara ait |
+| 413 | Zip 200 MB sınırını aşıyor |
+| 429 | Çok fazla bekleyen iş |
+
+## 10. İlgili belgeler
+
+- Canlı OpenAPI şeması: `http://<host>:8100/openapi.json`

@@ -3,10 +3,32 @@
 Yeni bir şirketi sisteme eklerken (onboarding) bizden **3 zorunlu, 1
 opsiyonel dosya** istenir. Bu belge her birinin kesin formatını tanımlar.
 
+## 0. Nasıl gönderilir — tek zip, `POST /musteri/onboard`
+
+Birden fazla şirketi **tek bir zip** ile gönderebilirsiniz (uç nokta, yetki ve cevap
+ayrıntıları: `API-KAYIT-SEMASI-REFERANS.md` §9). Zip'in kökünde her şirket için bir klasör
+bulunur; **klasör adı şirketin 10 haneli VKN'sidir**, dosya adları **tam olarak** aşağıdaki gibi olmalıdır:
+
+```
+yukleme.zip
+├── 6677889900/              ← şirketin VKN'si
+│   ├── mizan.xlsx           (zorunlu, §3)
+│   ├── faturalar/           (zorunlu, §2)
+│   │   ├── 0001.xml  ...    (dosya adı önemsiz)
+│   ├── yevmiye.xlsx         (zorunlu, §4 — ya da yevmiye.csv)
+│   └── nace.txt             (opsiyonel, §5)
+└── 1122334455/ ...
+```
+
+- Bu yolla gönderilen şirketler **yeni** olmalıdır. Sistemde zaten kayıtlı bir VKN gelirse
+  **atlanır, mevcut verisi değiştirilmez** (cevapta `atlandi` görürsünüz).
+- Bir şirkette hata olursa diğerleri yine işlenir; hata nedeni şirket bazında döner.
+- Bu uç nokta için API anahtarınıza **onboard yetkisi** ayrıca verilir.
+
 ## 1. VKN
 
-Şirketin kendi vergi kimlik numarası (10 hane, sadece rakam). Diğer üç
-dosyayla birlikte, ayrıca bildirilir.
+Şirketin kendi vergi kimlik numarası (10 hane, sadece rakam). Zip ile gönderirken
+VKN, şirket klasörünün adıdır (§0); ayrıca bir dosya gerekmez.
 
 ## 2. Fatura geçmişi — XML
 
