@@ -127,7 +127,7 @@ curl -H "Authorization: Bearer $API_ANAHTARI" \
 
 **İlerleme yüzdesi:** `yuzde` (0–100) işin genel ilerlemesidir (şirketlerin ortalaması); her şirketin de kendi `yuzde` ve
 `adim` değeri vardır: `sema` (25) → `mizan` (50) → `eslestirme` (75) → `rag` (100). Yüzde **basamaklıdır**: bir adım bitince
-artar, fatura sayısı çoksa son adımlarda uzun süre aynı değerde kalabilir (takılma değildir). `kuruldu` ve `atlandi`
+artar, fatura sayısı çoksa son adımlarda uzun süre aynı değerde kalabilir (takılma değildir). `kuruldu`, `guncellendi`, `degismedi` ve `atlandi`
 şirketler 100'dür; `hata` veren şirketin `adim` değeri hatanın hangi adımda olduğunu gösterir. İş `bitti` olunca `yuzde` 100'dür.
 
 **İşin durumu** (`durum`): `kuyrukta` → `calisiyor` → `bitti`. İş `bitti` olduğunda her şirketin nihai durumu belli olur.
@@ -139,7 +139,9 @@ artar, fatura sayısı çoksa son adımlarda uzun süre aynı değerde kalabilir
 | `bekliyor` | Sırada | Beklemeye devam edin |
 | `calisiyor` | Şu an kuruluyor | Beklemeye devam edin |
 | `kuruldu` | Şirket kuruldu, VKN anahtarınıza eklendi | `POST /fatura/isle` için hazır |
-| `atlandi` | Şirket **zaten kurulu**; hiçbir şey değiştirilmedi | Normal; mevcut şirketin verisi bu yolla güncellenemez |
+| `guncellendi` | Şirket **zaten kuruluydu**; gelen veride fark bulundu ve **yalnızca fark** uygulandı | `ozet`'te neyin değiştiğini görün |
+| `degismedi` | Şirket zaten kurulu ve gelen veri mevcutla **aynı**; hiçbir şey yazılmadı | Normal |
+| `atlandi` | Şirket kurulu ama anahtarınız **o şirket adına güncelleme yetkili değil**; hiçbir şey değiştirilmedi | Yetkiyi bizden isteyin |
 | `hata` | Bu şirket kurulamadı; nedeni `ayrinti` alanında | Düzeltip yeniden yükleyin (bkz. §6) |
 
 Şirketler **sırayla** işlenir; birinde hata olması diğerlerini durdurmaz.
@@ -153,12 +155,28 @@ artar, fatura sayısı çoksa son adımlarda uzun süre aynı değerde kalabilir
 | `yon_belirsiz` | VKN'nin ne alıcı ne satıcı olarak bulunamadığı fatura sayısı. **0'dan büyükse** klasör adındaki VKN yanlış olabilir (o faturalar öğrenmeye alınmaz) |
 | `nace_kodlari` | Kaydedilen NACE kodları (`nace.txt` verdiyseniz) |
 
+**Güncelleme sonucunda** (`guncellendi`/`degismedi`) `ozet` şu parçaları içerir (zip'te gelen parçalar için):
+
+| Parça | Alanlar |
+|---|---|
+| `nace` | `degisti` (bool), `eklenen`, `cikan` kodlar |
+| `mizan` | `eklenen`, `degisen`, `silinen` hesap sayıları, `uygulandi` (bool), `toplam`; koruma devreye girdiyse `uyari` |
+| `rag` | `yeni`, `degisen`, `ayni` emsal sayıları, `taranan`, `fatura_eslesme`, `yon_belirsiz` |
+| `degisiklik_var` | Herhangi bir parçada değişiklik uygulandı mı (bool) |
+
 `kuruldu` bir şirketin sonucunda `ayrinti` doluysa, şirket kurulmuş ancak anahtar kapsamına eklenememiştir; bize bildirin.
 
 ## 5. Önemli kurallar
 
-- **Mevcut şirket asla değiştirilmez.** Zaten sistemde kayıtlı bir VKN gönderirseniz `atlandi` olur, verisi olduğu gibi kalır.
-  Bu uç nokta yalnızca **yeni** şirket kurmak içindir.
+- **Kayıtlı şirket güncellenir, ama yalnızca fark uygulanır.** Zaten sistemde kayıtlı bir VKN gönderirseniz (ve anahtarınız o şirket adına yetkiliyse)
+  gelen veri mevcutla karşılaştırılır: **aynıysa hiçbir şey yazılmaz** (`degismedi`), **farklıysa yalnızca değişen kısım güncellenir** (`guncellendi`);
+  eski değer ve güncellenme zamanı sistemde kayıt altında tutulur. Anahtarınız o şirket adına yetkili değilse `atlandi` olur, verisi olduğu gibi kalır.
+- **Güncellemede yalnızca değişen dosyaları gönderebilirsiniz.** Örneğin yalnızca yeni bir `mizan.xlsx` ya da yalnızca `nace.txt`; ya da `faturalar/*.xml` +
+  `yevmiye.xlsx` (bu ikisi **birlikte** olmalı). Zip'te olmayan parçaya dokunulmaz. Kayıtlı şirkette üç dosyanın hepsi zorunlu **değildir**.
+- **Mizan tam hesap planı sayılır:** yeni hesap eklenir, adı değişen güncellenir, dosyada artık olmayan hesap **silinir** (eski değeri kayıtta kalır). Dosya boşsa ya da
+  mevcut hesapların yarısından fazlası silinecekse, eksik dosya şüphesiyle mizan **değiştirilmez** ve cevapta `uyari` döner.
+- **Emsaller (faturalar + yevmiye):** yeni faturalar eklenir, hesap kaydı/karşı tarafı değişenler güncellenir, aynı olana dokunulmaz; dosyada olmayan emsal silinmez.
+- **NACE:** `nace.txt` yoksa dokunulmaz; nokta/boşluk farkı değişiklik sayılmaz.
 - **Verileriniz iş bitince sunucudan silinir.** Yüklediğiniz ham dosyalar kurulum sonrası saklanmaz; yalnızca kurulum sonucu kalır.
 - **Sadece sizin işiniz görünür.** Başka bir anahtarın `is_id`'sini sorgularsanız `404` alırsınız.
 - **Aynı anda en fazla 5 bekleyen iş** kabul edilir; fazlası `429` döner.
@@ -180,7 +198,7 @@ artar, fatura sayısı çoksa son adımlarda uzun süre aynı değerde kalabilir
 
 **Bir şirket `hata` verdiyse:** `ayrinti` nedeni söyler (örn. eksik dosya, bozuk mizan). Düzeltip **aynı zip'i
 (ya da yalnızca hatalı şirketi içeren yeni bir zip'i) aynı anahtarla yeniden gönderin.** Daha önce `kuruldu` olan şirketler
-`atlandi` olarak geçilir, hata veren şirket yeniden kurulur (kurulum tekrarlanabilir şekilde tasarlandı); yani tüm zip'i yeniden göndermek güvenlidir.
+`degismedi` olarak geçilir, hata veren şirket yeniden işlenir (kurulum tekrarlanabilir şekilde tasarlandı); yani tüm zip'i yeniden göndermek güvenlidir.
 
 **İş yarıda kalırsa:** sistem iş sürerken yeniden başlarsa, bitmemiş şirketler `hata` ("iş yarıda kaldı") olarak işaretlenir;
 zip'i yeniden yükleyin.

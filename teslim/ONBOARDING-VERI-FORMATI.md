@@ -20,8 +20,11 @@ yukleme.zip
 └── 1122334455/ ...
 ```
 
-- Bu yolla gönderilen şirketler **yeni** olmalıdır. Sistemde zaten kayıtlı bir VKN gelirse
-  **atlanır, mevcut verisi değiştirilmez** (cevapta `atlandi` görürsünüz).
+- **Yeni şirket:** üç zorunlu dosya (mizan, faturalar, yevmiye) gerekir; `nace.txt` isteğe bağlıdır.
+- **Kayıtlı şirket (güncelleme):** Sistemde zaten kayıtlı bir VKN gelirse (ve anahtarınız o şirket adına yetkiliyse) gelen veri mevcutla
+  **karşılaştırılır — aynıysa hiçbir şey yazılmaz, farklıysa yalnızca değişen kısım güncellenir**; eski değer ve güncellenme zamanı sistemde
+  kayıt altında tutulur. Güncellemede yalnızca değişen dosyaları gönderebilirsiniz (örn. sadece `mizan.xlsx`); `faturalar/` ile `yevmiye` birlikte gelmeli.
+  Anahtarınız o şirket adına yetkili değilse şirket `atlandi` olur, verisi değişmez.
 - Bir şirkette hata olursa diğerleri yine işlenir; hata nedeni şirket bazında döner.
 - Bu uç nokta için API anahtarınıza **onboard yetkisi** ayrıca verilir.
 

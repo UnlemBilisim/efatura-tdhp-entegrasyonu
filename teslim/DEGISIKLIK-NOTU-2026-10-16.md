@@ -1,14 +1,16 @@
 # Güncelleme — 2026-10-16
 
 Bir önceki pakete (2026-10-06) göre **ne yeni**. Bu not yalnızca farkı özetler; ayrıntı ilgili belgelerdedir.
-**Mevcut entegrasyonunuzu bozan hiçbir değişiklik yoktur.**
+**Mevcut `/fatura/isle` entegrasyonunuzu bozan bir değişiklik yoktur.** (Zip ile şirket yükleme akışında kayıtlı VKN davranışı değişti, bkz. §2.)
 
 ## Yeni belge
 
 | Dosya | Durum |
 |---|---|
 | `FATURA-ISLEME-KILAVUZU.md` | **YENİ** — fatura işlemenin baştan sona anlatımı: tek fatura, paralel istekler ve toplu (zip) gönderim |
-| `API-KAYIT-SEMASI-REFERANS.md` | **Güncellendi** — yeni §10 (toplu fatura işleme), uç nokta listesi |
+| `API-KAYIT-SEMASI-REFERANS.md` | **Güncellendi** — yeni §10 (toplu fatura işleme), §9'da kayıtlı şirket güncelleme kuralları |
+| `MUSTERI-ONBOARD-ZIP-KILAVUZU.md` | **Güncellendi** — `guncellendi` / `degismedi` durumları, kısmi güncelleme |
+| `ONBOARDING-VERI-FORMATI.md` | **Güncellendi** — §0: yeni şirket ve kayıtlı şirket güncelleme farkı |
 
 ## 1. YENİ: Birden fazla faturayı tek zip ile işleme
 
@@ -24,7 +26,21 @@ yönetmeniz gerekmez.
 - **Onaylama otomatik yapılmaz.** Toplu işte üretilen tahminler `POST /fatura/onayla` için **24 saat** (tek istekte 30 dakika) saklanır.
 - Gönderdiğiniz ham XML'ler iş bitince sunucudan silinir; sonuçlar 14 gün saklanır.
 
-## 2. Paralel tek istekler hakkında açıklama
+## 2. DEĞİŞİKLİK: Kayıtlı şirket artık zip ile GÜNCELLENEBİLİR
+
+Önceki paketteki davranış değişti: zip'te **zaten kayıtlı bir VKN** geldiğinde artık `atlandi` olmaz (anahtarınız o şirket adına yetkiliyse).
+Gelen veri sistemdeki mevcut veriyle **karşılaştırılır**:
+
+- **Aynıysa hiçbir şey yazılmaz** → şirket sonucu `degismedi`.
+- **Fark varsa yalnızca değişen kısım güncellenir** → `guncellendi` (`ozet` neyin değiştiğini söyler); eski değer ve güncellenme zamanı sistemde kayıt altında tutulur.
+- Anahtarınız o şirket adına yetkili değilse `atlandi` (başka müşavirin verisi korunur).
+- **Zip'te yalnızca değişen dosyaları gönderebilirsiniz** (örn. sadece yeni `mizan.xlsx` ya da sadece `nace.txt`); `faturalar/*.xml` ile `yevmiye` birlikte gelmeli.
+- **Mizan tam hesap planı sayılır:** dosyada artık olmayan hesap silinir (eski değeri kayıtta kalır). Dosya boşsa ya da mevcut hesapların yarısından fazlası
+  silinecekse eksik dosya şüphesiyle mizan **değiştirilmez** ve cevapta `uyari` döner. Emsaller (faturalar + yevmiye) yalnızca eklenir/güncellenir, **silinmez**.
+
+Ayrıntı: `MUSTERI-ONBOARD-ZIP-KILAVUZU.md` (§4, §5) ve `ONBOARDING-VERI-FORMATI.md` §0. Yeni şirket kurma davranışı değişmedi.
+
+## 3. Paralel tek istekler hakkında açıklama
 
 `POST /fatura/isle` aynı anda birden fazla kez çağrılabilir (bu daha önce de böyleydi, belgelenmemişti): sunucu aynı anda **en fazla 2** faturayı işler,
 fazlası **sırada bekler** (reddedilmez, `429` yoktur). Bu yüzden zaman aşımınızı en az **600 saniye** tutun; aynı anda 4–5'ten fazla paralel istek
