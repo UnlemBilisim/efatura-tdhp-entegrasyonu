@@ -12,6 +12,10 @@ MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", str(10 * 1024 * 1024
 # uç nokta diske akıtırken gerçek bayt sayısını kendisi sayar (musteri_onboard_api.py).
 ONBOARD_YOLU = "/musteri/onboard"
 ONBOARD_MAX_ZIP_BYTES = int(os.environ.get("ONBOARD_MAX_ZIP_BYTES", str(200 * 1024 * 1024)))
+# Toplu fatura işleme zip'i (2026-10-16): aynı akış mantığı, kendi sınırı.
+TOPLU_YOLU = "/fatura/toplu-isle"
+TOPLU_MAX_ZIP_BYTES = int(os.environ.get("TOPLU_MAX_ZIP_BYTES", str(200 * 1024 * 1024)))
+AKIS_YOLLARI = {ONBOARD_YOLU: ONBOARD_MAX_ZIP_BYTES, TOPLU_YOLU: TOPLU_MAX_ZIP_BYTES}
 
 
 class SecurityMiddleware:
@@ -27,8 +31,8 @@ class SecurityMiddleware:
             content_length = int(headers.get(b"content-length", b"0"))
         except ValueError:
             content_length = 0
-        akis_yolu = scope.get("method") == "POST" and scope.get("path") == ONBOARD_YOLU
-        sinir = ONBOARD_MAX_ZIP_BYTES if akis_yolu else MAX_REQUEST_BYTES
+        akis_yolu = scope.get("method") == "POST" and scope.get("path") in AKIS_YOLLARI
+        sinir = AKIS_YOLLARI[scope["path"]] if akis_yolu else MAX_REQUEST_BYTES
         if content_length > sinir:
             response = JSONResponse(
                 {"detail": "Istek govdesi izin verilen boyutu asiyor."},

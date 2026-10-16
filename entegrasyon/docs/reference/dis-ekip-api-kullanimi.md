@@ -74,6 +74,8 @@ GET  http://<host>:8100/kayitli-sirketler  — bilinen VKN listesi (bkz. §2.1)
 POST http://<host>:8100/fatura/isle        — asıl tahmin (bu belgenin konusu)
 POST http://<host>:8100/fatura/onayla      — tahmini kalıcı kayıt/RAG'a al (§7)
 POST http://<host>:8100/musteri/onboard    — çok şirketli zip ile yeni şirket kur (§9, ayrı yetki ister)
+POST http://<host>:8100/fatura/toplu-isle  — birden fazla faturayı zip ile işle (§10)
+GET  http://<host>:8100/fatura/toplu/{id}  — toplu işin ilerlemesi/özeti (§10)
 GET  http://<host>:8100/musteri/isler/{id} — onboarding ilerlemesi (§9)
 ```
 
@@ -554,6 +556,48 @@ adımda olduğunu** gösterir (iş genel yüzdesinde o şirket işlenmiş sayıl
 | 404 | (`/musteri/isler/…`) iş yok ya da başka anahtara ait |
 | 413 | Zip 200 MB sınırını aşıyor |
 | 429 | Çok fazla bekleyen iş |
+
+> ✅ **Uygulandı** (2026-10-16, kullanıcı isteği — dış ekip birden fazla faturayı dosya olarak ve paralel göndermek istedi): `entegrasyon/toplu_fatura_api.py`
+> (`toplu_isle`, `toplu_is_durumu`, `toplu_sonuclar`, `faturalari_cikar`, `TopluCalisan`). Her fatura `entegrasyon/app.py::_toplu_islem` üzerinden **aynı iç
+> fonksiyondan** (`_fatura_isle_ic`) ve aynı eşzamanlılık sınırından (`fatura_isle_sirasi`) geçer. Toplu işçi sayısı `TOPLU_ISCI_SAYISI`
+> (varsayılan `MAX_ESZAMANLI_ISLEM - 1`, en az 1). Bekleyen tahmin süresi bağlam değişkeniyle uzatılır
+> (`model_eval_koprusu.py::tahmin_ttl_ayarla`, `TOPLU_TAHMIN_TTL_DAKIKA`, varsayılan 1440). Testler: `entegrasyon/tests/test_toplu_fatura.py`
+> (zip güvenliği, devam etme, yetki/kayıt, sayfalama, TTL bağlantısı). Gerçek LLM ile uçtan uca **henüz denenmedi**.
+
+## 10. `POST /fatura/toplu-isle` — toplu fatura işleme (zip)
+
+Birden fazla faturayı **tek zip** ile gönderirsiniz; her fatura tek-fatura uç noktasıyla (`POST /fatura/isle`) aynı hattan geçer,
+işlem arka planda yürür. Adım adım kullanım, örnek kod ve sonuç yorumlama: `FATURA-ISLEME-KILAVUZU.md`.
+
+| | |
+|---|---|
+| `POST /fatura/toplu-isle` | Gövde: ham zip (`Content-Type: application/zip`). Cevap `202` + `is_id` |
+| `GET /fatura/toplu/{is_id}` | Özet: `durum`, `yuzde`, `toplam`, `tamamlanan`, `sayilar`, fatura bazında kısa sonuç (sayfalı) |
+| `GET /fatura/toplu/{is_id}/sonuclar` | Fatura bazında **tam** sonuç (`cevap` = tek-fatura cevabının aynısı, `records[]` dahil), sayfalı |
+
+**Sorgu parametreleri (yükleme):** `satici_vkn` (10 hane; verilirse zip'teki tüm `.xml` dosyaları o şirketin faturasıdır, klasör düzeni
+önemsizdir; verilmezse kökte `<10 haneli VKN>/` klasörleri beklenir — çok şirketli), `onay` (`true`: satış faturasında KDV oranı uyarısına rağmen
+devam), `kur_secimi` (`orijinal`/`tl`: döviz faturaları). `onay`/`kur_secimi` zip'teki **tüm** faturalara uygulanır; verilmezse ilgili faturalar
+`onay_bekliyor`/`kur_bekliyor` sonucuyla biter (hata değildir).
+
+**Sonuç kategorileri** (`sonuc`): `hazir` (`tdhp_tahmini_tamamlandi`), `onaysiz` (`tdhp_dogrulama_basarisiz`), `onay_bekliyor`, `kur_bekliyor`,
+`hata` (fatura işlenemedi; `hata` + `http_durum` alanları). `?sonuc=` ile süzülür; `?sayfa=&boyut=` ile sayfalanır.
+
+**Kurallar:** Yetki, kuyruğa girmeden doğrulanır — zip'teki **her VKN** anahtara yetkili olmalı (`403`) ve kayıtlı olmalı (`404`); biri tutmazsa hiçbir
+fatura işlenmez. Sınırlar: zip ≤ 200 MB, ≤ 2000 fatura, tek XML ≤ 30 MB, aynı anda ≤ 5 bekleyen iş (`429`). Bozuk bir fatura yalnızca kendi satırını `hata`
+yapar. Onay (`POST /fatura/onayla`) otomatik yapılmaz; toplu işte üretilen tahminler **24 saat** onaylanabilir (tek istekte 30 dakika). Ham XML'ler iş
+bitince silinir, sonuçlar 14 gün saklanır. Uygulama yeniden başlarsa iş kaldığı yerden devam eder. Başka anahtarın işi `404` döner.
+
+| Kod | Anlamı |
+|---|---|
+| 400 | Zip değil/bozuk, güvensiz yol, parolalı, içinde `.xml` yok, fatura sayısı/boyut sınırı aşıldı |
+| 401 / 403 / 404 | Anahtar geçersiz / VKN'ye yetkisiz / şirket kayıtlı değil ya da iş yok |
+| 413 | Zip 200 MB sınırını aşıyor |
+| 422 | `satici_vkn` 10 hane değil ya da `kur_secimi` geçersiz |
+| 429 | Çok fazla bekleyen toplu iş |
+
+**Paralel tek istekler:** `POST /fatura/isle` aynı anda birden çok kez çağrılabilir; sunucu aynı anda en fazla **2** faturayı işler, fazlası **sırada
+bekler** (reddedilmez). Zaman aşımı ≥ 600 sn olmalı; yüzlerce fatura için toplu yol önerilir.
 
 ## 8. İlgili belgeler
 

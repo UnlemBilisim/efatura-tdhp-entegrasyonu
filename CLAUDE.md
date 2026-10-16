@@ -127,6 +127,16 @@ indeksini de güncelle.
 > olduğu için 2026-09-30'daki host testlerinde görülmemişti). Düzeltme:
 > `Mcp_mimarisi/alembic/env.py` sürücüyü açıkça `postgresql+psycopg2://` yapıyor.
 
+> ✅ **Uygulandı** (2026-10-16, kullanıcı isteği — dış ekip birden fazla faturayı dosya olarak ve paralel göndermek istedi): **toplu fatura işleme** —
+> `POST /fatura/toplu-isle` (zip, `satici_vkn` ya da `<vkn>/` klasörleri), `GET /fatura/toplu/{id}` ve `.../sonuclar`
+> (`entegrasyon/toplu_fatura_api.py`; sözleşme `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` §10, dış ekip kılavuzu
+> `teslim/FATURA-ISLEME-KILAVUZU.md`). Her fatura **tek-fatura ile aynı iç fonksiyondan ve aynı eşzamanlılık sınırından** geçer
+> (`app.py::_toplu_islem`); iş mantığı çoğaltılmadı. Kararlar: yetki kuyruğa girmeden doğrulanır (zip'teki her VKN yetkili+kayıtlı olmalı, aksi halde hiçbir
+> şey işlenmez); `onay`/`kur_secimi` tüm faturalara uygulanır (verilmezse ilgili faturalar `onay_bekliyor`/`kur_bekliyor` ile biter); **onaylama otomatik değil**
+> (insan kararı) ama toplu tahminler 24 saat (tek istekte 30 dk) onaylanabilir; iş sürerken yeniden başlama kaldığı yerden devam eder; ham XML iş bitince
+> silinir, sonuçlar 14 gün saklanır. Paralel tek istekler zaten desteklenir (en çok 2 aynı anda, fazlası **sırada bekler**, reddedilmez). Her HTTP isteği ayrıca
+> hata mesajıyla tek JSON satırı loglanır (`entegrasyon/istek_gunlugu.py`) ve Mac'te `izleme/panel.py` ile izlenir. **Gerçek LLM ile uçtan uca denenmedi.**
+
 ## Çalıştırmak için gerekenler (sık atlanan)
 
 > ✅ **Uygulandı** (2026-09-28, kullanıcı kararı): `baslat.sh` kaldırıldı,

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 import api_anahtarlari
@@ -24,6 +24,7 @@ def _token_parmak_izi(token: str) -> str:
 
 
 def require_api_key(
+    request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Security(_bearer),
 ) -> IstemciKimligi:
     supplied = credentials.credentials if credentials and credentials.scheme.lower() == "bearer" else ""
@@ -41,6 +42,8 @@ def require_api_key(
     if kimlik is None:
         _logger.warning("AUTH REDDEDILDI — token_parmak_izi=%s", _token_parmak_izi(supplied))
         raise _yetkisiz()
+    # İstek günlüğü (istek_gunlugu.py) hangi anahtarın çağırdığını loglayabilsin diye — yalnızca ETİKET, anahtar değil.
+    request.state.istemci = kimlik.etiket
     return kimlik
 
 

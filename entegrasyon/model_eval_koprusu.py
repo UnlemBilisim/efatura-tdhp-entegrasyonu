@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+import contextvars
 import hashlib
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -251,8 +252,23 @@ def faturayi_onayla(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict, onaylandi
     rag_common.upsert_approved_invoice(collection, invoice, tdhp_tahmini.get("entries", []))
 
 
+_tahmin_ttl_dakika: contextvars.ContextVar = contextvars.ContextVar("tahmin_ttl_dakika", default=30)
+
+
+def tahmin_ttl_ayarla(dakika: int):
+    """Bu bağlamda (iş parçacığı/istek) kaydedilen bekleyen tahminlerin onay süresini değiştirir (varsayılan 30 dk).
+    Toplu fatura işi uzun sürdüğü için erken biten faturaların onay süresi dolmasın diye uzun süre verir.
+    Dönen token ile `tahmin_ttl_sifirla(token)` çağrılmalıdır."""
+    return _tahmin_ttl_dakika.set(dakika)
+
+
+def tahmin_ttl_sifirla(token) -> None:
+    _tahmin_ttl_dakika.reset(token)
+
+
 def bekleyen_tahmin_kaydet(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict) -> str:
-    """Sunucunun urettigi tahmini 30 dakika sureyle onay bekleyen depoya yazar."""
+    """Sunucunun urettigi tahmini onay bekleyen depoya yazar (varsayilan 30 dakika sureyle;
+    toplu islerde `tahmin_ttl_ayarla` ile uzatilabilir)."""
     model_eval_yolunu_ekle()
     from psycopg2.extras import Json
     from core.db import get_conn
@@ -260,7 +276,7 @@ def bekleyen_tahmin_kaydet(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict) ->
     prediction_id = str(uuid.uuid4())
     invoice_id = str(tdhp_tahmini.get("invoice_id") or "?")
     invoice_hash = hashlib.sha256(fatura_xml.encode("utf-8")).hexdigest()
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=_tahmin_ttl_dakika.get())
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(

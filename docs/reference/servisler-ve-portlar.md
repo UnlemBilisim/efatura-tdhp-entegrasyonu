@@ -63,6 +63,12 @@ HTTPS ile verilmelidir.
 | `MAX_REQUEST_BYTES` | `10485760` | iki HTTP middleware'i | 10 MB toplam istek sınırı uygulanır |
 | `ONBOARD_MAX_ZIP_BYTES` | `209715200` | `entegrasyon/security.py` | Yalnızca `POST /musteri/onboard` için 200 MB (gövde belleğe alınmaz, diske akıtılır) |
 | `ONBOARD_DATA_DIR` | sistem geçici dizini (compose: `/app/data/onboarding`) | `entegrasyon/musteri_onboard_api.py` | Onboarding iş durumu ve "yarım kurulum" kayıtları; compose'ta `efatura-onboarding` volume'ü |
+| `TOPLU_MAX_ZIP_BYTES` | `209715200` | `entegrasyon/security.py` | `POST /fatura/toplu-isle` zip sınırı (200 MB; gövde belleğe alınmaz) |
+| `TOPLU_MAX_FATURA` | `2000` | `entegrasyon/toplu_fatura_api.py` | Bir zip'teki en çok fatura sayısı |
+| `TOPLU_ISCI_SAYISI` | `max(1, MAX_ESZAMANLI_ISLEM - 1)` | `entegrasyon/toplu_fatura_api.py` | Toplu işte aynı anda işlenen fatura (bir yuva tek istekler için boş kalır) |
+| `TOPLU_TAHMIN_TTL_DAKIKA` | `1440` | `entegrasyon/toplu_fatura_api.py` | Toplu işte üretilen tahminlerin onay süresi (tek istekte 30 dk) |
+| `TOPLU_SAKLAMA_GUN` | `14` | `entegrasyon/toplu_fatura_api.py` | Bitmiş toplu iş sonuçlarının saklama süresi |
+| `MAX_ESZAMANLI_ISLEM` | `2` | `entegrasyon/es_zamanli_sinir.py` | Aynı anda işlenen fatura sayısı (tek + toplu paylaşır); fazlası sırada bekler |
 | `ONBOARD_MAX_ACILMIS_BYTES` | `1073741824` | `entegrasyon/musteri_onboard_api.py` | Zip'in açılmış toplam boyut sınırı (zip bomb koruması) |
 
 > ✅ **Uygulandı** (2026-09-28): `EFATURA_API_TOKEN` env değişkeni
@@ -204,3 +210,8 @@ docker compose logs -f app | grep -A 45 "DIŞ EKİP JSON"
 > ile otomatik; yetki `api_anahtari_yonet.py onboard-yetkisi --etiket <e>`). `docker/Dockerfile`
 > artık `scripts/musteri_onboard_toplu.py`'yi imaja kopyalıyor ve `app` servisi
 > `efatura-onboarding` named volume'ünü `/app/data/onboarding`'e bağlıyor.
+
+> ✅ **Uygulandı** (2026-10-16): `POST /fatura/toplu-isle`, `GET /fatura/toplu/{is_id}`, `GET /fatura/toplu/{is_id}/sonuclar` eklendi
+> (`entegrasyon/toplu_fatura_api.py`) — sözleşme: `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` §10. İş durumu ve sonuçlar
+> `ONBOARD_DATA_DIR/toplu/` altında (onboarding ile aynı `efatura-onboarding` volume'ü). Her istek ayrıca `entegrasyon.istek` logger'ıyla
+> hata mesajı dahil tek JSON satırı olarak loglanır (`entegrasyon/istek_gunlugu.py`; panel: `izleme/`).

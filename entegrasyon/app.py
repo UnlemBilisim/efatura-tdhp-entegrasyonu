@@ -55,6 +55,8 @@ from security import MAX_REQUEST_BYTES, SecurityMiddleware
 from log_ortak import RequestIdMiddleware, loglamayi_kur
 from es_zamanli_sinir import fatura_isle_sirasi
 import musteri_onboard_api
+import toplu_fatura_api
+from istek_gunlugu import IstekGunluguMiddleware
 
 from mcp_mimarisi_istemcisi import McpMimarisiErisilemezHatasi, fatura_kontrol_et
 from model_eval_koprusu import (
@@ -64,6 +66,8 @@ from model_eval_koprusu import (
     fatura_kur_bilgisi,
     model_eval_hazir_mi,
     sirket_kayitli_mi,
+    tahmin_ttl_ayarla,
+    tahmin_ttl_sifirla,
     tdhp_tahmini_yap,
 )
 from yon_tespiti import FaturaYonuBelirsizHatasi, faturayi_parse_et_ve_yonu_dogrula
@@ -87,6 +91,7 @@ app = FastAPI(
 # dahil butun sonraki islemlerden once) bir request-id atansin, boylece boyut
 # limiti reddi gibi erken donen cevaplarda bile log satirlari korele edilebilsin.
 app.add_middleware(SecurityMiddleware)
+app.add_middleware(IstekGunluguMiddleware)  # Security'nin 413'lerini de görsün; RequestId'nin İÇİNDE (request_id log'a taşınsın)
 app.add_middleware(RequestIdMiddleware)
 app.include_router(musteri_onboard_api.router)
 app.add_event_handler("startup", musteri_onboard_api.calisani_baslat)
@@ -791,3 +796,28 @@ def _log_model_eval_cevabi(tahmin: dict, sure_s: float, adim: str) -> None:
         # records[] yine kullanılabilir; zarf üretimi ayrı bir adım (bkz.
         # model_eval_koprusu.py::tdhp_tahmini_yap).
         _logger.warning("%s dis_sema YOK — records[]: %s", adim, tahmin.get("records"))
+
+
+# --- Toplu fatura işleme (toplu_fatura_api.py) -----------------------------------------------------
+# Her fatura, tek-fatura uç noktasıyla AYNI iç fonksiyondan (`_fatura_isle_ic`) ve AYNI eşzamanlılık sınırından
+# (`fatura_isle_sirasi`) geçer; iş mantığı burada çoğaltılmaz. Bağlantı burada (dosya sonunda) kurulur ki
+# toplu modül app'i import etmek zorunda kalmasın (döngüsel import olmasın).
+
+def _toplu_islem(xml: str, vkn: str, dosya_adi: str, onay, kur_secimi, gonderen: str) -> dict:
+    istek = FaturaIsleIstegi(
+        fatura_xml=xml, satici_vkn=vkn, dosya_adi=dosya_adi, onay=onay, kur_secimi=kur_secimi,
+        gonderen_kullanici=f"toplu:{gonderen}"[:200],
+    )
+    # Toplu iş uzun sürer: erken biten faturaların onay (prediction_id) süresi dolmasın diye süre uzatılır.
+    token = tahmin_ttl_ayarla(toplu_fatura_api.TAHMIN_TTL_DAKIKA)
+    try:
+        with fatura_isle_sirasi():
+            cevap = _fatura_isle_ic(istek)
+    finally:
+        tahmin_ttl_sifirla(token)
+    return cevap.model_dump(mode="json")
+
+
+toplu_fatura_api.baglan(_toplu_islem, sirket_kayitli_mi)
+app.include_router(toplu_fatura_api.router)
+app.add_event_handler("startup", toplu_fatura_api.calisani_baslat)
