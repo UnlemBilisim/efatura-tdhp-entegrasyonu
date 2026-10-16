@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>İzleme Paneli</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --bg:#f6f7f9; --kart:#fff; --yazi:#1d2330; --soluk:#667085; --cizgi:#e2e5ea; --ana:#2f5bea;
+          --ok:#12805c; --uyari:#a15c07; --hata:#b42318; --ok-bg:#e7f6ef; --uyari-bg:#fff4e0; --hata-bg:#fdecea; --kod:#f1f3f6; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14171d; --kart:#1d222b; --yazi:#e8ebf0; --soluk:#9aa4b2; --cizgi:#303744;
+          --ana:#7a9bff; --ok:#4cc79a; --uyari:#f5b95a; --hata:#ff8a80; --ok-bg:#16322a; --uyari-bg:#3a2d14; --hata-bg:#3a1f1d; --kod:#262c37; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--yazi); font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif; }
+  header { display:flex; flex-wrap:wrap; gap:12px; align-items:center; padding:14px 20px; border-bottom:1px solid var(--cizgi); background:var(--kart); }
+  h1 { font-size:17px; margin:0; } .soluk { color:var(--soluk); font-size:12px; }
+  .ayar { display:flex; gap:14px; align-items:center; margin-left:auto; flex-wrap:wrap; }
+  select, button { font:inherit; padding:5px 9px; border:1px solid var(--cizgi); border-radius:7px; background:var(--kart); color:var(--yazi); }
+  label.t { display:flex; gap:5px; align-items:center; cursor:pointer; }
+  main { padding:16px 20px 60px; max-width:1300px; margin:0 auto; }
+  #baglanti { padding:10px 14px; border-radius:8px; margin-bottom:12px; background:var(--hata-bg); color:var(--hata); display:none; font-weight:600; }
+  .kartlar { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:14px; }
+  .kart { background:var(--kart); border:1px solid var(--cizgi); border-radius:10px; padding:10px 14px; }
+  .kart b { display:block; font-size:22px; } .kart.hata b { color:var(--hata); } .kart.uyari b { color:var(--uyari); } .kart.ok b { color:var(--ok); }
+  nav { display:flex; gap:4px; margin-bottom:10px; border-bottom:1px solid var(--cizgi); }
+  nav button { border:0; border-bottom:2px solid transparent; border-radius:0; background:none; padding:8px 14px; cursor:pointer; color:var(--soluk); }
+  nav button.aktif { color:var(--yazi); border-bottom-color:var(--ana); font-weight:600; }
+  table { width:100%; border-collapse:collapse; background:var(--kart); border:1px solid var(--cizgi); border-radius:10px; overflow:hidden; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--cizgi); vertical-align:top; font-size:13px; }
+  th { background:var(--kod); font-weight:600; position:sticky; top:0; }
+  tr.satir { cursor:pointer; } tr.satir:hover { background:var(--kod); }
+  td.mono, .mono { font-family:ui-monospace,Menlo,monospace; font-size:12px; }
+  .durum { display:inline-block; min-width:38px; text-align:center; padding:1px 7px; border-radius:6px; font-weight:700; font-size:12px; }
+  .d2 { background:var(--ok-bg); color:var(--ok); } .d4 { background:var(--uyari-bg); color:var(--uyari); } .d5 { background:var(--hata-bg); color:var(--hata); }
+  .hata-metni { color:var(--hata); }
+  .bos { padding:30px; text-align:center; color:var(--soluk); background:var(--kart); border:1px solid var(--cizgi); border-radius:10px; }
+  .detay td { background:var(--kod); } pre { margin:0; white-space:pre-wrap; word-break:break-word; font:12px/1.45 ui-monospace,Menlo,monospace; }
+  .is { background:var(--kart); border:1px solid var(--cizgi); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .cubuk { height:8px; background:var(--kod); border-radius:5px; overflow:hidden; margin:6px 0 8px; } .cubuk i { display:block; height:100%; background:var(--ana); }
+  .sirket { display:grid; grid-template-columns:110px 90px 70px 1fr; gap:8px; padding:3px 0; font-size:13px; }
+  .gizli { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>İzleme Paneli</h1>
+  <span class="soluk" id="kaynak">—</span>
+  <div class="ayar">
+    <label class="t">Zaman <select id="pencere">
+      <option value="15">son 15 dk</option><option value="60" selected>son 1 saat</option>
+      <option value="360">son 6 saat</option><option value="1440">son 24 saat</option></select></label>
+    <label class="t"><input type="checkbox" id="saglik"> sağlık kontrollerini göster</label>
+    <label class="t"><input type="checkbox" id="yalnizHata"> yalnızca hatalar</label>
+    <label class="t"><input type="checkbox" id="otomatik" checked> otomatik yenile (5 sn)</label>
+    <button id="yenile">Yenile</button>
+    <span class="soluk" id="guncel"></span>
+  </div>
+</header>
+<main>
+  <div id="baglanti"></div>
+  <div class="kartlar" id="kartlar"></div>
+  <nav id="sekmeler">
+    <button data-s="istekler" class="aktif">İstekler</button>
+    <button data-s="isler">Onboarding işleri</button>
+    <button data-s="hatalar">Hata logları</button>
+    <button data-s="ham">Ham log</button>
+  </nav>
+  <section id="istekler"></section>
+  <section id="isler" class="gizli"></section>
+  <section id="hatalar" class="gizli"></section>
+  <section id="ham" class="gizli"></section>
+</main>
+<script src="/panel.js"></script>
+</body>
+</html>
