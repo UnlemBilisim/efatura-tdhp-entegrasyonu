@@ -428,9 +428,12 @@ class TestPredictSingleInvoiceAltKirilim:
 
     def test_cari_hesap_cozulemezse_uyari_eklenir(self, monkeypatch):
         """320 (cari/tedarikci) alt kirilima cozulemezse (mizanda karsi taraf
-        yok), o entry'ye 'yeni karsi taraf' uyarisi eklenir - 770 (gider) ayni
-        sekilde cozulemese bile UYARI ALMAZ (2026-07-24 kullanici karari,
-        CARI_HESAP_KODLARI)."""
+        yok), o entry'ye 'yeni karsi taraf' uyarisi eklenir. 770 (gider) de
+        ayni sekilde cozulemezse FARKLI bir metinle ('mizanda eslesen bir alt
+        kirilim bulunamadi') ama YINE uyari alir (2026-10-02 karari ile
+        genisletildi - oneri artik TUM hesap turlerinde verilir, sadece cari
+        hesaplarla sinirli degil; ayrim artik metin icerigindedir, varlik
+        degil - ayrintili test: TestYeniAltKodOnerisi)."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
         monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
@@ -446,13 +449,143 @@ class TestPredictSingleInvoiceAltKirilim:
             )
 
         by_code = {e["account_code"]: e for e in result["entries"]}
-        # 320 cari hesap, 3 haneli kaldi -> uyari OLMALI
+        # 320 cari hesap, 3 haneli kaldi -> uyari OLMALI (cari metni)
         assert by_code["320"].get("uyari") is not None
         assert "mizanda bulunamadı" in by_code["320"]["uyari"]
-        # 770 gider hesabi, 3 haneli kaldi ama cari DEGIL -> uyari OLMAMALI
-        assert by_code["770"].get("uyari") is None
+        # 770 gider hesabi, 3 haneli kaldi -> uyari OLMALI (gider metni, farkli)
+        assert by_code["770"].get("uyari") is not None
+        assert "mizanda eşleşen bir alt kırılım bulunamadı" in by_code["770"]["uyari"]
         # 191 cozuldu -> uyari yok
         assert by_code["191.05.00005"].get("uyari") is None
+
+
+class TestYeniAltKodOnerisi:
+    """_yeni_alt_kod_oner() ve _entry_dicts_uygula()'nin onerilen_yeni_kod
+    alani (2026-10-02, kullanici karari - alt kirilim hic cozulemedigi/LLM
+    emin olmadiginda mizanla CAKISMAYAN yeni bir alt kod onerilsin, tum
+    hesap turlerinde (cari+gider) ama KDV'de ORAN onerilmesin, her zaman
+    insan onayi gereksin - approvable=False zaten UNRESOLVED_COUNTERPARTY
+    ile saglaniyor, bu testler sadece oneri uretimini dogrular)."""
+
+    ALT_320 = [
+        ("320.01.00001", "Acos Makina Ltd"),
+        ("320.01.00966", "Son Cari Kart"),
+        ("320.02.00003", "Yurt Disi Musteri"),
+    ]
+    ALT_770 = [
+        ("770.01.00027", "Diger Cesitli Giderler"),
+        ("770.01.00043", "Son Gider Kalemi"),
+    ]
+    ALT_391 = [
+        ("391.01.00001", "%20 Hesaplanan KDV"),
+        ("391.02.00001", "%10 Hesaplanan KDV"),
+    ]
+
+    def test_en_yaygin_orta_kisimdan_bir_fazla_sira_onerilir(self):
+        """320'de en yaygin orta kisim '01' (2 kayit, '02' 1 kayit) -> oneri
+        '01' grubundaki en buyuk siradan (00966) bir fazlasi (00967) olmali,
+        '02' grubundan DEGIL (az kullanilan/son eklenen grup secilmemeli)."""
+        mizan = {"320": self.ALT_320}
+        onerilen = single._yeni_alt_kod_oner("320", mizan)
+        assert onerilen == "320.01.00967"
+
+    def test_tek_secenekli_ana_kod_onerisi(self):
+        mizan = {"770": self.ALT_770}
+        onerilen = single._yeni_alt_kod_oner("770", mizan)
+        assert onerilen == "770.01.00044"
+
+    def test_mizanda_hic_olmayan_ana_kod_none_doner(self):
+        """Mizanda hic secenegi olmayan bir ana kod icin (gercekten
+        tanimsiz) rastgele bir orta-kisim UYDURULMAZ, None doner."""
+        mizan = {"320": self.ALT_320}
+        assert single._yeni_alt_kod_oner("888", mizan) is None
+
+    def test_bos_mizan_none_doner(self):
+        assert single._yeni_alt_kod_oner("320", {}) is None
+        assert single._yeni_alt_kod_oner("320", None) is None
+
+    def test_cari_cozulemezse_uyaridaki_oneri_alani_dolar(self, monkeypatch):
+        """320 (cari) 3 haneli kalirsa uyariya hem onerilen_yeni_kod alani
+        hem de metin icinde oneri cumlesi eklenir."""
+        spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
+        mizan = {"320": self.ALT_320, "191": [("191.05.00005", "%20 5/10 Tevkifatli KDV")], "770": self.ALT_770}
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: mizan)
+
+        secim_response = '{"secimler": [{"ana_kod": "191", "alt_kod": "191.05.00005"}, {"ana_kod": "770", "alt_kod": "770.01.00027"}]}'
+        responses = [_balanced_response(), (secim_response, 0.2, None)]
+
+        with patch.object(single, "call_model", side_effect=responses):
+            result = single.predict_single_invoice(
+                SAMPLE_XML, model=spec, own_vkn=OWN_VKN,
+                rag=False, self_correct=False, tevkifat_hint=False, iade_hint=False,
+                alt_kirilim=True,
+            )
+
+        by_code = {e["account_code"]: e for e in result["entries"]}
+        assert by_code["320"]["onerilen_yeni_kod"] == "320.01.00967"
+        assert "320.01.00967" in by_code["320"]["uyari"]
+
+    def test_kdv_cozulemezse_oran_onerilmez(self):
+        """391 (KDV) 3 haneli kalirsa onerilen_yeni_kod alani HIC EKLENMEZ -
+        oran mevzuata bagli, sistem uyduramaz (2026-10-02 kullanici karari,
+        'tum hesap turlerinde' istisnasinin kendisi)."""
+        mizan = {"391": self.ALT_391, "191": [("191.05.00005", "%20 5/10 Tevkifatli KDV")], "770": self.ALT_770}
+
+        # SAMPLE_XML'deki 191'i 391'e cevirip test etmek yerine dogrudan
+        # _entry_dicts_uygula'yi cagirmak daha dogrudan ve acik.
+        entry_dicts = [
+            {"account_code": "391", "amount": 100.0, "dc": "Alacak"},
+        ]
+        sonuc = single._entry_dicts_uygula(entry_dicts, {}, alt_kirilimlar_tumu=mizan)
+
+        assert sonuc[0]["account_code"] == "391"
+        assert "onerilen_yeni_kod" not in sonuc[0]
+        assert "mevzuata bağlı" in sonuc[0]["uyari"]
+
+    def test_gider_cozulemezse_uyaridaki_oneri_alani_dolar(self):
+        """Gider (cari OLMAYAN, KDV OLMAYAN) bir kod 3 haneli kalirsa da
+        ayni sekilde onerilen_yeni_kod eklenir (2026-10-02 karari: 'tum
+        hesap turlerinde' cari ile sinirli degil)."""
+        mizan = {"770": self.ALT_770}
+        entry_dicts = [{"account_code": "770", "amount": 50.0, "dc": "Borc"}]
+        sonuc = single._entry_dicts_uygula(entry_dicts, {}, alt_kirilimlar_tumu=mizan)
+
+        assert sonuc[0]["onerilen_yeni_kod"] == "770.01.00044"
+        assert "770.01.00044" in sonuc[0]["uyari"]
+
+    def test_cozulen_kod_oneri_almaz(self):
+        """Alt kirilima basariyla cozulen (nokta iceren) bir kod icin hic
+        uyari/oneri eklenmez - oneri sadece 3 haneli KALAN kodlar icindir."""
+        mizan = {"770": self.ALT_770}
+        entry_dicts = [{"account_code": "770", "amount": 50.0, "dc": "Borc"}]
+        sonuc = single._entry_dicts_uygula(
+            entry_dicts, {"770": "770.01.00027"}, alt_kirilimlar_tumu=mizan
+        )
+
+        assert sonuc[0]["account_code"] == "770.01.00027"
+        assert "uyari" not in sonuc[0]
+        assert "onerilen_yeni_kod" not in sonuc[0]
+
+    def test_tevkifatli_gider_kdv_sanilmaz(self):
+        """REGRESYON (2026-10-02, canli uctan uca testte bulundu): 730 gibi
+        bir GIDER ana kodunun bazi alt kirilimlari isminde tevkifat orani
+        gecirebilir (orn. '%18 2/10 Tevkifatli Nakliye Gideri') - bu bir KDV
+        hesabi DEGIL. Eski kod `any(_kdv_orani_isimden(ad) is not None for
+        ...)` ile TEK bir eslesen isim yuzunden tum 730'u yanlislikla "KDV
+        hesabi, oran onerilmez" sanip onerilen_yeni_kod EKLEMİYORDU. Artik
+        KDV_HESAP_KODLARI (sadece 191/391) ile ayirt ediliyor - 730 gider
+        kalsa bile oneri verilmeli."""
+        mizan = {
+            "730": [
+                ("730.01.00001", "Diğer Çeşitli Giderler"),
+                ("730.02.00002", "%18 2/10 Tevkifatlı Nakliye Ve Taşımacılık Giderleri"),
+            ]
+        }
+        entry_dicts = [{"account_code": "730", "amount": 100.0, "dc": "Borc"}]
+        sonuc = single._entry_dicts_uygula(entry_dicts, {}, alt_kirilimlar_tumu=mizan)
+
+        assert "onerilen_yeni_kod" in sonuc[0]
+        assert "KDV hesabı" not in sonuc[0]["uyari"]
 
 
 class TestCariFuzzyEsleme:

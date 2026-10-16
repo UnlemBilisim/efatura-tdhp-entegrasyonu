@@ -61,6 +61,9 @@ HTTPS ile verilmelidir.
 | `OLLAMA_HOST` | `http://localhost:11434` | `model_eval/core/constants.py:10` | Varsayılana düşer (yerel) |
 | `MCP_INTERNAL_API_TOKEN` | **yok** | `Mcp_mimarisi/.../auth.py`, MCP istemcisi | Dahili endpoint'ler kapalı kalır |
 | `MAX_REQUEST_BYTES` | `10485760` | iki HTTP middleware'i | 10 MB toplam istek sınırı uygulanır |
+| `ONBOARD_MAX_ZIP_BYTES` | `209715200` | `entegrasyon/security.py` | Yalnızca `POST /musteri/onboard` için 200 MB (gövde belleğe alınmaz, diske akıtılır) |
+| `ONBOARD_DATA_DIR` | sistem geçici dizini (compose: `/app/data/onboarding`) | `entegrasyon/musteri_onboard_api.py` | Onboarding iş durumu ve "yarım kurulum" kayıtları; compose'ta `efatura-onboarding` volume'ü |
+| `ONBOARD_MAX_ACILMIS_BYTES` | `1073741824` | `entegrasyon/musteri_onboard_api.py` | Zip'in açılmış toplam boyut sınırı (zip bomb koruması) |
 
 > ✅ **Uygulandı** (2026-09-28): `EFATURA_API_TOKEN` env değişkeni
 > **kaldırıldı**. Dış API anahtarları artık `public.api_anahtarlari`
@@ -193,3 +196,11 @@ docker compose logs -f app | grep -A 45 "DIŞ EKİP JSON"
 > bu adresin yanlış olduğunu, kod dağıtımının Docker registry üzerinden
 > yapılması gerektiğini bildirdi (2026-07-29). `package.json`/`.npmrc`
 > dosyaları repoda kalıyor ama **kullanılan asıl dağıtım kanalı Docker'dır.**
+
+> ✅ **Uygulandı** (2026-10-06): `POST /musteri/onboard` ve `GET /musteri/isler/{is_id}`
+> eklendi (`entegrasyon/musteri_onboard_api.py`) — API sözleşmesi:
+> `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` §9. Anahtar tablosuna
+> `onboard_yetkisi` sütunu eklendi (`api_anahtarlari.py`, `CREATE/ALTER ... IF NOT EXISTS`
+> ile otomatik; yetki `api_anahtari_yonet.py onboard-yetkisi --etiket <e>`). `docker/Dockerfile`
+> artık `scripts/musteri_onboard_toplu.py`'yi imaja kopyalıyor ve `app` servisi
+> `efatura-onboarding` named volume'ünü `/app/data/onboarding`'e bağlıyor.

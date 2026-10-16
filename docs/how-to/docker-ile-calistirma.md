@@ -170,6 +170,12 @@ docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py \
 docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py \
   olustur --etiket dis-ekip --vkn 0460351893
 
+# Müşavire yeni şirket kurma (POST /musteri/onboard) yetkisi ver / geri al:
+docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py \
+  onboard-yetkisi --etiket dis-ekip            # --kaldir ile geri alınır
+# (ya da baştan: olustur ... --onboard-yetkisi; VKN vermeden de olur — o zaman anahtar
+#  başlangıçta hiçbir şirkete yetkili değildir, zip ile kurduğu şirketlere yetki kazanır)
+
 # Listeleme / iptal:
 docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py listele
 docker compose exec app python3 /app/entegrasyon/api_anahtari_yonet.py iptal --etiket dis-ekip

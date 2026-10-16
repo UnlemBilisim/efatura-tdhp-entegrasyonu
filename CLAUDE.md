@@ -97,6 +97,36 @@ indeksini de güncelle.
    > (`docs/how-to/docker-ile-calistirma.md` §2) ve `mizan_excel_yukle.py`
    > sessiz 0-satır okuma bug'ı (`model_eval/CLAUDE.md` 2026-09-30 notu).
 
+> ✅ **Uygulandı** (2026-10-06, kullanıcı kararı): **Çok şirketli zip ile onboarding uç
+> noktası** — dış ekip yeni şirketleri artık `POST /musteri/onboard` ile tek zip olarak
+> yükler (`entegrasyon/musteri_onboard_api.py`; sözleşme:
+> `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` §9). Asıl kurulum mantığı
+> DEĞİŞMEDİ — her şirket için `scripts/musteri_onboard_toplu.py::musteriyi_onboard_et`
+> aynen çağrılır. Kullanıcının onayladığı güvenlik kararları: (1) **mevcut şirket
+> atlanır, üzerine yazılmaz** (onboarding mizanı `TRUNCATE`'leyip yeniden yazdığı için);
+> tek istisna AYNI anahtarın yarım bıraktığı kurulum, (2) yalnızca **`onboard_yetkisi`**
+> verilmiş anahtarlar kullanabilir (`api_anahtarlari.py`, `auth.py::require_onboard_yetkisi`;
+> verme: `api_anahtari_yonet.py onboard-yetkisi`; VKN'siz, yalnızca `olustur --onboard-yetkisi`
+> ile "kapsamsız onboard anahtarı" da üretilebilir, 2026-10-06) ve başarılı kurulumda yeni VKN o
+> anahtarın kapsamına otomatik eklenir (atlanan/mevcut şirkete kapsam VERİLMEZ), (3) zip güvenli açılır (zip-slip, zip bomb, dosya
+> sayısı/boyut, izinli dosya adları) ve **200 MB** sınırı yalnızca bu yol için geçerlidir
+> (`security.py`, gövde belleğe alınmaz). İlerleme yüzdesi (2026-10-06): iş ve şirket bazında `yuzde` + şirketin `adim`ı
+> (`scripts/musteri_onboard_toplu.py::_musteriyi_onboard_et` her adımda `ilerleme(adim, yuzde)` geri çağrısını çağırır;
+> basamaklı: şema 25, mizan 50, eşleştirme 75, RAG 100). İş durumu diskte (`ONBOARD_DATA_DIR`,
+> `efatura-onboarding` volume'ü), müşteri ham verisi iş bitince silinir. Kod değişikliği
+> sonrası `docker compose build app` gerekir; `docker/Dockerfile` artık
+> `scripts/musteri_onboard_toplu.py`'yi imaja kopyalıyor. Canlı doğrulama: Docker içinde,
+> geçici veritabanıyla (`model_eval_test`) uçtan uca — mock şirket 6 sn'de kuruldu, aynı
+> zip ikinci kez `atlandi`; deneme verileri (şema, anahtarlar, ChromaDB koleksiyonu)
+> temizlendi, gerçek veritabanına yazılmadı.
+>
+> ⚠️ **Bu denemede bulunan gerçek bir bug (Docker'da onboarding hiç çalışmıyordu):**
+> imaj, alembic'in transitive bağımlılığı olarak SQLAlchemy 2.1.1 kuruyor ve 2.1'de
+> öneksiz `postgresql://` adresinin varsayılan sürücüsü psycopg2 değil psycopg (v3) oldu →
+> `alembic upgrade head` "No module named 'psycopg'" ile çöküyordu (host venv'inde 2.0.x
+> olduğu için 2026-09-30'daki host testlerinde görülmemişti). Düzeltme:
+> `Mcp_mimarisi/alembic/env.py` sürücüyü açıkça `postgresql+psycopg2://` yapıyor.
+
 ## Çalıştırmak için gerekenler (sık atlanan)
 
 > ✅ **Uygulandı** (2026-09-28, kullanıcı kararı): `baslat.sh` kaldırıldı,
@@ -123,7 +153,7 @@ istiyor — ajan açamaz, kullanıcı açmalı.
 
 ```bash
 python3 -m pytest Mcp_mimarisi/test -q          # PostgreSQL varsa 32, yoksa 28 geçer
-python3 -m pytest entegrasyon/tests -q          # 21 test
+python3 -m pytest entegrasyon/tests -q          # 61 test
 (cd model_eval && python3 -m pytest tests -q)   # 242 test
 ```
 

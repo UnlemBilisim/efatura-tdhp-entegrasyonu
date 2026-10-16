@@ -16,6 +16,14 @@ config = context.config
 # alembic.ini'ye sabit/gizli bağlantı bilgisi yazılmaz.
 _database_url = os.environ.get("DATABASE_URL")
 if _database_url:
+    # ✅ Düzeltildi (2026-10-06, Docker'da çok şirketli onboarding denenirken bulundu):
+    # SQLAlchemy 2.1'de "postgresql://" öneksiz adresin varsayılan sürücüsü psycopg2
+    # DEĞİL psycopg (v3) oldu; imaj alembic'in transitive bağımlılığı olarak SQLAlchemy'nin
+    # en yeni sürümünü (2.1.1) kurduğu için migration "No module named 'psycopg'" ile
+    # çöküyordu (host venv'inde 2.0.x olduğu için hiç görülmemişti). Sürücüyü açıkça
+    # psycopg2'ye sabitliyoruz — projenin kurduğu tek sürücü bu (requirements.txt).
+    if _database_url.startswith("postgresql://"):
+        _database_url = "postgresql+psycopg2://" + _database_url[len("postgresql://"):]
     config.set_main_option("sqlalchemy.url", _database_url)
 
 # ALEMBIC_TENANT_SCHEMA (2026-07-30, çoklu şirket geçişi): verilirse

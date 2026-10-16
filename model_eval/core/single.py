@@ -50,6 +50,20 @@ DEFAULT_MODEL_SPEC_STR = "ollama:gemma4:31b-cloud"
 # (belirsiz semantik eslesme), "yeni karsi taraf" degil.
 CARI_HESAP_KODLARI = {"120", "320", "340", "440", "159", "420"}
 
+# KDV hesaplarinin ANA kodlari (Indirilecek/Hesaplanan KDV) - 2026-10-02'de
+# bulunan bug'in duzeltmesi: _entry_dicts_uygula onceden bir ana kodun KDV
+# hesabi olup olmadigini "alt kirilim adlarindan en az biri %N deseni tasiyor
+# mu" (any(...)) ile tahmin ediyordu. Bu YANLIS - 600/602/646/649/656/679/730/
+# 770/150 gibi GIDER/GELIR hesaplarinda da tevkifat orani/iskonto gibi
+# nedenlerle isimde "%N" gecen alt kirilimlar VAR (ornek: "730.02.00002 - %18
+# 2/10 Tevkifatli Nakliye Ve Tasimacilik Giderleri" - bu bir GIDER kalemi,
+# KDV degil); gercek bir fatura ile canli testte 730 (Genel Uretim Giderleri)
+# yanlislikla "KDV hesabi, oran onerilmez" diye isaretlendi, 52 secenekten
+# sadece 2'si (%4) KDV-benzeri isimdi. TDHP'de KDV ana kodlari sabittir (191=
+# Indirilecek KDV, 391=Hesaplanan KDV) - CARI_HESAP_KODLARI ile ayni desen,
+# isim sezgisi yerine ANA KOD kumesiyle ayirt edilir.
+KDV_HESAP_KODLARI = {"191", "391"}
+
 # Cari hesap alt kirilimini karsi taraf unvanina gore ISIM BENZERLIGIYLE
 # esleme esigi (2026-07-27, kullanici karari - bkz. memory alt-kirilim-fuzzy-esleme).
 # Mizandaki unvanlarda yazim/kisaltma farki olsa bile ("San.Tic.Ltd.Sti" vs
@@ -610,15 +624,94 @@ def _entry_dicts_uygula(entry_dicts, ana_koddan_alt_koda, alt_kirilimlar_tumu=No
         iz = kod_kaynagi.get(kod)
         if iz:
             yeni_e["secim_kaynagi"] = iz
-        # 3 haneli KALDI mi (nokta yok) VE bu bir cari hesap mi?
-        if "." not in yeni_kod and yeni_kod in CARI_HESAP_KODLARI:
-            yeni_e["uyari"] = (
-                f"Karşı taraf mizanda bulunamadı — {yeni_kod} için alt kırılım "
-                "(cari kart) açılmamış olabilir, muhasebeci kontrol etmeli (yeni "
-                "müşteri/tedarikçi)."
-            )
+        # 3 haneli KALDI mi (nokta yok)? Alt kirilim hic cozulemedi demektir.
+        if "." not in yeni_kod:
+            if yeni_kod in CARI_HESAP_KODLARI:
+                yeni_e["uyari"] = (
+                    f"Karşı taraf mizanda bulunamadı — {yeni_kod} için alt kırılım "
+                    "(cari kart) açılmamış olabilir, muhasebeci kontrol etmeli (yeni "
+                    "müşteri/tedarikçi)."
+                )
+                onerilen = _yeni_alt_kod_oner(yeni_kod, alt_kirilimlar_tumu)
+                if onerilen:
+                    yeni_e["onerilen_yeni_kod"] = onerilen
+                    yeni_e["uyari"] += (
+                        f" Öneri: yeni bir cari kart açılacaksa {onerilen} boş bir "
+                        "sıra numarasıdır, mizanda çakışmaz — muhasebeci onaylarsa kullanılabilir."
+                    )
+            else:
+                kdv_orani_var_mi = yeni_kod in KDV_HESAP_KODLARI
+                yeni_e["uyari"] = (
+                    f"{yeni_kod} için mizanda eşleşen bir alt kırılım bulunamadı — "
+                    "muhasebeci kontrol etmeli."
+                )
+                if kdv_orani_var_mi:
+                    # KDV turu icin YENI ORAN icat edilmez - mevzuata aykiri bir
+                    # kod uydurmak riskli, sadece durumu bildir (2026-10-02,
+                    # kullanici karari: "tum hesap turlerinde" oneri istendi ama
+                    # KDV burada BILEREK istisna - oran mevzuata bagli, sistem
+                    # uyduramaz).
+                    yeni_e["uyari"] += (
+                        " Bu bir KDV hesabı — faturadaki oran mizanda kayıtlı "
+                        "oranlardan hiçbiriyle eşleşmiyor olabilir, yeni bir oran "
+                        "KODU ÖNERİLMEZ (mevzuata bağlı, sistem uyduramaz)."
+                    )
+                else:
+                    onerilen = _yeni_alt_kod_oner(yeni_kod, alt_kirilimlar_tumu)
+                    if onerilen:
+                        yeni_e["onerilen_yeni_kod"] = onerilen
+                        yeni_e["uyari"] += (
+                            f" Öneri: yeni bir alt kırılım açılacaksa {onerilen} boş bir "
+                            "sıra numarasıdır, mizanda çakışmaz — muhasebeci onaylarsa kullanılabilir."
+                        )
         sonuc.append(yeni_e)
     return sonuc
+
+
+def _yeni_alt_kod_oner(ana_kod, alt_kirilimlar_tumu):
+    """Bir ana kod icin mizanda MEVCUT alt kirilimlarin en buyuk sira
+    numarasindan bir fazlasini oneri olarak doner (orn. mevcut en buyuk
+    320.02.00966 ise -> 320.02.00967). Mizanin kendi gercek verisinden
+    turetildigi icin baska bir firma/islem tarafindan KULLANILMAKTA olan bir
+    kodla CAKISMAZ (2026-10-02, kullanici karari - "onerilen kod, mizanda
+    zaten kullanilmakta olan bir kodla cakismamali"). Sadece bir ONERIDIR -
+    mizana hicbir sey YAZILMAZ, kullaniciya "bu numarayi acabilirsiniz"
+    bilgisi verir; fiilen kullanilip kullanilmayacagina muhasebeci karar
+    verir (entry'deki `uyari` alani sayesinde validate_prediction bu
+    faturayi zaten approvable=False yapar, bkz. UNRESOLVED_COUNTERPARTY).
+
+    Orta kisim (orn. 320.02.xxxxx'teki "02") EN YAYGIN kullanilan grup
+    secilir - en SON eklenen kaydin orta kismi DEGIL (2026-09-30'da fark
+    edilen gercek: 120/320'de orta kisim "yurt ici"/"yurt disi" gibi anlamli
+    bir ayrim tasiyabiliyor, bkz. model_eval/CLAUDE.md "alt kategori" notu -
+    yeni, siniflandirilmamis bir karsi taraf icin en OLASI/varsayilan grubu
+    tahmin etmek, "en son hangi grup kullanildi" bilgisinden daha guvenilir).
+
+    Mizanda bu ana kod icin HIC secenek yoksa (alt kirilim grubu/orta-kisim
+    kavrami bilinmiyor) None doner - rastgele bir orta-kisim uydurulmaz."""
+    from collections import Counter
+
+    secenekler = (alt_kirilimlar_tumu or {}).get(ana_kod, [])
+    if not secenekler:
+        return None
+    orta_sayaci = Counter()
+    en_buyuk_sira_orta_bazinda = {}
+    for kod, _ad in secenekler:
+        parcalar = kod.split(".")
+        if len(parcalar) != 3:
+            continue
+        orta = parcalar[1]
+        try:
+            sira = int(parcalar[2])
+        except ValueError:
+            continue
+        orta_sayaci[orta] += 1
+        en_buyuk_sira_orta_bazinda[orta] = max(en_buyuk_sira_orta_bazinda.get(orta, 0), sira)
+    if not orta_sayaci:
+        return None
+    en_yaygin_orta = orta_sayaci.most_common(1)[0][0]
+    yeni_sira = en_buyuk_sira_orta_bazinda[en_yaygin_orta] + 1
+    return f"{ana_kod}.{en_yaygin_orta}.{yeni_sira:05d}"
 
 
 def _normalize_entries(entries):

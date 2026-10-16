@@ -3,13 +3,6 @@
 Karara bağlanmamış ya da ertelenmiş işler. Bir madde tamamlanınca buradan
 silinir, ilgili belgeye `✅ Uygulandı` notu düşülür.
 
-## Açık soru — karar bekliyor
-
-- [ ] **Dış ekibe sözleşme değişikliğini bildir** (2026-09-28): `404`
-  (onboard edilmemiş VKN), `403` (anahtarın VKN yetkisi yok), `EFATURA_API_TOKEN`
-  yerine şirkete bağlı API anahtarı. Belge:
-  `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md`.
-
 ## Doğrulama kuralı
 
 - [x] **`PAYABLE_MISMATCH` kalıcı ölçüm script'i yazıldı, gerçek veriyle
@@ -83,13 +76,96 @@ Kur her zaman **orijinal** para biriminde tutulacak (kullanıcı kararı — TL'
   21,2 GB'lık kullanılmayan disk (durmuş `vllm-edefter-core` container'ı +
   image'ı, başka bir projeye ait) kullanıcı onayıyla temizlendi.
 
-**Hâlâ eksik/kararsız:**
-- **Jev:** `.env`'e `TYPESAFE_API_KEY` eklenmesi bekleniyor — henüz teyit
-  gelmedi, test edilmedi. Veri kapsamı konuşuldu ama netleşmedi: sadece
-  unvan + aday kart adları + para birimi gitmeli, tutar/VKN gitmemeli
-  (bu bir dış bulut servisi — KVKK açısından netleşmesi gerek).
-- Üçü de hazır olunca 144 zor vakayı üçüne de koşturup karşılaştırma HENÜZ
-  yapılmadı.
+**Jev/TypeSafe — gerçek API çağrısıyla test edildi (2026-10-01):**
+- API sözleşmesi bulundu/doğrulandı: `POST https://api.typesafe.ai/v1/systemone`,
+  `Authorization: Bearer <TYPESAFE_API_KEY>`, gövde
+  `{"state", "model": "jev-latest", "questions": {"<ad>": {"type": "choice",
+  "instructions", "criteria": {kod: açıklama, ...}}}}`, cevap
+  `answers.<ad>.{choice, confidence, probabilities}` (başka bir projedeki
+  — `aktarimli-chat/packages/intent-router/` — gerçek, çalışan entegrasyondan
+  teyit edildi, uydurulmadı).
+- Küçük ölçekte (3 seçenek, gerçek mizan verisiyle: "A.E.B. Kaynak Muh San
+  Tic" unvanı) canlı test edildi — `200`, doğru kartı %99 güvenle seçti.
+- **Kritik kısıt bulundu: TypeSafe Choice API en fazla 255 seçenek kabul
+  ediyor** (`400 Too many choices. Must have at most 255 choices.`) — gerçek
+  mizanımızdaki ana cari hesaplar bunun çok üzerinde (`120`: 390, `320`: 993
+  alt kırılım). **Doğrudan tüm alt kırılım listesiyle kullanılamaz** —
+  kullanılacaksa önce bir ön-eleme adımı (örn. isim benzerliğiyle en yakın
+  N<255 adayı seçip sadece onları TypeSafe'e sormak) gerekir; bu, kullanıcı
+  kararı gerektiren bir tasarım sorusu, henüz karar verilmedi.
+- Veri kapsamı konuşuldu ama netleşmedi: sadece unvan + aday kart adları +
+  para birimi gitmeli, tutar/VKN gitmemeli (bu bir dış bulut servisi — KVKK
+  açısından netleşmesi gerek).
+- Üçü de (Jev/Ollaya/mevcut LLM) hazır olunca 144 zor vakayı üçüne de
+  koşturup karşılaştırma HENÜZ yapılmadı — Jev'in 255 kısıtı yüzünden bu
+  karşılaştırma öncesi ön-eleme kararı verilmeli.
+
+**3 haneli ANA KOD tahmini için iki-asamali (grup 1-7 → 3 haneli) pilot
+ölçüm (2026-10-02, kullanıcı önerisi — "sadece 1den 7 ye kadar tahmin
+sonra 3 haneli" — gerçek test edildi):**
+- Fikir doğru yönde: TDHP'nin 271 ana kodu tek başına hem TypeSafe'in 255
+  hem Ollaya'nın 64 sınırını aşıyor, ama ilk hane bazında 7 gruba
+  ayrıldığında en büyük grup 56 kod (2xx) — her iki servis için de rahatça
+  sığıyor. Tek bir fatura üzerinde (3 kalem: 120/600/391) İLK denemede
+  %92-99 güvenle hepsi doğru çıkmıştı.
+- **Ama n=10 gerçek faturada (36 hesap kodu kalemi, `Archive2/jsons`'dan
+  rastgele seçildi) GERÇEK doğruluk ölçüldüğünde sonuç çok daha düşük
+  çıktı: en iyi denemede %44,4 (16/36 doğru 3 haneli kod)** — mevcut
+  sistemin (n=1646, exact_pair_match %81,4) çok altında. Script:
+  `model_eval/scripts/typesafe_3haneli_pilot.py`, ham sonuç:
+  `model_eval/results/typesafe_3haneli_pilot.json`.
+- **Kök neden — her kalem için TypeSafe'e verilecek "bağlam metni" (state)
+  üretmek kendi başına zor bir problem çıktı, en az 3 ayrı iterasyonda
+  farklı sistematik hatalar bulundu:**
+  1. İlk denemede (%16,7) tüm kalemlere neredeyse aynı jenerik metin
+     verilmişti — ayırt edici bilgi olmayınca model her seferinde aynı
+     (yanlış) cevabı verdi.
+  2. İkinci denemede (%44,4, EN İYİ sonuç) kalem bazında ayırt edici
+     açıklama (vergi adı, ürün adı, karşı taraf) + **yön düzeltmesi**
+     eklendi — ground-truth JSON'daki `header.invoice_type` ("SATIS")
+     KARŞI TARAFIN fatura türüdür, BİZİM yönümüzü (alıcı mı satıcı mı)
+     göstermez; dosya adındaki `-inbox`/`-outbox` ekiyle yön açıkça
+     belirtilince 320/329 (cari borç) kalemlerindeki sistematik "yanlışlıkla
+     600 (satış geliri)" hatası büyük ölçüde düzeldi.
+  3. Üçüncü denemede (vergi/gider ayrımını daha da netleştirmeye çalışınca)
+     sonuç %30,6'ya GERİLEDİ — daha fazla açıklayıcı kelime eklemek bazı
+     kalemlerde (191 KDV) yeni karışıklıklar yarattı. Bu, prompt
+     mühendisliğinin DOĞRUSAL iyileşmediğini gösterdi — iyi niyetli bir
+     netleştirme başka bir yeri bozabiliyor.
+  - **Kalıcı sorun kalan kodlar:** 770/730 (faaliyet giderleri) ve 689
+    (diğer olağandışı gider/vergi) kalemleri üç denemede de tutarlı
+    şekilde yanlış koda (120, 180, 191 gibi) gitti — bu kalemler için
+    doğru ayırt edici açıklama henüz bulunamadı.
+- **KARAR (2026-10-02, kullanıcı kararı): TypeSafe/Jev KULLANILMAYACAK —
+  araştırma kapatıldı.** Gerekçe: iki-aşamalı Choice yöntemi teorik olarak
+  seçenek sınırını aşmanın bir yolu, ama PRATİKTE her kalem için doğru
+  "bağlam metni" üretmek, mevcut sistemin (LLM'in tüm fatura bağlamını bir
+  arada görmesi) yaptığı işin kendisi kadar karmaşık çıktı. %44,4 doğruluk,
+  mevcut sistemin %81,4'ünün çok altında kaldı — bu farkı kapatmak
+  belirsiz sayıda ek iterasyon gerektirirdi, kazanç (hız/maliyet/TypeSafe'in
+  kendi güven skoru üretmesi) bunu haklı çıkarmadı. Test script'i ve
+  `.env`'deki `TYPESAFE_API_KEY` kaldırıldı — ileride tekrar gündeme
+  gelirse bu bölümdeki bulgular (API sözleşmesi, 255 seçenek sınırı, yön
+  tespiti hatası, 3 deneme detayı) başlangıç noktası olarak kullanılabilir.
+
+**Ollaya — aynı gün gerçek testle keşfedildi, Jev'den DAHA KISITLI çıktı:**
+- Ollaya, TypeSafe ile **BİREBİR AYNI API sözleşmesini** konuşuyor —
+  `POST http://<sunucu>:11437/v1/systemone` (tünel üzerinden), aynı
+  `questions.<ad>.{type:"choice", instructions, criteria}` gövdesi, auth
+  gerektirmiyor (TypeSafe Bearer token isterken Ollaya istemiyor). Model
+  adı `"winnow"` — gerçek istekte `"model": "winnow:latest"` olarak
+  yanıtlandı. Aynı 3 seçenekli test (önce TypeSafe'de denenen) burada da
+  doğru sonucu verdi (%99,97 güven).
+- **Kritik bulgu: Ollaya'nın seçenek sınırı TypeSafe'in 255'inden ÇOK DAHA
+  DÜŞÜK — gerçek ikili aramayla tam olarak bulundu: 64 seçenek geçiyor,
+  65 geçmiyor** (`422 TOO_MANY_OPTIONS`, hata mesajı "option budget"
+  diyor — muhtemelen sabit bir SAYI değil, toplam prompt token bütçesi;
+  64 bu özel test verisiyle (320 hesabının ilk N alt kırılımı, ortalama
+  unvan uzunluğuyla) ölçülen sınır, farklı/daha uzun isimli bir kritere
+  karşı bu sayı değişebilir). Bu, gerçek mizanımızdaki `320` (993 seçenek)
+  için gereken ön-elemeyi Jev'dekinden (N<255) çok daha agresif (N<~64)
+  yapmayı gerektirir — üç yöntem karşılaştırması tasarlanırken bu ikisinin
+  AYRI ön-eleme eşikleri olması gerektiği unutulmamalı.
 - Ollaya varsayılan portu (11435) bizim SSH tünelimizle çakışıyor — Mac'te
   11436, sunucuda 11437 kullanıldı, bu geçiciydi; kalıcı bir port kararı yok.
 - (2026-09-29 sonu itibarıyla tünel ve Docker servisleri elden geçirildi,
@@ -156,6 +232,40 @@ limiti (30 MB) güncellemesi tamamlandı — bkz. `teslim/README.md`,
 
 ## Diğer
 
+- [x] **Alt kırılım hiç çözülemediğinde yeni kod önerisi eklendi**
+  (2026-10-02, kullanıcı kararı — "mizan bilgisine göre mantıklı, mizanda
+  zaten kullanılan bir kodla çakışmayan, YENİ bir alt kırılım kodu
+  önersin"). `model_eval/core/single.py::_yeni_alt_kod_oner` — mizanda en
+  yaygın kullanılan orta kısımdan (kategori) bir sonraki boş sıra
+  numarasını önerir, tüm hesap türlerinde (cari+gider), KDV hesaplarında
+  (191/391) oran mevzuata bağlı olduğu için önerilmez. Öneri sadece bir
+  bilgidir, mizana yazılmaz; `entry["uyari"]` zaten `approvable=False`
+  yaptığı için her zaman insan onayı gerektirir — canlı testte
+  `/fatura/onayla`'nın bu kaydı `422` ile reddettiği doğrulandı. Dış ekip
+  `records[]` şemasına da `onerilen_yeni_kod` alanı eklendi (geriye dönük
+  uyumlu, 6→7 alan).
+  **Canlı uçtan uca testte gerçek bir bug bulundu ve düzeltildi:** KDV
+  tespiti önceden "alt kırılım isimlerinden biri `%N` içeriyor mu" (`any`)
+  sezgisiyle yapılıyordu — tevkifatlı gider kalemleri de (örn. "%18 2/10
+  Tevkifatlı Nakliye Gideri") isminde `%N` geçirdiği için gider hesapları
+  (730 gibi, 52 alt kırılımdan sadece 2'si/%4'ü) yanlışlıkla KDV sayılıp
+  öneri almıyordu. `KDV_HESAP_KODLARI = {"191","391"}` sabit kümesiyle
+  düzeltildi. Test: `model_eval/tests/test_single.py::TestYeniAltKodOnerisi`
+  (9 test) + `test_disa_aktarim.py` (2 test). Tam paket (280 test) + ruff
+  regresyonsuz geçti.
+  **Web arayüzü de güncellendi, bu sırada İKİNCİ bir bug bulundu:**
+  `entegrasyon/static/index.html`'e "Önerilen Yeni Kod" sütunu eklendi,
+  ama `entegrasyon/app.py::KalemTahmini` (Pydantic modeli) alanı hiç
+  tanımlamadığı için sütun tarayıcıda hep BOŞ çıktı — Pydantic, modelde
+  olmayan alanları coerce sırasında sessizce düşürüyordu; `curl` ile
+  sadece `dis_sema.records[]` kontrol edilmişti (o tipsiz `dict` olduğu
+  için sorunu yaşamıyordu), `entries[]` hiç kontrol edilmemişti.
+  `KalemTahmini`'ye alan eklenip düzeltildi, `git stash` ile düzeltme
+  olmadan testin gerçekten kırıldığı kanıtlandı. Test: `entegrasyon/
+  tests/test_kalem_tahmini_semasi.py` (3 test). Tarayıcıda (Playwright)
+  uçtan uca tekrar test edilip ekran görüntüsüyle kanıtlandı. Örnek test
+  XML'i: `ornek-test-faturasi-alt-kirilim-onerisi.xml` (proje kökü).
+  Detay: `model_eval/CLAUDE.md` 2026-10-02 notu.
 - [x] **Linter (ruff) eklendi, CI'ya bağlandı** (2026-10-01). `ruff.toml`
   (proje kökü) — kasıtlı DAR kural seti (sadece `F`/pyflakes + `E9`): geniş
   kural setleriyle ilk denemede 198+ kozmetik uyarı (stil/import sıralama,

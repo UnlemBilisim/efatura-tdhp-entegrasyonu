@@ -7,6 +7,12 @@ from starlette.responses import JSONResponse
 
 MAX_REQUEST_BYTES = int(os.environ.get("MAX_REQUEST_BYTES", str(10 * 1024 * 1024)))
 
+# Çok şirketli onboarding zip'i (2026-10-06): genel sınırdan çok büyük olabilir ve belleğe
+# alınmamalı. Yalnızca bu yol için ayrı (daha yüksek) sınır; gövde ara belleğe ALINMAZ,
+# uç nokta diske akıtırken gerçek bayt sayısını kendisi sayar (musteri_onboard_api.py).
+ONBOARD_YOLU = "/musteri/onboard"
+ONBOARD_MAX_ZIP_BYTES = int(os.environ.get("ONBOARD_MAX_ZIP_BYTES", str(200 * 1024 * 1024)))
+
 
 class SecurityMiddleware:
     def __init__(self, app):
@@ -21,7 +27,9 @@ class SecurityMiddleware:
             content_length = int(headers.get(b"content-length", b"0"))
         except ValueError:
             content_length = 0
-        if content_length > MAX_REQUEST_BYTES:
+        akis_yolu = scope.get("method") == "POST" and scope.get("path") == ONBOARD_YOLU
+        sinir = ONBOARD_MAX_ZIP_BYTES if akis_yolu else MAX_REQUEST_BYTES
+        if content_length > sinir:
             response = JSONResponse(
                 {"detail": "Istek govdesi izin verilen boyutu asiyor."},
                 status_code=413,
@@ -29,7 +37,7 @@ class SecurityMiddleware:
             await response(scope, receive, send)
             return
 
-        if scope.get("method") in {"POST", "PUT", "PATCH"}:
+        if scope.get("method") in {"POST", "PUT", "PATCH"} and not akis_yolu:
             messages = []
             total = 0
             more_body = True

@@ -31,6 +31,7 @@ DIS_SEMA_ALANLARI = {
     "account_code_reason",
     "amount",
     "debit_credit",
+    "onerilen_yeni_kod",
 }
 
 
@@ -164,6 +165,21 @@ class TestSemaUyumu:
         kayit = kayitlari_disa_aktar(tahmin)[0]
         assert kayit["account_code"] == "689.01.00012"
         assert kayit["amount"] == 566.67
+
+    def test_onerilen_yeni_kod_varsa_aktarilir(self):
+        """2026-10-02: ic semadaki onerilen_yeni_kod alani dis semaya AYNEN
+        tasinir — dis ekip bunu "bu kodu acabilirsiniz" onerisi olarak
+        gosterebilsin diye."""
+        tahmin = {
+            "entries": [
+                {"account_code": "320", "dc": "Alacak", "amount": 100.0, "onerilen_yeni_kod": "320.01.00967"},
+            ]
+        }
+        assert kayitlari_disa_aktar(tahmin)[0]["onerilen_yeni_kod"] == "320.01.00967"
+
+    def test_onerilen_yeni_kod_yoksa_none(self):
+        tahmin = {"entries": [{"account_code": "191.01.00020", "dc": "Borc", "amount": 1.0}]}
+        assert kayitlari_disa_aktar(tahmin)[0]["onerilen_yeni_kod"] is None
 
 
 def _ornek_invoice(direction="inbox"):

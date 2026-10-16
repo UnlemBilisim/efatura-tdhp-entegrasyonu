@@ -569,6 +569,106 @@ bir mimari denetim geçirdi:**
 > canlı test edilmişti (bkz. 2026-09-30 mock çok-müşavirli uçtan uca test
 > notu, kök `CLAUDE.md`).
 
+> ✅ **Uygulandı (2026-10-02, kullanıcı kararı) — alt kırılım hiç
+> çözülemediğinde YENİ kod önerisi:** Önceden (2026-07-24 notu) bir ana kod
+> (ör. `320`) alt kırılıma çözülemediğinde entry'ye sadece bir `uyari`
+> ekleniyordu, kullanıcıya somut bir aksiyon önerilmiyordu. Kullanıcı
+> isteği: "mizan bilgisine göre mantıklı, mizanda zaten kullanılan bir
+> kodla çakışmayan, YENİ bir alt kırılım kodu önersin."
+>
+> Yeni `core/single.py::_yeni_alt_kod_oner(ana_kod, alt_kirilimlar_tumu)`:
+> o ana kod için mizanda **en yaygın kullanılan** orta kısmı (ör.
+> `320.XX.xxxxx`'teki `XX`) seçer — en SON eklenen kaydın orta kısmı DEĞİL,
+> çünkü 2026-09-30'da fark edildiği gibi orta kısım bazı hesaplarda
+> (120/320) anlamlı bir kategori ayrımı (yurt içi/yurt dışı gibi) taşıyabilir;
+> en yaygın grup, sınıflandırılmamış yeni bir kayıt için en olası
+> varsayılandır. O grubun en büyük sıra numarasından bir fazlasını önerir
+> (ör. mevcut en büyük `320.01.00966` → öneri `320.01.00967`) — mizanın
+> kendi gerçek verisinden türetildiği için başka bir kayıtla ÇAKIŞMAZ.
+> Mizanda o ana kod için hiç seçenek yoksa (gerçekten tanımsız bir kod)
+> `None` döner, rastgele bir orta kısım UYDURULMAZ.
+>
+> `_entry_dicts_uygula` bu öneriyi **tüm hesap türlerinde** (cari + gider/
+> stok) `entry["onerilen_yeni_kod"]` alanına ve `uyari` metnine ekler — TEK
+> istisna **KDV hesapları** (`_kdv_orani_isimden` ile tespit edilir, alt
+> kırılım adında `%N` deseni varsa): onlarda oran mevzuata bağlı olduğu için
+> yeni bir oran KODU önerilmez, sadece durum bildirilir. Öneri SADECE bir
+> bilgidir — mizana hiçbir şey yazılmaz, `entry["uyari"]` alanı zaten
+> `validate_prediction`'daki `UNRESOLVED_COUNTERPARTY` kuralıyla
+> `approvable=False` yaptığı için bu faturalar HER ZAMAN insan onayı
+> gerektirir (kullanıcı kararı — otomatik onaylanmaz).
+>
+> Test: `tests/test_single.py::TestYeniAltKodOnerisi` (8 yeni — en yaygın
+> orta kısım seçimi, tek seçenekli ana kod, mizanda hiç olmayan ana kod →
+> `None`, boş mizan güvenli, cari/gider'de `uyari`+`onerilen_yeni_kod`
+> birlikte dolması, KDV'de ASLA `onerilen_yeni_kod` eklenmemesi, çözülen
+> koda hiç dokunulmaması); mevcut
+> `TestPredictSingleInvoiceAltKirilim::test_cari_hesap_cozulemezse_uyari_eklenir`
+> güncellendi (eski beklenti "770/gider uyarı ALMAZ"dı, artık gider de
+> FARKLI bir metinle uyarı alıyor — bu davranış değişikliğinin kendisi).
+> Tüm paket (277 test) ve `ruff check` regresyonsuz geçti.
+>
+> **Dış şemaya da eklendi (aynı gün, kullanıcı kararı):**
+> `core/disa_aktarim.py::kayitlari_disa_aktar` artık `onerilen_yeni_kod`
+> alanını (`records[]` içinde, bulunamadıysa `null`) dış ekip şemasına da
+> taşıyor — 6 alanlı sözleşme 7 alana çıktı, geriye dönük uyumlu (eski
+> entegrasyon yeni alanı yoksayarak çalışmaya devam eder). Sözleşme belgesi
+> güncellendi: `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` §3.1
+> (ve senkron kopyası `teslim/API-KAYIT-SEMASI-REFERANS.md`). Test:
+> `tests/test_disa_aktarim.py` (2 yeni — alan varsa aktarılır, yoksa
+> `null`).
+>
+> **Gerçek bug, canlı uçtan uca testte bulundu (aynı gün):**
+> `_entry_dicts_uygula`'nın KDV tespiti önceden `any(_kdv_orani_isimden(ad)
+> is not None for ...)` ile yapılıyordu — "bu ana kodun alt kırılım
+> isimlerinden EN AZ BİRİ `%N` deseni taşıyor mu" sorusuydu. Bu YANLIŞ:
+> gider/gelir hesaplarında (600/602/646/649/656/679/730/770/150) tevkifat
+> oranı veya iskonto gibi nedenlerle isminde `%N` geçen alt kırılımlar da
+> var (örnek, gerçek mizanda bulundu: `730.02.00002` =
+> "%18 2/10 Tevkifatlı Nakliye Ve Taşımacılık Giderleri" — bu bir GİDER
+> kalemi, KDV değil). Canlı testte (Docker + gerçek LLM, mizanda hiç
+> olmayan bir tedarikçiyle kurgulanan fatura) `730` (Genel Üretim
+> Giderleri, 52 alt kırılımdan sadece 2'si/%4'ü KDV-benzeri isimli) bu
+> yüzden yanlışlıkla "KDV hesabı, oran önerilmez" sayılıp
+> `onerilen_yeni_kod` HİÇ eklenmedi — oysa gerçekten bir gider hesabıydı,
+> öneri alması gerekiyordu. Ölçüm: mizandaki 12 ana koddan 10'u (191/391
+> dışındakiler) bu yanlış pozitife açıktı (`150`: %2, `600`: %59, `602`:
+> %33, `610`: %100, `646`: %43, `649`: %80, `656`: %33, `679`: %62, `730`:
+> %4, `770`: %2 — bazıları çok yüksek oranda, rastgele bir örnekte bile
+> sık tetiklenirdi).
+>
+> Düzeltme: yeni `KDV_HESAP_KODLARI = {"191", "391"}` sabiti (TDHP'de
+> İndirilecek/Hesaplanan KDV ana kodları sabittir) — `CARI_HESAP_KODLARI`
+> ile aynı desen, isim sezgisi yerine ANA KOD kümesiyle ayırt edilir.
+> `kdv_orani_var_mi = yeni_kod in KDV_HESAP_KODLARI` oldu. Regresyon testi:
+> `tests/test_single.py::TestYeniAltKodOnerisi::test_tevkifatli_gider_kdv_sanilmaz`
+> (gerçek `730` alt kırılım verisiyle, düzeltme öncesi başarısız olurdu).
+> Canlı testte tekrar doğrulandı: aynı senaryo (Docker rebuild + gerçek
+> LLM çağrısı) tekrarlandığında `730` artık doğru şekilde
+> `onerilen_yeni_kod` alıyor.
+>
+> **İkinci bug, web arayüzü güncellenirken bulundu (aynı gün):**
+> `entegrasyon/static/index.html`'e `onerilen_yeni_kod` için yeni bir tablo
+> sütunu eklenip tarayıcıda canlı test edildiğinde sütun her zaman BOŞ
+> çıktı — `dis_sema.records[]` (curl ile daha önce doğrulanmıştı) doluydu
+> ama arayüzün kullandığı `tahmin.entries[]` alanı boştu. Kök neden:
+> `entegrasyon/app.py::KalemTahmini` (Pydantic modeli, `entries[]`'in HTTP
+> cevabındaki şekli) alanı hiç tanımlamıyordu —
+> `TdhpTahminiCevabi(**tahmin)` ham sözlüğü coerce ederken Pydantic
+> modelde TANIMLI OLMAYAN alanları SESSİZCE düşürüyordu. `dis_sema` ise
+> `Optional[dict]` (tipsiz, serbest sözlük) olduğu için bu sorunu hiç
+> yaşamıyordu — bu yüzden `curl` ile `dis_sema.records[]` kontrol edilince
+> sorun fark edilmemişti, iki ayrı veri yolundan biri eksikti.
+> Düzeltme: `KalemTahmini`'ye `onerilen_yeni_kod: Optional[str] = None`
+> eklendi. Test: `entegrasyon/tests/test_kalem_tahmini_semasi.py` (3 yeni —
+> alan korunur, yoksa `None`, JSON serileştirmede de kalır); düzeltme
+> olmadan gerçekten başarısız olduğu `git stash` ile doğrulandı. Tarayıcıda
+> (Playwright/browse ile) yeniden test edilip "Önerilen Yeni Kod" sütununun
+> `320.01.00967` rozetiyle göründüğü ekran görüntüsüyle kanıtlandı.
+> **Ders:** `entries[]`/`records[]` gibi iki paralel şema olan yerlerde her
+> ikisinin de canlı test edilmesi gerekiyor — biri (tipsiz `dict`) bir
+> alan kaybını maskeleyebiliyor.
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),

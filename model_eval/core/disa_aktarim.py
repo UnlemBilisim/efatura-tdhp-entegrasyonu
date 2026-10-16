@@ -107,11 +107,17 @@ def kayitlari_disa_aktar(tdhp_tahmini, emsal_sayisi=0, karsi_taraf_vkn=None):
         {"account_code": "191.01.00020", "account_code_type": "G",
          "account_description": "%20 Indirilecek KDV",
          "account_code_reason": "...", "amount": 283.33,
-         "debit_credit": "BORÇ"}
+         "debit_credit": "BORÇ", "onerilen_yeni_kod": None}
 
     `uyari` dolu olan kayitlarda uyari metni gerekcenin SONUNA eklenir -
     dis sema ayri bir uyari alani tanimlamiyor, ama bu bilgi kaybolmamali
-    (muhasebecinin elle kontrol etmesi gereken durumu isaret ediyor)."""
+    (muhasebecinin elle kontrol etmesi gereken durumu isaret ediyor).
+
+    `onerilen_yeni_kod` (2026-10-02, kullanici karari): ic semadaki ayni
+    adli alanin (core/single.py::_yeni_alt_kod_oner) AYNEN aktarimi - alt
+    kirilim hic cozulemediginde mizanla CAKISMAYAN yeni bir kod onerisi.
+    Cozulmezse yoksa None (alan HER kayitta vardir, dis ekip tip
+    tutarliligi icin - account_description ile ayni gerekce)."""
     kayitlar = []
     for e in tdhp_tahmini.get("entries") or []:
         kod = e.get("account_code")
@@ -128,6 +134,7 @@ def kayitlari_disa_aktar(tdhp_tahmini, emsal_sayisi=0, karsi_taraf_vkn=None):
                 "account_code_reason": gerekce,
                 "amount": e.get("amount"),
                 "debit_credit": DC_DIS_KARSILIGI.get(e.get("dc"), e.get("dc")),
+                "onerilen_yeni_kod": e.get("onerilen_yeni_kod"),
             }
         )
     return kayitlar

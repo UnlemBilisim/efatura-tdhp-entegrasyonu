@@ -144,3 +144,41 @@ def test_baska_sirketin_tahmini_bulunamadi_sayilir(db, monkeypatch):
 
     sirket_a_istemcisi = IstemciKimligi("a", False, frozenset({SIRKET_A}))
     assert model_eval_koprusu.bekleyen_tahmini_onayla(prediction_id, sirket_a_istemcisi) == "INV-1"
+
+
+def test_onboard_yetkisi_varsayilan_kapali_ve_acilip_kapanir(db):
+    anahtar = api_anahtarlari.anahtar_olustur("musavir", [SIRKET_A])
+    assert api_anahtarlari.anahtari_dogrula(anahtar).onboard_yetkisi is False  # sessizce yetki kazanmaz
+    assert api_anahtarlari.onboard_yetkisini_ayarla("musavir", True) is True
+    assert api_anahtarlari.anahtari_dogrula(anahtar).onboard_yetkisi is True
+    assert api_anahtarlari.onboard_yetkisini_ayarla("musavir", False) is True
+    assert api_anahtarlari.anahtari_dogrula(anahtar).onboard_yetkisi is False
+
+
+def test_onboard_yetkili_anahtar_olusturulabilir_ve_iptal_edilene_yetki_verilemez(db):
+    anahtar = api_anahtarlari.anahtar_olustur("yetkili", [SIRKET_A], onboard_yetkisi=True)
+    assert api_anahtarlari.anahtari_dogrula(anahtar).onboard_yetkisi is True
+    api_anahtarlari.anahtari_iptal_et("yetkili")
+    assert api_anahtarlari.onboard_yetkisini_ayarla("yetkili", True) is False
+    assert api_anahtarlari.onboard_yetkisini_ayarla("yok-boyle", True) is False
+
+
+def test_eski_tablo_sutunsuz_olsa_da_migration_ekler(db, monkeypatch):
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("ALTER TABLE public.api_anahtarlari DROP COLUMN onboard_yetkisi")
+        conn.commit()
+    monkeypatch.setattr(api_anahtarlari, "_tablo_hazir", False)
+    anahtar = api_anahtarlari.anahtar_olustur("eski", [SIRKET_A])  # tabloyu_hazirla → sütun geri gelir
+    assert api_anahtarlari.anahtari_dogrula(anahtar).onboard_yetkisi is False
+
+
+def test_yalniz_onboard_anahtari_baslangicta_hicbir_sirkete_yetkili_degildir(db):
+    anahtar = api_anahtarlari.anahtar_olustur("yeni-musavir", [], onboard_yetkisi=True)
+    kimlik = api_anahtarlari.anahtari_dogrula(anahtar)
+    assert kimlik.onboard_yetkisi and not kimlik.tum_sirketler and kimlik.izinli_vknler == frozenset()
+    assert not kimlik.vkn_izinli_mi(SIRKET_A)
+    # onboard ile kurduğu şirketin VKN'si sonradan kapsama eklenir; diğerleri yine yetkisiz
+    assert api_anahtarlari.anahtar_vkn_ekle("yeni-musavir", SIRKET_B) is True
+    kimlik = api_anahtarlari.anahtari_dogrula(anahtar)
+    assert kimlik.vkn_izinli_mi(SIRKET_B) and not kimlik.vkn_izinli_mi(SIRKET_A)

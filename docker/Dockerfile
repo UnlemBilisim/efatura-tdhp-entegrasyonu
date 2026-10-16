@@ -38,6 +38,8 @@ RUN pip install --no-cache-dir -r /app/model_eval/requirements.txt
 COPY Mcp_mimarisi/ /app/Mcp_mimarisi/
 COPY entegrasyon/ /app/entegrasyon/
 COPY model_eval/ /app/model_eval/
+# Çok şirketli zip onboarding uç noktası (entegrasyon/musteri_onboard_api.py) bu betiği çağırır.
+COPY scripts/musteri_onboard_toplu.py /app/scripts/musteri_onboard_toplu.py
 
 # --- Process yönetimi ---
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf

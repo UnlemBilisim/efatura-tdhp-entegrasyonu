@@ -27,6 +27,9 @@ CREATE TABLE IF NOT EXISTS public.api_anahtarlari (
     olusturulma    TIMESTAMPTZ NOT NULL DEFAULT now(),
     son_kullanim   TIMESTAMPTZ
 );
+-- 2026-10-06: müşteri (şirket) onboarding uç noktası için ayrı yetki. Mevcut
+-- anahtarlar DEFAULT FALSE ile gelir — hiçbiri sessizce onboard yetkisi kazanmaz.
+ALTER TABLE public.api_anahtarlari ADD COLUMN IF NOT EXISTS onboard_yetkisi BOOLEAN NOT NULL DEFAULT FALSE;
 """
 
 _tablo_hazir = False
@@ -37,6 +40,7 @@ class IstemciKimligi:
     etiket: str
     tum_sirketler: bool
     izinli_vknler: frozenset
+    onboard_yetkisi: bool = False
 
     def vkn_izinli_mi(self, vkn: str | None) -> bool:
         return self.tum_sirketler or (vkn in self.izinli_vknler)
@@ -72,21 +76,28 @@ def anahtari_dogrula(anahtar: str) -> IstemciKimligi | None:
             cur.execute(
                 """UPDATE public.api_anahtarlari SET son_kullanim = now()
                    WHERE anahtar_hash = %s AND aktif
-                   RETURNING etiket, tum_sirketler, izinli_vknler""",
+                   RETURNING etiket, tum_sirketler, izinli_vknler, onboard_yetkisi""",
                 (anahtar_ozeti(anahtar),),
             )
             satir = cur.fetchone()
         conn.commit()
     if satir is None:
         return None
-    etiket, tum_sirketler, izinli_vknler = satir
-    return IstemciKimligi(etiket, tum_sirketler, frozenset(izinli_vknler))
+    etiket, tum_sirketler, izinli_vknler, onboard_yetkisi = satir
+    return IstemciKimligi(etiket, tum_sirketler, frozenset(izinli_vknler), onboard_yetkisi)
 
 
-def anahtar_olustur(etiket: str, izinli_vknler: list[str], tum_sirketler: bool = False) -> str:
-    """Yeni anahtar üretip kaydeder; düz metin anahtarı SADECE burada döner."""
-    if not tum_sirketler and not izinli_vknler:
-        raise ValueError("En az bir VKN verilmeli ya da tum_sirketler=True olmalı")
+def anahtar_olustur(
+    etiket: str, izinli_vknler: list[str], tum_sirketler: bool = False, onboard_yetkisi: bool = False
+) -> str:
+    """Yeni anahtar üretip kaydeder; düz metin anahtarı SADECE burada döner.
+    `onboard_yetkisi`: anahtar `POST /musteri/onboard` ile yeni şirket kurabilir
+    (varsayılan KAPALI — bilinçli olarak verilir)."""
+    # Kapsamsız anahtar yalnızca onboard yetkisiyle mümkün: böyle bir anahtar BAŞLANGIÇTA hiçbir
+    # şirkete yetkili değildir, yalnızca POST /musteri/onboard ile kendi kurduğu yeni şirketlere
+    # yetki kazanır (mevcut şirketlere asla — onlar `atlandi` olur, kapsam eklenmez).
+    if not tum_sirketler and not izinli_vknler and not onboard_yetkisi:
+        raise ValueError("En az bir VKN verilmeli, tum_sirketler=True ya da onboard_yetkisi=True olmalı")
     for vkn in izinli_vknler:
         if not (vkn.isdigit() and len(vkn) == 10):
             raise ValueError(f"Geçersiz VKN: {vkn!r} — 10 haneli sayısal olmalı")
@@ -96,9 +107,9 @@ def anahtar_olustur(etiket: str, izinli_vknler: list[str], tum_sirketler: bool =
         with conn.cursor() as cur:
             cur.execute(
                 """INSERT INTO public.api_anahtarlari
-                   (etiket, anahtar_hash, tum_sirketler, izinli_vknler)
-                   VALUES (%s, %s, %s, %s)""",
-                (etiket, anahtar_ozeti(anahtar), tum_sirketler, list(izinli_vknler)),
+                   (etiket, anahtar_hash, tum_sirketler, izinli_vknler, onboard_yetkisi)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (etiket, anahtar_ozeti(anahtar), tum_sirketler, list(izinli_vknler), onboard_yetkisi),
             )
         conn.commit()
     return anahtar
@@ -134,6 +145,21 @@ def anahtar_vkn_ekle(etiket: str, vkn: str) -> bool:
     return guncellendi
 
 
+def onboard_yetkisini_ayarla(etiket: str, yetki: bool) -> bool:
+    """Var olan aktif bir anahtarın onboard yetkisini açar/kapatır. Aktif anahtar
+    yoksa False döner."""
+    tabloyu_hazirla()
+    with _get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE public.api_anahtarlari SET onboard_yetkisi = %s WHERE etiket = %s AND aktif",
+                (yetki, etiket),
+            )
+            guncellendi = cur.rowcount == 1
+        conn.commit()
+    return guncellendi
+
+
 def anahtari_iptal_et(etiket: str) -> bool:
     tabloyu_hazirla()
     with _get_conn() as conn:
@@ -152,7 +178,7 @@ def anahtarlari_listele() -> list[dict]:
     with _get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """SELECT etiket, tum_sirketler, izinli_vknler, aktif, olusturulma, son_kullanim
+                """SELECT etiket, tum_sirketler, izinli_vknler, aktif, olusturulma, son_kullanim, onboard_yetkisi
                    FROM public.api_anahtarlari ORDER BY olusturulma"""
             )
             sutunlar = [d[0] for d in cur.description]

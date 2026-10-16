@@ -73,6 +73,8 @@ GET  http://<host>:8100/durum              — sağlık kontrolü
 GET  http://<host>:8100/kayitli-sirketler  — bilinen VKN listesi (bkz. §2.1)
 POST http://<host>:8100/fatura/isle        — asıl tahmin (bu belgenin konusu)
 POST http://<host>:8100/fatura/onayla      — tahmini kalıcı kayıt/RAG'a al (§7)
+POST http://<host>:8100/musteri/onboard    — çok şirketli zip ile yeni şirket kur (§9, ayrı yetki ister)
+GET  http://<host>:8100/musteri/isler/{id} — onboarding ilerlemesi (§9)
 ```
 
 > ⚠️ **Gerçek adres henüz iletilmedi.** `<host>` bir yer tutucudur — dağıtım
@@ -213,7 +215,8 @@ kayitlar = cevap["tdhp_tahmini"]["dis_sema"]   # ← istediğiniz JSON
       "account_description": "TİMSAN VINÇ VE MÜHENDISLIK SANAYİ TİCARET LTD",
       "account_code_reason": "Karşı taraf unvanı mizandaki '...' kaydıyla eşleşti (isim benzerliği %100); aynı cari hesap kullanıldı.",
       "amount": 58319.2,
-      "debit_credit": "BORÇ"
+      "debit_credit": "BORÇ",
+      "onerilen_yeni_kod": null
     }
   ],
   "success": true,
@@ -254,6 +257,12 @@ kayitlar = cevap["tdhp_tahmini"]["dis_sema"]   # ← istediğiniz JSON
 > (`model_eval/tests/test_disa_aktarim.py`, 21 test). **Canlı doğrulama:**
 > gerçek bir fatura (`AKA2025000000001`) `POST /fatura/isle` ile işlendi;
 > `records[]` alan kümesi karşı tarafın örnek JSON'uyla birebir eşleşti.
+>
+> ✅ **Uygulandı** (2026-10-02, kullanıcı kararı — alt kırılım hiç
+> çözülemediğinde muhasebeciye somut bir aksiyon önerisi sunulsun):
+> 7. alan `onerilen_yeni_kod` eklendi (aşağıya bakın). Mevcut 6 alanın
+> hiçbiri değişmedi — bu **geriye dönük uyumlu bir ekleme**, önceki
+> entegrasyonunuz bu yeni alanı yoksayarak çalışmaya devam eder.
 
 Dış ekip, muhasebe kayıtlarını kendi alan adlarıyla istiyor. `model_eval`'ın
 iç şeması (`entries[]`) farklı — bu bölüm iki şema arasındaki **tek yönlü**
@@ -264,7 +273,7 @@ dönüşümü tanımlar.
 şemayı değiştirmek bunların hepsini kırardı. Bunun yerine dışa aktarımda tek
 yönlü dönüşüm yapılır: **iç şema serbest kalır, dış sözleşme sabitlenir.**
 
-Her `records[]` öğesi **tam olarak** şu 6 alanı taşır — eksik veya fazla alan yok:
+Her `records[]` öğesi **tam olarak** şu 7 alanı taşır — eksik veya fazla alan yok:
 
 | Alan | Tip | Açıklama |
 |---|---|---|
@@ -274,6 +283,7 @@ Her `records[]` öğesi **tam olarak** şu 6 alanı taşır — eksik veya fazla
 | `account_code_reason` | string | Kodun neden seçildiği. **Asla boş kalmaz.** |
 | `amount` | number | Tutar — dönüşümde değiştirilmez. |
 | `debit_credit` | string | `"BORÇ"` / `"ALACAK"` (iç şemadaki `"Borc"`/`"Alacak"`ın karşılığı). |
+| `onerilen_yeni_kod` | string veya `null` | Alt kırılım hiç çözülemediğinde (`account_code` 3 haneli kaldığında) mizanla **çakışmayan** yeni bir alt kod önerisi (ör. `"320.01.00967"`). Çözülemediyse veya çözüldüyse `null`. **Bu bir öneridir, mizana hiçbir şey yazılmaz** — kullanılıp kullanılmayacağına her zaman muhasebeci karar vermeli (`success`/`account_code_reason` zaten bu kayıtların kontrol gerektirdiğini işaret eder). |
 
 Örnek:
 
@@ -457,6 +467,93 @@ Cevap:
 
 Bulunmayan tahmin `404`; süresi dolan, daha önce onaylanan veya eş zamanlı
 onaylanan tahmin `409`; doğrulamadan geçmeyen tahmin `422` döner.
+
+## 9. `POST /musteri/onboard` — çok şirketli zip ile yeni şirket kurma
+
+> **Uygulayan:** [`entegrasyon/musteri_onboard_api.py`](../../musteri_onboard_api.py)
+> (`musteri_onboard`, `musteri_is_durumu`, `zip_guvenli_ac`), asıl kurulum
+> `scripts/musteri_onboard_toplu.py`.
+>
+> ✅ **Uygulandı** (2026-10-06, kullanıcı kararı): Dış ekip artık yeni şirketlerin
+> verisini tek bir zip ile yükleyebilir. Gerçek PostgreSQL + RAG ile Docker içinde
+> uçtan uca denendi (geçici veritabanı, mock şirket: 6 sn, mizan 21 satır, fatura
+> eşleşmesi 2/2; aynı zip ikinci kez yüklenince şirket **atlandı**, üzerine yazılmadı).
+> Testler: `entegrasyon/tests/test_musteri_onboard.py`,
+> `test_api_anahtarlari_db.py::test_onboard_*`.
+
+**Yetki:** Yalnızca **onboard yetkisi** verilmiş anahtarlar kullanabilir (bizim tarafımızdan
+`api_anahtari_yonet.py onboard-yetkisi --etiket <müşavir>` ile verilir). Yetkisiz anahtar
+`403` alır. Başarılı kurulumda yeni VKN o anahtarın kapsamına **otomatik eklenir** — anahtar değişmez.
+
+**İstek:** gövde, ham zip (`Content-Type: application/zip`). Boyut sınırı **200 MB**
+(`ONBOARD_MAX_ZIP_BYTES`; bu uç nokta için genel 30 MB sınırından bağımsız).
+
+```bash
+curl -X POST http://<host>:8100/musteri/onboard \
+  -H "Authorization: Bearer $API_ANAHTARI" -H "Content-Type: application/zip" \
+  --data-binary @yukleme.zip
+```
+
+**Zip yapısı** — kökte her şirket için bir klasör (klasör adı = 10 haneli VKN). Tek bir
+sarmalayıcı klasör (macOS "Sıkıştır" gibi) tolere edilir:
+
+```
+yukleme.zip
+├── 6677889900/
+│   ├── mizan.xlsx            (zorunlu)
+│   ├── faturalar/*.xml       (zorunlu — dosya adı önemsiz, fatura no XML'den okunur)
+│   ├── yevmiye.xlsx          (zorunlu — ya da yevmiye.csv)
+│   └── nace.txt              (opsiyonel)
+└── 1122334455/ ...
+```
+
+Dosya adları **tam olarak** böyle olmalı (büyük/küçük harf fark etmez). Formatlar:
+[`ONBOARDING-VERI-FORMATI.md`](../../../teslim/ONBOARDING-VERI-FORMATI.md). Başka dosyalar
+yok sayılır (cevapta `atlanan_dosya` olarak sayılır); `<10 haneli VKN>` olmayan klasörler
+`gecersiz_klasorler`'de listelenir.
+
+**Cevap `202`** (işlem arka planda, şirketler sırayla kurulur):
+
+```json
+{"is_id": "bb45...", "durum": "kuyrukta", "sirketler": ["1122334455", "6677889900"],
+ "atlanan_dosya": 0, "gecersiz_klasorler": []}
+```
+
+**İlerleme:** `GET /musteri/isler/{is_id}` (aynı anahtar; başka anahtarın işi `404` döner):
+
+```json
+{"is_id": "bb45...", "durum": "calisiyor", "yuzde": 63,
+ "sirketler": {
+   "6677889900": {"durum": "kuruldu", "yuzde": 100, "adim": "rag", "ayrinti": null,
+                  "ozet": {"mizan_satir_sayisi": 21, "fatura_eslesme": "2/2", "yon_belirsiz": 0}},
+   "1122334455": {"durum": "calisiyor", "yuzde": 25, "adim": "sema", "ayrinti": null, "ozet": null}}}
+```
+
+`durum` (iş): `kuyrukta` → `calisiyor` → `bitti`. Şirket durumları: `bekliyor`, `calisiyor`,
+`kuruldu`, `atlandi` (zaten kurulu), `hata` (nedeni `ayrinti`'de; diğer şirketler yine işlenir).
+
+**İlerleme yüzdesi:** `yuzde` (0–100) işin genel ilerlemesidir; şirketlerin yüzdelerinin ortalamasıdır. Her şirketin
+kendi `yuzde` ve `adim` değeri vardır: `sema` (25) → `mizan` (50) → `eslestirme` (75) → `rag` (100). Yüzde **basamaklıdır**
+(adımlar bitince artar); özellikle `eslestirme`'den `rag`'a geçerken fatura sayısı çoksa uzun süre aynı değerde kalabilir,
+bu takılma değildir. `kuruldu` ve `atlandi` şirketler 100'dür; `hata` veren şirketin `yuzde`/`adim` değeri **hatanın hangi
+adımda olduğunu** gösterir (iş genel yüzdesinde o şirket işlenmiş sayılır). İş `bitti` olunca `yuzde` 100'dür.
+
+**Kurallar:**
+- **Mevcut şirket atlanır, üzerine yazılmaz.** Güncelleme bu uç noktadan yapılamaz.
+  Tek istisna: aynı anahtarın daha önce başlatıp **yarım bıraktığı** kurulum yeniden yüklenince tamamlanır.
+- Şirket başına hata diğerlerini durdurmaz. `kuruldu` ama `ayrinti` doluysa şirket kuruldu
+  fakat anahtar kapsamına eklenemedi — bize bildirin.
+- Gönderdiğiniz ham veri iş bitince **sunucudan silinir**; yalnızca kurulum sonucu kalır.
+- Aynı anda en fazla 5 bekleyen iş; fazlası `429`.
+
+| Kod | Anlamı |
+|---|---|
+| 400 | Zip değil/bozuk, güvensiz yol (`../`), zip bomb şüphesi, parola korumalı, işlenecek şirket klasörü yok |
+| 401 | Anahtar yok/geçersiz |
+| 403 | Anahtarın onboard yetkisi yok |
+| 404 | (`/musteri/isler/…`) iş yok ya da başka anahtara ait |
+| 413 | Zip 200 MB sınırını aşıyor |
+| 429 | Çok fazla bekleyen iş |
 
 ## 8. İlgili belgeler
 

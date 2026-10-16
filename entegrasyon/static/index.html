@@ -389,20 +389,25 @@ function tdhpTablosu(tahmin) {
   }
   const entries = tahmin.entries || [];
   const uyariliVar = entries.some(e => e.uyari);
+  const oneriliVar = entries.some(e => e.onerilen_yeni_kod);
   const dogrulamaHatalari = (tahmin.validation_errors || []).map(error =>
     `<li>${h(error.message || error.code)}</li>`
   ).join('');
   let rows = entries.map(e => {
     const uyariHucre = e.uyari ? `⚠️ ${e.uyari}` : '';
-    return `<tr class="${e.uyari ? 'satir-uyumsuz' : ''}"><td>${h(e.account_code)}</td><td>${h(e.dc)}</td><td>${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})}</td><td class="kucuk-not">${h(uyariHucre)}</td></tr>`;
+    const oneriHucre = e.onerilen_yeni_kod
+      ? `<span class="rozet rozet-uyari">${h(e.onerilen_yeni_kod)}</span>`
+      : '';
+    return `<tr class="${e.uyari ? 'satir-uyumsuz' : ''}"><td>${h(e.account_code)}</td><td>${h(e.dc)}</td><td>${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})}</td><td class="kucuk-not">${h(uyariHucre)}</td><td>${oneriHucre}</td></tr>`;
   }).join('');
   return `<div class="sonuc-kutusu sonuc-uygun">
     <strong>Tek Düzen Hesap Planı Tahmini${tahmin.currency ? ' (' + h(tahmin.currency) + ')' : ''}</strong>
     <table>
-      <tr><th>Hesap Kodu</th><th>Borç/Alacak</th><th>Tutar</th><th>Uyarı</th></tr>
+      <tr><th>Hesap Kodu</th><th>Borç/Alacak</th><th>Tutar</th><th>Uyarı</th><th>Önerilen Yeni Kod</th></tr>
       ${rows}
     </table>
-    ${uyariliVar ? '<p class="kucuk-not">⚠️ İşaretli satırlar: karşı taraf mizanda bulunamadı — muhasebecinin yeni bir cari kart (alt kırılım) açması gerekebilir.</p>' : ''}
+    ${uyariliVar ? '<p class="kucuk-not">⚠️ İşaretli satırlar: mizanda eşleşen bir alt kırılım bulunamadı — muhasebecinin yeni bir kart/kod açması gerekebilir.</p>' : ''}
+    ${oneriliVar ? '<p class="kucuk-not">💡 "Önerilen Yeni Kod" sütunu sadece bir ÖNERİDİR — mizana hiçbir şey yazılmaz, kullanılıp kullanılmayacağına muhasebeci karar verir. Bu kayıt her zaman insan onayı gerektirir.</p>' : ''}
     ${dogrulamaHatalari ? `<div class="kucuk-not"><strong>Doğrulama hataları:</strong><ul>${dogrulamaHatalari}</ul></div>` : ''}
     <p class="kucuk-not">
       Borç toplam: ${tahmin.borc_toplam ?? '-'} | Alacak toplam: ${tahmin.alacak_toplam ?? '-'} |
@@ -743,12 +748,13 @@ function sonucSatirIci(dosyaAdi, cevap) {
       const entries = t.entries || [];
       const uyariliVar = entries.some(e => e.uyari);
       const satirlar = entries.map(e =>
-        `${h(e.account_code)} <span class="kucuk-not">(${h(e.dc)}, ${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})})</span>${e.uyari ? ' ⚠️' : ''}`
+        `${h(e.account_code)} <span class="kucuk-not">(${h(e.dc)}, ${Number(e.amount).toLocaleString('tr-TR', {minimumFractionDigits: 2})})</span>${e.uyari ? ' ⚠️' : ''}` +
+        (e.onerilen_yeni_kod ? ` <span class="kucuk-not">→ öneri: ${h(e.onerilen_yeni_kod)}</span>` : '')
       ).join('<br>');
       const dengeNotu = t.balanced === false ? ' <strong style="color:#a00">DENGESİZ ⚠️</strong>' : '';
       const dogrulamaNotu = (t.validation_errors || []).map(error => h(error.message || error.code)).join('<br>');
       tdhpHtml = `${satirlar}${dengeNotu}` +
-        (uyariliVar ? '<br><span class="kucuk-not">⚠️ cari mizanda bulunamadı</span>' : '') +
+        (uyariliVar ? '<br><span class="kucuk-not">⚠️ mizanda eşleşen alt kırılım bulunamadı</span>' : '') +
         (dogrulamaNotu ? `<br><span class="kucuk-not">⚠️ ${dogrulamaNotu}</span>` : '');
     }
   }

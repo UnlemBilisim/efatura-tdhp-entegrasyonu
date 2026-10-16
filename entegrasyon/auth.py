@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 from typing import Optional
 
-from fastapi import HTTPException, Security, status
+from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 import api_anahtarlari
@@ -41,6 +41,18 @@ def require_api_key(
     if kimlik is None:
         _logger.warning("AUTH REDDEDILDI — token_parmak_izi=%s", _token_parmak_izi(supplied))
         raise _yetkisiz()
+    return kimlik
+
+
+def require_onboard_yetkisi(kimlik: IstemciKimligi = Depends(require_api_key)) -> IstemciKimligi:
+    """Şirket kurma (onboarding) uç noktaları için: geçerli anahtar + açıkça verilmiş
+    onboard yetkisi. Yetkisiz anahtar 403 alır (anahtar geçerli ama bu işlem için yetkisiz)."""
+    if not kimlik.onboard_yetkisi:
+        _logger.warning("ONBOARD YETKISI REDDEDILDI — istemci=%s", kimlik.etiket)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu anahtarın yeni şirket kurma (onboard) yetkisi yok.",
+        )
     return kimlik
 
 

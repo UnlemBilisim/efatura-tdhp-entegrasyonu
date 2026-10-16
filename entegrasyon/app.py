@@ -51,9 +51,10 @@ from pydantic import BaseModel, Field
 
 from api_anahtarlari import IstemciKimligi
 from auth import require_api_key, vkn_yetkisini_dogrula
-from security import SecurityMiddleware
+from security import MAX_REQUEST_BYTES, SecurityMiddleware
 from log_ortak import RequestIdMiddleware, loglamayi_kur
 from es_zamanli_sinir import fatura_isle_sirasi
+import musteri_onboard_api
 
 from mcp_mimarisi_istemcisi import McpMimarisiErisilemezHatasi, fatura_kontrol_et
 from model_eval_koprusu import (
@@ -87,6 +88,8 @@ app = FastAPI(
 # limiti reddi gibi erken donen cevaplarda bile log satirlari korele edilebilsin.
 app.add_middleware(SecurityMiddleware)
 app.add_middleware(RequestIdMiddleware)
+app.include_router(musteri_onboard_api.router)
+app.add_event_handler("startup", musteri_onboard_api.calisani_baslat)
 
 
 @app.exception_handler(Exception)
@@ -110,7 +113,15 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
 class FaturaIsleIstegi(BaseModel):
-    fatura_xml: str = Field(min_length=1, max_length=5_000_000)
+    fatura_xml: str = Field(min_length=1, max_length=MAX_REQUEST_BYTES)
+    """max_length, SecurityMiddleware'in govde-boyutu sinirindan (MAX_REQUEST_
+    BYTES, security.py) turetilir - 2026-10-02'de bulunan regresyon: 2026-09-28'de
+    bu alan 5_000_000 (karakter) olarak SABIT kodlanmisti, o an MAX_REQUEST_BYTES
+    de 10 MB oldugu icin tutarliydi; 2026-10-01'de MAX_REQUEST_BYTES 30 MB'a
+    cikarilirken bu alan GUNCELLENMEMISTI - istek govdesi 30 MB'a kadar kabul
+    edilirken fatura_xml 5 MB'i gecince (413 yerine) 422 ile reddediliyordu,
+    gercek sinir sessizce 10 MB kucukte kalmisti. Artik tek kaynak MAX_REQUEST_
+    BYTES - env var'i degisince ikisi birlikte degisir, ayri bir sayi tutulmaz."""
     satici_vkn: str
     """Kullanıcının KENDİ şirketinin VKN'si (fatura üzerindeki gerçek satıcı
     VKN'si değil — fatura outbox ise ikisi aynı olur, inbox ise farklıdır).
@@ -157,6 +168,12 @@ class KalemTahmini(BaseModel):
     account_description: Optional[str] = None
     """Mizandaki HESAP ADI (örn. "%20 İndirilecek KDV") — alt kırılım
     çözüldüyse dolu (bkz. core/single.py::_entry_dicts_uygula)."""
+    onerilen_yeni_kod: Optional[str] = None
+    """Alt kırılım hiç çözülemediğinde (account_code 3 haneli kaldığında)
+    mizanla ÇAKIŞMAYAN yeni bir alt kod önerisi (örn. "320.01.00967") — KDV
+    hesaplarında (191/391) hiç üretilmez, oran mevzuata bağlıdır (bkz.
+    model_eval/core/single.py::_yeni_alt_kod_oner). Sadece bir öneridir,
+    mizana hiçbir şey yazılmaz; `uyari` zaten bu kaydı onaysız bırakır."""
 
 
 class KayitDisa(BaseModel):

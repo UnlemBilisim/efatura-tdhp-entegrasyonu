@@ -82,7 +82,10 @@ def _musteri_dosyalarini_dogrula(musteri_dizini: Path) -> tuple[Path, Path, Path
     return mizan, faturalar, yevmiye
 
 
-def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str) -> dict:
+def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str, ilerleme=None) -> dict:
+    """`ilerleme` (opsiyonel, zip uç noktası için): her adım BİTİNCE `ilerleme(adim, yuzde)` çağrılır —
+    sema=25, mizan=50, eslestirme=75, rag=100. Verilmezse davranış DEĞİŞMEZ (komut satırı akışı)."""
+    _ilerle = ilerleme or (lambda adim, yuzde: None)
     mizan_yolu, faturalar_dizini, yevmiye_yolu = _musteri_dosyalarini_dogrula(musteri_dizini)
     nace_kodlari = _nace_kodlarini_oku(musteri_dizini)
 
@@ -92,17 +95,20 @@ def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str) -> 
     from tenant_onboarding import onboard_et  # noqa: E402
 
     onboard_et(vkn, database_url, nace_kodlari=nace_kodlari)
+    _ilerle("sema", 25)
 
     print(f"\n--- [2/4] {vkn}: mizan yukleniyor ---")
     from mizan_excel_yukle import yukle as mizan_yukle  # noqa: E402
 
     mizan_satir_sayisi = mizan_yukle(vkn, str(mizan_yolu), database_url=database_url)
+    _ilerle("mizan", 50)
 
     print(f"\n--- [3/4] {vkn}: fatura XML'leri yevmiye ile eslestiriliyor ---")
     from yevmiye_fatura_esle import esle_ve_uret  # noqa: E402
 
     cikti_dizini = musteri_dizini / ".jsons_uretilen"
     ozet = esle_ve_uret(vkn, faturalar_dizini, yevmiye_yolu, cikti_dizini)
+    _ilerle("eslestirme", 75)
 
     print(f"\n--- [4/4] {vkn}: RAG koleksiyonu olusturuluyor ---")
     if ozet["eslesen"] == 0:
@@ -114,6 +120,7 @@ def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str) -> 
         from build_vector_db import index_directory  # noqa: E402
 
         index_directory(own_vkn=vkn, data_dir=cikti_dizini)
+    _ilerle("rag", 100)
 
     if ozet["yon_belirsiz_atlanan"]:
         print(
@@ -130,6 +137,10 @@ def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str) -> 
         "yon_belirsiz": len(ozet["yon_belirsiz_atlanan"]),
         "nace_kodlari": nace_kodlari,
     }
+
+
+# Genel (herkese açık) ad — entegrasyon/musteri_onboard_api.py zip uç noktası bunu çağırır.
+musteriyi_onboard_et = _musteriyi_onboard_et
 
 
 def main() -> None:
