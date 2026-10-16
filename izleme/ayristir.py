@@ -108,7 +108,7 @@ def genel_yuzde(is_kaydi: dict) -> int:
     sirketler = list((is_kaydi.get("sirketler") or {}).values())
     if not sirketler:
         return 0
-    bitti = ("kuruldu", "atlandi", "hata")
+    bitti = ("kuruldu", "guncellendi", "degismedi", "atlandi", "hata")
     return round(sum(100 if s.get("durum") in bitti else s.get("yuzde", 0) for s in sirketler) / len(sirketler))
 
 

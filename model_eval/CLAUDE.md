@@ -669,6 +669,13 @@ bir mimari denetim geçirdi:**
 > ikisinin de canlı test edilmesi gerekiyor — biri (tipsiz `dict`) bir
 > alan kaybını maskeleyebiliyor.
 
+> ✅ **Uygulandı (2026-10-16, kullanıcı kararı) — kayıtlı şirket onboarding GÜNCELLEMESİ:** yeni `core/onboarding_guncelleme.py` — kayıtlı bir şirket için gelen
+> NACE / mizan / RAG emsal verisi mevcutla karşılaştırılır, yalnızca fark uygulanır, eski değer + güncellenme zamanı `onboarding_guncelleme_gecmisi` tablosuna
+> (şirketin şemasında) loglanır. Mizan okuyucusu `mizan_excel_yukle.py::mizan_hesap_satirlari` olarak ortaklaştırıldı (`yukle()` de onu kullanır — davranış aynı).
+> Mizan = tam hesap planı (dosyada olmayan hesap silinir; boş dosya / >%50 silme koruması), RAG yalnızca ekleme/güncelleme (silme yok), NACE dosyası yoksa dokunulmaz.
+> Ayrıntı ve güvenlik güvencesi (güncelleme yalnızca anahtar o VKN'ye yetkiliyse): kök `../CLAUDE.md` 2026-10-16 notu. Testler: `tests/test_onboarding_guncelleme.py`
+> (fark kuralları + gerçek PostgreSQL), `tests/test_musteri_guncelle_orkestrasyon.py` (mock şirketle uçtan uca; ChromaDB sahte).
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),

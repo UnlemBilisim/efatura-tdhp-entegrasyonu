@@ -15,14 +15,16 @@ Asıl onboarding mantığı DEĞİŞMEDİ: `scripts/musteri_onboard_toplu.py`
 yeniden yazılmaz. Bu modül yalnızca güvenli zip açma, kuyruklama, kalıcı iş
 durumu ve yetkiyi ekler.
 
-Güvenlik kararları (2026-10-06, kullanıcı onayıyla):
-  * Mevcut şirket ATLANIR, üzerine yazılmaz — onboarding mizanı silip yeniden
-    yazdığı için yanlış bir zip başka müşterinin verisini bozabilirdi. Tek istisna:
-    AYNI anahtarın daha önce başlatıp yarım bıraktığı kurulum yeniden denenebilir
-    (kurulum idempotent, yalnızca kendi yarım verisini tamamlar).
+Güvenlik kararları (2026-10-06, kullanıcı onayıyla; 2026-10-16'da güncelleme eklendi):
+  * KAYITLI şirket (2026-10-16, kullanıcı kararı): zip tekrar gelirse artık işlenir — gelen veri mevcutla KARŞILAŞTIRILIR, yalnızca
+    fark uygulanır (fark yoksa hiçbir şey yazılmaz), eski değer + güncellenme zamanı veritabanında loglanır
+    (`model_eval/core/onboarding_guncelleme.py`). Önceki karar ("kayıtlı şirket atlanır, üzerine yazılmaz") şu GÜVENCEYLE
+    gevşetildi: güncelleme yalnızca anahtarın o VKN adına yetkili olduğu durumda yapılır (`vkn_izinli_mi`); aksi halde şirket
+    `atlandi` olur, hiçbir şey değiştirilmez. Yani onboard yetkisi olan BAŞKA bir müşavir, kapsamında olmayan bir şirketin
+    mizanını/emsallerini değiştiremez.
+  * AYNI anahtarın daha önce başlatıp yarım bıraktığı kurulum yeniden denenir (kurulum idempotent).
   * Yalnızca `onboard_yetkisi` verilmiş anahtarlar kullanabilir
-    (`auth.py::require_onboard_yetkisi`); başarılı kurulumda yeni VKN o anahtarın
-    kapsamına eklenir.
+    (`auth.py::require_onboard_yetkisi`); başarılı KURULUMDA yeni VKN o anahtarın kapsamına eklenir.
   * Zip güvenli açılır: zip-slip, zip bomb, dosya sayısı/boyut sınırı, yalnızca
     izinli dosya adları; dosyalar `extractall` ile değil tek tek, gerçek bayt
     sayısı sayılarak yazılır (başlıktaki boyut güvenilmez)."""
@@ -193,11 +195,12 @@ class IsDeposu:
         gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(gecici, yol)
 
-    def olustur(self, etiket: str, vknler: list, atlanan_dosya: int, gecersiz_klasorler: list) -> dict:
+    def olustur(self, etiket: str, vknler: list, atlanan_dosya: int, gecersiz_klasorler: list, guncelleme_yetkisiz: Optional[list] = None) -> dict:
         is_id = uuid.uuid4().hex
         veri = {
             "is_id": is_id, "etiket": etiket, "olusturulma": _simdi(), "durum": "kuyrukta",
             "atlanan_dosya": atlanan_dosya, "gecersiz_klasorler": gecersiz_klasorler,
+            "guncelleme_yetkisiz": sorted(guncelleme_yetkisiz or []),
             "sirketler": {v: {"durum": "bekliyor", "yuzde": 0, "adim": None, "ayrinti": None, "ozet": None} for v in vknler},
         }
         with self._kilit:
@@ -218,14 +221,14 @@ class IsDeposu:
     @staticmethod
     def _genel_yuzde(veri: dict) -> int:
         """İşin genel yüzdesi = şirket yüzdelerinin ortalaması. Şirket yüzdesi adım adım artar
-        (şema 25 → mizan 50 → eşleştirme 75 → RAG 100); `kuruldu`/`atlandi`/`hata` şirketler genel hesapta 100 sayılır
+        (şema 25 → mizan 50 → eşleştirme 75 → RAG 100); `kuruldu`/`guncellendi`/`degismedi`/`atlandi`/`hata` şirketler genel hesapta 100 sayılır
         (iş o şirket için bitti; `hata` şirketin kendi `yuzde`/`adim` değeri hatanın hangi adımda olduğunu gösterir). Adım içi (örn. RAG'ın uzun sürmesi) ilerleme gösterilmez: yüzde basamaklıdır."""
         if veri.get("durum") == "bitti":
             return 100
         sirketler = veri["sirketler"].values()
         if not sirketler:
             return 0
-        bitti = ("kuruldu", "atlandi", "hata")  # hata veren şirket de "işlenmesi bitti" sayılır (yüzdesi hatanın yerini gösterir)
+        bitti = ("kuruldu", "guncellendi", "degismedi", "atlandi", "hata")  # hata veren şirket de "işlenmesi bitti" sayılır (yüzdesi hatanın yerini gösterir)
         return round(sum(100 if s["durum"] in bitti else s.get("yuzde", 0) for s in sirketler) / len(sirketler))
 
     def guncelle(self, is_id: str, is_durumu: Optional[str] = None, vkn: Optional[str] = None, **sirket_alanlari) -> None:
@@ -294,8 +297,11 @@ class Calisan:
         kur: Callable[..., dict],
         kapsam_ekle: Callable[[str, str], bool],
         is_dizini: Callable[[str], Path],
+        guncelle: Optional[Callable[..., dict]] = None,
     ):
         self.depo, self.kurulu_mu, self.kur, self.kapsam_ekle, self.is_dizini = depo, kurulu_mu, kur, kapsam_ekle, is_dizini
+        # guncelle(vkn, musteri_dizini, ilerleme, is_id, istemci) -> özet sözlüğü; verilmezse kayıtlı şirket eskisi gibi atlanır.
+        self.guncelle = guncelle
         self.kuyruk: "queue.Queue[str]" = queue.Queue()
         self._thread: Optional[threading.Thread] = None
 
@@ -325,18 +331,39 @@ class Calisan:
         self.depo.guncelle(is_id, is_durumu="calisiyor")
         try:
             for vkn in veri["sirketler"]:
-                self._sirketi_isle(is_id, etiket, vkn, dizin)
+                self._sirketi_isle(is_id, etiket, vkn, dizin, yetkisiz=vkn in (veri.get("guncelleme_yetkisiz") or []))
         finally:
             shutil.rmtree(dizin, ignore_errors=True)  # gelen ham müşteri verisi iş bitince silinir
             self.depo.guncelle(is_id, is_durumu="bitti")
         sonuclar = {v: s["durum"] for v, s in (self.depo.getir(is_id) or {}).get("sirketler", {}).items()}
         _audit.info(json.dumps({"olay": "musteri_onboard_bitti", "is_id": is_id, "istemci": etiket, "sonuclar": sonuclar}, ensure_ascii=False))
 
-    def _sirketi_isle(self, is_id: str, etiket: str, vkn: str, dizin: Path) -> None:
+    def _guncelle(self, is_id: str, etiket: str, vkn: str, dizin: Path) -> None:
+        """Kayıtlı şirket: gelen veriyi mevcutla karşılaştırıp yalnızca farkı uygular (`guncellendi`), fark yoksa `degismedi`."""
+        self.depo.guncelle(is_id, vkn=vkn, durum="calisiyor")
+
+        def ilerleme(adim: str, yuzde: int) -> None:
+            self.depo.guncelle(is_id, vkn=vkn, adim=adim, yuzde=yuzde)
+
+        try:
+            ozet = self.guncelle(vkn, dizin / vkn, ilerleme, is_id, etiket)
+        except Exception as exc:  # noqa: BLE001
+            mesaj = f"{type(exc).__name__}: {str(exc)}".replace(str(dizin), "<zip>")[:400]
+            _logger.error("onboard guncelleme basarisiz vkn=%s is_id=%s: %s", vkn, is_id, mesaj)
+            self.depo.guncelle(is_id, vkn=vkn, durum="hata", ayrinti=mesaj)
+            return
+        self.depo.guncelle(is_id, vkn=vkn, durum="guncellendi" if ozet.get("degisiklik_var") else "degismedi", yuzde=100, ozet=ozet)
+
+    def _sirketi_isle(self, is_id: str, etiket: str, vkn: str, dizin: Path, yetkisiz: bool = False) -> None:
         kayit = self.depo.kurulum_kaydi(vkn)
         yeniden_deneme = bool(kayit and kayit["durum"] == "yarim" and kayit["etiket"] == etiket)
         if self.kurulu_mu(vkn) and not yeniden_deneme:
-            self.depo.guncelle(is_id, vkn=vkn, durum="atlandi", yuzde=100, ayrinti="Şirket zaten kurulu — üzerine yazılmadı.")
+            if yetkisiz or self.guncelle is None:
+                # Güncelleme yalnızca anahtarın o VKN adına yetkili olduğu durumda yapılır (başka müşavirin verisi korunur).
+                self.depo.guncelle(is_id, vkn=vkn, durum="atlandi", yuzde=100,
+                                   ayrinti="Şirket zaten kurulu ve bu anahtarın bu şirket üzerinde güncelleme yetkisi yok — hiçbir şey değiştirilmedi.")
+            else:
+                self._guncelle(is_id, etiket, vkn, dizin)
             return
         self.depo.guncelle(is_id, vkn=vkn, durum="calisiyor")
         self.depo.kurulum_kaydet(vkn, "yarim", etiket)  # başarısız olursa yarım kalır, AYNI anahtar tekrar deneyebilir
@@ -373,19 +400,27 @@ def _varsayilan_calisan() -> Calisan:
 
         return tenant_kayitli_mi(vkn)
 
-    def kur(vkn: str, musteri_dizini: Path, ilerleme=None) -> dict:
+    def _betik():
         betik = Path(__file__).resolve().parent.parent / "scripts" / "musteri_onboard_toplu.py"
         spec = importlib.util.spec_from_file_location("musteri_onboard_toplu", betik)
         modul = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(modul)
-        return modul.musteriyi_onboard_et(vkn, musteri_dizini, os.environ["DATABASE_URL"], ilerleme=ilerleme)
+        return modul
+
+    def kur(vkn: str, musteri_dizini: Path, ilerleme=None) -> dict:
+        return _betik().musteriyi_onboard_et(vkn, musteri_dizini, os.environ["DATABASE_URL"], ilerleme=ilerleme)
+
+    def guncelle(vkn: str, musteri_dizini: Path, ilerleme, is_id: str, istemci: str) -> dict:
+        return _betik().musteriyi_guncelle(
+            vkn, musteri_dizini, os.environ["DATABASE_URL"], ilerleme=ilerleme, is_id=is_id, istemci=istemci,
+        )
 
     def kapsam_ekle(etiket: str, vkn: str) -> bool:
         import api_anahtarlari
 
         return api_anahtarlari.anahtar_vkn_ekle(etiket, vkn)
 
-    return Calisan(depo, kurulu_mu, kur, kapsam_ekle, lambda is_id: kok / "dosyalar" / is_id)
+    return Calisan(depo, kurulu_mu, kur, kapsam_ekle, lambda is_id: kok / "dosyalar" / is_id, guncelle=guncelle)
 
 
 _calisan: Optional[Calisan] = None
@@ -450,7 +485,9 @@ async def musteri_onboard(request: Request, kimlik: IstemciKimligi = Depends(req
     finally:
         zip_yolu.unlink(missing_ok=True)
 
-    is_kaydi = c.depo.olustur(kimlik.etiket, sonuc["vknler"], sonuc["atlanan_dosya"], sonuc["gecersiz_klasorler"])
+    # Kayıtlı bir şirket için güncelleme yalnızca anahtar o VKN adına yetkiliyse yapılır; yetkisizler iş kaydında işaretlenir.
+    yetkisiz = [v for v in sonuc["vknler"] if c.kurulu_mu(v) and not kimlik.vkn_izinli_mi(v)]
+    is_kaydi = c.depo.olustur(kimlik.etiket, sonuc["vknler"], sonuc["atlanan_dosya"], sonuc["gecersiz_klasorler"], yetkisiz)
     # Dosyalar, gerçek iş kimliğine göre adlandırılmış dizine taşınır (çalışan bunu is_id ile bulur).
     hedef = c.is_dizini(is_kaydi["is_id"])
     hedef.parent.mkdir(parents=True, exist_ok=True)

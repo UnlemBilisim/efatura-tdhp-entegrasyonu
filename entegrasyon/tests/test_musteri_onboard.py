@@ -303,3 +303,123 @@ def test_http_cevabinda_yuzde_alani_var(monkeypatch, ortam):
     assert d["yuzde"] == 0 and d["sirketler"][VKN_A]["yuzde"] == 0 and d["sirketler"][VKN_A]["adim"] is None
     c.isle(c.kuyruk.get_nowait())
     assert cl.get(f"/musteri/isler/{j['is_id']}", headers=H).json()["yuzde"] == 100
+
+
+# ---------------- KAYITLI şirket güncelleme (2026-10-16) ----------------
+
+@pytest.fixture
+def ortam_g(tmp_path):
+    """Çalışan + sahte `guncelle` (veritabanı/Ollama yok). o["sonuc"] ile güncelleme çıktısı ayarlanır."""
+    depo = mo.IsDeposu(tmp_path / "veri")
+    o = {"kurulanlar": [], "kapsam": [], "kurulu": {VKN_A}, "guncellenenler": [], "sonuc": {"degisiklik_var": True, "mod": "guncelleme"},
+         "hata": None}
+
+    def kur(vkn, dizin, ilerleme=None):
+        o["kurulanlar"].append(vkn)
+        return {"vkn": vkn}
+
+    def guncelle(vkn, dizin, ilerleme, is_id, istemci):
+        assert (dizin / "mizan.xlsx").exists()
+        o["guncellenenler"].append((vkn, is_id, istemci))
+        for adim, yuzde in (("nace", 25), ("mizan", 50), ("eslestirme", 75), ("rag", 100)):
+            ilerleme(adim, yuzde)
+        if o["hata"]:
+            raise o["hata"](f"patladi {dizin}")
+        return dict(o["sonuc"])
+
+    c = mo.Calisan(depo, lambda v: v in o["kurulu"], kur, lambda e, v: o["kapsam"].append((e, v)) or True,
+                   lambda i: depo.kok / "dosyalar" / i, guncelle=guncelle)
+    return c, o
+
+
+def _is_g(c, tmp_path, vknler, etiket="musavir", yetkisiz=None):
+    veri = c.depo.olustur(etiket, vknler, 0, [], yetkisiz)
+    z = tmp_path / f"{veri['is_id']}.zip"
+    z.write_bytes(_zip({k: v for vkn in vknler for k, v in _tam_sirket(vkn).items()}))
+    mo.zip_guvenli_ac(z, c.is_dizini(veri["is_id"]))
+    return veri["is_id"]
+
+
+def test_kayitli_sirket_yetkiliyse_guncellenir_degisiklik_varsa_guncellendi(ortam_g, tmp_path):
+    c, o = ortam_g
+    is_id = _is_g(c, tmp_path, [VKN_A])
+    c.isle(is_id)
+    s = c.depo.getir(is_id)["sirketler"][VKN_A]
+    assert s["durum"] == "guncellendi" and s["yuzde"] == 100 and s["adim"] == "rag" and s["ozet"]["mod"] == "guncelleme"
+    assert o["guncellenenler"] == [(VKN_A, is_id, "musavir")] and o["kurulanlar"] == []
+    assert o["kapsam"] == []  # güncelleme kapsamı değiştirmez
+
+
+def test_fark_yoksa_degismedi_ve_genel_yuzde_100(ortam_g, tmp_path):
+    c, o = ortam_g
+    o["sonuc"] = {"degisiklik_var": False, "mod": "guncelleme"}
+    is_id = _is_g(c, tmp_path, [VKN_A])
+    c.isle(is_id)
+    j = c.depo.getir(is_id)
+    assert j["sirketler"][VKN_A]["durum"] == "degismedi" and j["durum"] == "bitti" and j["yuzde"] == 100
+
+
+def test_guncelleme_yetkisi_yoksa_atlanir_ve_veri_degismez(ortam_g, tmp_path):
+    c, o = ortam_g
+    is_id = _is_g(c, tmp_path, [VKN_A], yetkisiz=[VKN_A])
+    c.isle(is_id)
+    s = c.depo.getir(is_id)["sirketler"][VKN_A]
+    assert s["durum"] == "atlandi" and "yetkisi yok" in s["ayrinti"]
+    assert o["guncellenenler"] == [] and o["kurulanlar"] == []  # hiçbir şey çağrılmadı
+
+
+def test_guncelleme_hatasi_yolu_sizdirmaz_ve_digerleri_devam_eder(ortam_g, tmp_path):
+    c, o = ortam_g
+    o["kurulu"].add(VKN_B)
+    o["hata"] = RuntimeError
+    is_id = _is_g(c, tmp_path, [VKN_A, VKN_B])
+    c.isle(is_id)
+    s = c.depo.getir(is_id)["sirketler"]
+    assert all(x["durum"] == "hata" and "<zip>" in x["ayrinti"] and str(c.depo.kok) not in x["ayrinti"] for x in s.values())
+    assert len(o["guncellenenler"]) == 2  # birinin hatası diğerini durdurmadı
+
+
+def test_yeni_ve_kayitli_sirket_ayni_zipte(ortam_g, tmp_path):
+    c, o = ortam_g
+    is_id = _is_g(c, tmp_path, [VKN_A, VKN_B])  # A kayıtlı (güncellenir), B yeni (kurulur)
+    c.isle(is_id)
+    s = c.depo.getir(is_id)["sirketler"]
+    assert s[VKN_A]["durum"] == "guncellendi" and s[VKN_B]["durum"] == "kuruldu"
+    assert o["kurulanlar"] == [VKN_B] and o["kapsam"] == [("musavir", VKN_B)]  # yalnızca YENİ şirket kapsama eklenir
+
+
+def test_yarim_kurulum_ayni_anahtarla_kurulum_olarak_tekrar_denenir_guncelleme_degil(ortam_g, tmp_path):
+    c, o = ortam_g
+    c.depo.kurulum_kaydet(VKN_A, "yarim", "musavir")
+    c.isle(_is_g(c, tmp_path, [VKN_A]))
+    assert o["kurulanlar"] == [VKN_A] and o["guncellenenler"] == []
+
+
+def test_guncelleme_destegi_olmayan_calisan_eski_gibi_atlar(ortam, tmp_path):
+    c, o = ortam  # guncelle=None
+    o["kurulu"].add(VKN_A)
+    is_id = _is_olustur(c, tmp_path, [VKN_A])
+    c.isle(is_id)
+    assert c.depo.getir(is_id)["sirketler"][VKN_A]["durum"] == "atlandi"
+
+
+def test_http_yetkili_anahtar_kayitli_sirketi_gunceller_yetkisiz_olan_atlanir(monkeypatch, ortam_g):
+    c, o = ortam_g
+    o["kurulu"].add(VKN_B)
+    kimlik = IstemciKimligi("musavir", False, frozenset({VKN_A}), True)  # yalnızca A'ya yetkili; B (kayıtlı) kapsam dışı
+    cl = _istemci(monkeypatch, ortam_g, kimlik)
+    r = cl.post(mo.ONBOARD_YOLU, content=_zip({**_tam_sirket(VKN_A), **_tam_sirket(VKN_B)}), headers=H)
+    assert r.status_code == 202, r.text
+    c.isle(c.kuyruk.get_nowait())
+    d = cl.get(f"/musteri/isler/{r.json()['is_id']}", headers=H).json()
+    assert d["sirketler"][VKN_A]["durum"] == "guncellendi" and d["sirketler"][VKN_B]["durum"] == "atlandi"
+    assert d["guncelleme_yetkisiz"] == [VKN_B]
+    assert [x[0] for x in o["guncellenenler"]] == [VKN_A]  # B'ye dokunulmadı
+
+
+def test_http_tum_sirketler_anahtari_her_kayitli_sirketi_guncelleyebilir(monkeypatch, ortam_g):
+    c, o = ortam_g
+    cl = _istemci(monkeypatch, ortam_g, IstemciKimligi("yonetici", True, frozenset(), True))
+    r = cl.post(mo.ONBOARD_YOLU, content=_zip(_tam_sirket(VKN_A)), headers=H)
+    c.isle(c.kuyruk.get_nowait())
+    assert cl.get(f"/musteri/isler/{r.json()['is_id']}", headers=H).json()["sirketler"][VKN_A]["durum"] == "guncellendi"

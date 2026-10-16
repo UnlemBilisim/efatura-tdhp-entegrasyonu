@@ -102,6 +102,16 @@ def _mizan_satirlarini_oku(excel_yolu):
     return satirlar
 
 
+def mizan_hesap_satirlari(excel_yolu):
+    """Excel'deki 3 seviyeli hesapları [(hesap_kodu, ana_kod, hesap_adi)] olarak döner — `yukle()` (ilk kurulum, TRUNCATE+INSERT) ve
+    `core/onboarding_guncelleme.py::mizan_guncelle` (güncelleme, yalnızca fark) AYNI okuyucuyu/süzgeci kullanır."""
+    return [
+        (kod, kod.split(".")[0], ad)
+        for kod, ad in _mizan_satirlarini_oku(excel_yolu)
+        if len(kod.split(".")) == 3 and len(kod.split(".")[0]) == 3
+    ]
+
+
 def yukle(vkn: str, excel_yolu: str, database_url: str | None = None) -> int:
     """Excel'deki tum satirlari tenant_<vkn>.mizan_alt_kirilim tablosuna
     yazar (TRUNCATE + INSERT). Sadece 3-seviyeli kodlar (XXX.YY.ZZZZZ) DB'ye
@@ -120,11 +130,7 @@ def yukle(vkn: str, excel_yolu: str, database_url: str | None = None) -> int:
         raise SystemExit(f"Gecersiz VKN: {vkn!r} - 10 haneli sayisal olmali")
 
     sema = f"tenant_{vkn}"
-    satirlar = [
-        (kod, kod.split(".")[0], ad)
-        for kod, ad in _mizan_satirlarini_oku(excel_yolu)
-        if len(kod.split(".")) == 3 and len(kod.split(".")[0]) == 3
-    ]
+    satirlar = mizan_hesap_satirlari(excel_yolu)
 
     from core.db import tenant_kayitli_mi
 

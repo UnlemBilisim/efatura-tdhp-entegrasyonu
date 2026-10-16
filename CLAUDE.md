@@ -104,7 +104,7 @@ indeksini de güncelle.
 > DEĞİŞMEDİ — her şirket için `scripts/musteri_onboard_toplu.py::musteriyi_onboard_et`
 > aynen çağrılır. Kullanıcının onayladığı güvenlik kararları: (1) **mevcut şirket
 > atlanır, üzerine yazılmaz** (onboarding mizanı `TRUNCATE`'leyip yeniden yazdığı için);
-> tek istisna AYNI anahtarın yarım bıraktığı kurulum, (2) yalnızca **`onboard_yetkisi`**
+> tek istisna AYNI anahtarın yarım bıraktığı kurulum — **2026-10-16'da bu karar kullanıcı isteğiyle DEĞİŞTİ, aşağıdaki "Kayıtlı şirket güncelleme" notuna bakın**, (2) yalnızca **`onboard_yetkisi`**
 > verilmiş anahtarlar kullanabilir (`api_anahtarlari.py`, `auth.py::require_onboard_yetkisi`;
 > verme: `api_anahtari_yonet.py onboard-yetkisi`; VKN'siz, yalnızca `olustur --onboard-yetkisi`
 > ile "kapsamsız onboard anahtarı" da üretilebilir, 2026-10-06) ve başarılı kurulumda yeni VKN o
@@ -136,6 +136,20 @@ indeksini de güncelle.
 > (insan kararı) ama toplu tahminler 24 saat (tek istekte 30 dk) onaylanabilir; iş sürerken yeniden başlama kaldığı yerden devam eder; ham XML iş bitince
 > silinir, sonuçlar 14 gün saklanır. Paralel tek istekler zaten desteklenir (en çok 2 aynı anda, fazlası **sırada bekler**, reddedilmez). Her HTTP isteği ayrıca
 > hata mesajıyla tek JSON satırı loglanır (`entegrasyon/istek_gunlugu.py`) ve Mac'te `izleme/panel.py` ile izlenir. **Gerçek LLM ile uçtan uca denenmedi.**
+
+> ✅ **Uygulandı** (2026-10-16, kullanıcı kararı — "kayıtlı VKN tekrar gelirse işleme al, mevcutla karşılaştır; aynıysa işleme alma, değişen varsa güncelle ve
+> eski bilgiyi güncellenme tarihiyle veritabanında logla"): **Kayıtlı şirket güncelleme** — zip'te kayıtlı bir VKN gelirse (artık `atlandi` değil) gelen veri mevcutla
+> karşılaştırılır, yalnızca FARK uygulanır (fark yoksa hiçbir şey yazılmaz → `degismedi`; uygulandıysa `guncellendi`). Mantık: `model_eval/core/onboarding_guncelleme.py`
+> (NACE / mizan / RAG emsalleri için ayrı fark+uygulama), orkestrasyon `scripts/musteri_onboard_toplu.py::musteriyi_guncelle`, worker `entegrasyon/musteri_onboard_api.py`
+> (`Calisan._guncelle`). Eski değer + yeni değer + zaman + iş/anahtar: şirketin kendi şemasındaki `onboarding_guncelleme_gecmisi` tablosu (varsayılan şirkette public);
+> mizan satırlarında `updated_at` yenilenir. **Güvenlik güvencesi (eski "atlanır" kararı şu şekilde gevşetildi):** güncelleme YALNIZCA anahtar o VKN adına yetkiliyse yapılır
+> (`vkn_izinli_mi`, yükleme anında belirlenip iş kaydındaki `guncelleme_yetkisiz` listesine yazılır); yetkisiz anahtar `atlandi` alır, böylece onboard yetkisi olan BAŞKA bir
+> müşavir kapsamında olmayan şirketin verisini değiştiremez. Kurallar: kısmi zip mümkün (yalnız mizan/nace/faturalar+yevmiye; fatura ve yevmiye birlikte); mizan TAM hesap
+> planı sayılır (dosyada olmayan hesap silinir, eski değeri geçmişte) AMA dosya boşsa ya da hesapların >%50'si silinecekse mizan UYGULANMAZ (`uyari`); RAG emsalleri yalnızca
+> eklenir/güncellenir, ASLA silinmez (`/fatura/onayla` ile gelenler korunur) ve yalnızca (3 haneli kod, yön, ad, karşı taraf) değişince güncellenir (yevmiyede sadece TUTAR
+> değişimi emsali değiştirmez); NACE dosyası yoksa dokunulmaz. Parçalar sırayla ve ayrı işlemlerle uygulanır; sonraki parça hata verirse öncekiler (loglanmış olarak) kalır,
+> tekrar çalıştırmak güvenlidir. Gerçek PostgreSQL ile test edildi (`model_eval/tests/test_onboarding_guncelleme.py`, `test_musteri_guncelle_orkestrasyon.py`,
+> `entegrasyon/tests/test_musteri_onboard.py`). **Gerçek (canlı) LLM/embedding ile uçtan uca henüz denenmedi** — RAG adımı testlerde sahte koleksiyonla çalıştı.
 
 ## Çalıştırmak için gerekenler (sık atlanan)
 

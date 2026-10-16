@@ -531,18 +531,38 @@ yok sayılır (cevapta `atlanan_dosya` olarak sayılır); `<10 haneli VKN>` olma
    "1122334455": {"durum": "calisiyor", "yuzde": 25, "adim": "sema", "ayrinti": null, "ozet": null}}}
 ```
 
+Kayıtlı bir şirketin güncelleme sonucu (`guncellendi`/`degismedi`) `ozet` içinde parça parça gelir; adımlar `nace` (25) → `mizan` (50) → `eslestirme` (75) → `rag` (100):
+
+```json
+{"durum": "guncellendi", "yuzde": 100, "adim": "rag", "ayrinti": null,
+ "ozet": {"mod": "guncelleme", "degisiklik_var": true,
+          "nace":  {"degisti": true, "eklenen": ["471100"], "cikan": []},
+          "mizan": {"eklenen": 3, "degisen": 1, "silinen": 0, "uygulandi": true, "toplam": 24},
+          "rag":   {"yeni": 5, "degisen": 1, "ayni": 40, "taranan": 46, "fatura_eslesme": "46/46", "yon_belirsiz": 0}}}
+```
+
 `durum` (iş): `kuyrukta` → `calisiyor` → `bitti`. Şirket durumları: `bekliyor`, `calisiyor`,
-`kuruldu`, `atlandi` (zaten kurulu), `hata` (nedeni `ayrinti`'de; diğer şirketler yine işlenir).
+`kuruldu` (yeni şirket kuruldu), `guncellendi` (kayıtlı şirket: değişiklik bulundu ve uygulandı), `degismedi` (kayıtlı şirket: gelen veri mevcutla aynı, hiçbir şey yazılmadı), `atlandi` (kayıtlı şirket ama anahtarınız o şirket adına güncelleme yetkili değil), `hata` (nedeni `ayrinti`'de; diğer şirketler yine işlenir).
 
 **İlerleme yüzdesi:** `yuzde` (0–100) işin genel ilerlemesidir; şirketlerin yüzdelerinin ortalamasıdır. Her şirketin
 kendi `yuzde` ve `adim` değeri vardır: `sema` (25) → `mizan` (50) → `eslestirme` (75) → `rag` (100). Yüzde **basamaklıdır**
 (adımlar bitince artar); özellikle `eslestirme`'den `rag`'a geçerken fatura sayısı çoksa uzun süre aynı değerde kalabilir,
-bu takılma değildir. `kuruldu` ve `atlandi` şirketler 100'dür; `hata` veren şirketin `yuzde`/`adim` değeri **hatanın hangi
+bu takılma değildir. `kuruldu`, `guncellendi`, `degismedi` ve `atlandi` şirketler 100'dür; `hata` veren şirketin `yuzde`/`adim` değeri **hatanın hangi
 adımda olduğunu** gösterir (iş genel yüzdesinde o şirket işlenmiş sayılır). İş `bitti` olunca `yuzde` 100'dür.
 
 **Kurallar:**
-- **Mevcut şirket atlanır, üzerine yazılmaz.** Güncelleme bu uç noktadan yapılamaz.
-  Tek istisna: aynı anahtarın daha önce başlatıp **yarım bıraktığı** kurulum yeniden yüklenince tamamlanır.
+- **Kayıtlı şirket GÜNCELLENİR** (anahtarınız o VKN adına yetkiliyse): gelen veri sistemdeki mevcut veriyle karşılaştırılır;
+  **aynıysa hiçbir şey yazılmaz** (`degismedi`), **fark varsa yalnızca farkı** uygular (`guncellendi`) ve eski değer ile güncellenme zamanı
+  sistemde kayıt altında tutulur. Anahtarınız o şirket adına yetkili değilse şirket `atlandi` olur, hiçbir şey değiştirilmez
+  (başka bir müşavirin verisi korunur). Aynı anahtarın daha önce başlatıp **yarım bıraktığı** kurulum yeniden yüklenince tamamlanır.
+- **Güncellemede zip'te yalnızca değişen parçaları gönderebilirsiniz** (hepsi zorunlu değildir): `nace.txt` (NACE kodları),
+  `mizan.xlsx` (hesap planı), `faturalar/*.xml` + `yevmiye.xlsx|csv` (öğrenme emsalleri; ikisi **birlikte** gelmeli). Zip'te olmayan parçaya dokunulmaz.
+  - **Mizan** tam hesap planı olarak değerlendirilir: yeni hesap eklenir, adı değişen güncellenir, dosyada artık **olmayan hesap silinir** (eski değeri
+    kayıtta kalır). Veri kaybına karşı koruma: dosyada hiç hesap yoksa ya da mevcut hesapların yarısından fazlası silinecekse mizan **değiştirilmez**
+    ve cevapta `uyari` döner — eksik dosya gönderdiyseniz tam dosyayla yeniden yükleyin.
+  - **Emsaller (faturalar + yevmiye):** yeni fatura eklenir, hesap kayıtları ya da karşı tarafı değişen güncellenir; aynı olana dokunulmaz. Dosyada olmayan
+    emsaller **silinmez**. (Emsal yalnızca hesap kodu/yön içerir; yevmiyede yalnızca TUTAR değişirse emsal değişmiş sayılmaz.)
+  - **NACE:** `nace.txt` yoksa dokunulmaz; nokta/boşluk farkı (`10.71.01` = `107101`) değişiklik sayılmaz.
 - Şirket başına hata diğerlerini durdurmaz. `kuruldu` ama `ayrinti` doluysa şirket kuruldu
   fakat anahtar kapsamına eklenemedi — bize bildirin.
 - Gönderdiğiniz ham veri iş bitince **sunucudan silinir**; yalnızca kurulum sonucu kalır.

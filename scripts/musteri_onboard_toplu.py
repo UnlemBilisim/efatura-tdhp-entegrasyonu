@@ -43,6 +43,7 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR / "Mcp_mimarisi" / "scripts"))
+sys.path.insert(0, str(ROOT_DIR / "Mcp_mimarisi" / "src"))  # efatura_kdv.sirket_bilgileri (güncelleme yolu tenant_onboarding import etmeden NACE'ye ihtiyaç duyar)
 sys.path.insert(0, str(ROOT_DIR / "model_eval"))
 sys.path.insert(0, str(ROOT_DIR / "model_eval" / "scripts"))
 
@@ -141,6 +142,95 @@ def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str, ile
 
 # Genel (herkese açık) ad — entegrasyon/musteri_onboard_api.py zip uç noktası bunu çağırır.
 musteriyi_onboard_et = _musteriyi_onboard_et
+
+
+def musteriyi_guncelle(vkn: str, musteri_dizini: Path, database_url: str, ilerleme=None, is_id=None, istemci=None) -> dict:
+    """KAYITLI bir şirketin onboarding verisini GÜNCELLER (2026-10-16, kullanıcı kararı): gelen dosyalar mevcut veriyle karşılaştırılır,
+    yalnızca FARK uygulanır, eski değer + güncellenme zamanı `onboarding_guncelleme_gecmisi` tablosuna loglanır; fark yoksa hiçbir şey yazılmaz.
+    Ayrıntı ve kurallar: `model_eval/core/onboarding_guncelleme.py`.
+
+    Kısmi güncelleme mümkündür — zip'te yalnızca mevcut olan parçalar işlenir: `nace.txt` (NACE), `mizan.xlsx` (hesap planı),
+    `faturalar/*.xml` + `yevmiye.xlsx|csv` (RAG emsalleri; ikisi BİRLİKTE gelmeli). Hiçbiri yoksa hata.
+    `ilerleme(adim, yuzde)`: nace 25 → mizan 50 → eslestirme 75 → rag 100 (parça yoksa o adım atlanıp ilerleme yine bildirilir).
+    Parçalar sırayla ve ayrı işlemlerle uygulanır; sonraki parça hata verirse öncekiler (zaten loglanmış olarak) kalır, tekrar
+    çalıştırmak güvenlidir (uygulanmış fark artık fark sayılmaz)."""
+    import psycopg2
+    from psycopg2 import sql
+
+    _ilerle = ilerleme or (lambda adim, yuzde: None)
+    mizan_yolu = musteri_dizini / "mizan.xlsx"
+    faturalar = musteri_dizini / "faturalar"
+    yevmiye = next((p for p in (musteri_dizini / "yevmiye.xlsx", musteri_dizini / "yevmiye.csv") if p.exists()), None)
+    nace_var = (musteri_dizini / "nace.txt").exists()
+    mizan_var = mizan_yolu.exists()
+    fatura_var = faturalar.is_dir() and any(faturalar.glob("*.xml"))
+    if fatura_var != (yevmiye is not None):
+        raise OnboardHatasi(f"{vkn}: faturalar/*.xml ve yevmiye.xlsx|csv BİRLİKTE gelmeli (yalnızca biri var)")
+    if not (nace_var or mizan_var or fatura_var):
+        raise OnboardHatasi(f"{vkn}: güncellenecek dosya yok (nace.txt, mizan.xlsx ya da faturalar/ + yevmiye bekleniyor)")
+
+    from core.onboarding_guncelleme import mizan_guncelle, nace_guncelle, rag_guncelle, rag_kayitlarini_hazirla  # noqa: E402
+
+    ozet: dict = {"mod": "guncelleme", "vkn": vkn}
+    conn = psycopg2.connect(database_url)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(sql.SQL("SET search_path TO {}, public").format(sql.Identifier(f"tenant_{vkn}")))
+        conn.commit()
+        cur = conn.cursor()
+
+        if nace_var:
+            from efatura_kdv.sirket_bilgileri import nace_kodlarini_getir, nace_kodlarini_kaydet  # noqa: E402
+
+            yeni_nace = _nace_kodlarini_oku(musteri_dizini)
+            if yeni_nace:
+                ozet["nace"] = nace_guncelle(
+                    vkn, yeni_nace, cur, is_id, istemci,
+                    getir=lambda v: nace_kodlarini_getir(v, database_url=database_url),
+                    kaydet=lambda v, k: nace_kodlarini_kaydet(v, k, database_url=database_url),
+                )
+                conn.commit()
+            else:
+                ozet["nace"] = {"degisti": False, "uyari": "nace.txt boş — NACE değiştirilmedi"}
+        _ilerle("nace", 25)
+
+        if mizan_var:
+            from mizan_excel_yukle import mizan_hesap_satirlari  # noqa: E402
+
+            ozet["mizan"] = mizan_guncelle(mizan_hesap_satirlari(mizan_yolu), cur, vkn, is_id, istemci)
+            conn.commit()
+        _ilerle("mizan", 50)
+
+        if fatura_var:
+            from yevmiye_fatura_esle import esle_ve_uret  # noqa: E402
+
+            cikti_dizini = musteri_dizini / ".jsons_uretilen"
+            esl = esle_ve_uret(vkn, faturalar, yevmiye, cikti_dizini)
+            _ilerle("eslestirme", 75)
+            if esl["eslesen"] == 0:
+                ozet["rag"] = {"yeni": 0, "degisen": 0, "ayni": 0, "taranan": 0,
+                               "uyari": "hiçbir fatura yevmiye ile eşleşmedi — emsal değiştirilmedi"}
+            else:
+                from rag_common import get_collection, koleksiyon_adi_coz  # noqa: E402
+
+                koleksiyon = get_collection(collection_name=koleksiyon_adi_coz(vkn))
+                ozet["rag"] = rag_guncelle(rag_kayitlarini_hazirla(cikti_dizini), koleksiyon, cur, vkn, is_id, istemci)
+                conn.commit()
+            ozet["rag"]["fatura_eslesme"] = f"{esl['eslesen']}/{esl['toplam_xml']}"
+            ozet["rag"]["yon_belirsiz"] = len(esl["yon_belirsiz_atlanan"])
+        _ilerle("rag", 100)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    ozet["degisiklik_var"] = bool(
+        (ozet.get("nace") or {}).get("degisti")
+        or (ozet.get("mizan") or {}).get("uygulandi")
+        or (ozet.get("rag") or {}).get("yeni") or (ozet.get("rag") or {}).get("degisen")
+    )
+    return ozet
 
 
 def main() -> None:

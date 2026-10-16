@@ -73,9 +73,9 @@ function isler() {
     Object.entries(j.sirketler || {}).forEach(([vkn, s]) => {
       const r = el("div", undefined, "sirket");
       r.appendChild(el("span", vkn, "mono"));
-      const d = el("span", s.durum, "durum " + (s.durum === "hata" ? "d5" : s.durum === "atlandi" ? "d4" : "d2")); r.appendChild(d);
+      const d = el("span", s.durum, "durum " + (s.durum === "hata" ? "d5" : (s.durum === "atlandi" || s.durum === "degismedi") ? "d4" : "d2")); r.appendChild(d);
       r.appendChild(el("span", "%" + (s.yuzde ?? 0) + (s.adim ? " " + s.adim : ""), "soluk"));
-      r.appendChild(el("span", s.ayrinti || (s.ozet ? "mizan " + s.ozet.mizan_satir_sayisi + " satır, fatura eşleşme " + s.ozet.fatura_eslesme : ""), s.durum === "hata" ? "hata-metni" : "soluk"));
+      r.appendChild(el("span", s.ayrinti || (s.ozet ? (s.ozet.mod === "guncelleme" ? "güncelleme: " + (s.ozet.degisiklik_var ? "değişiklik uygulandı" : "fark yok") : "mizan " + s.ozet.mizan_satir_sayisi + " satır, fatura eşleşme " + s.ozet.fatura_eslesme) : ""), s.durum === "hata" ? "hata-metni" : "soluk"));
       k.appendChild(r);
     });
     if ((j.gecersiz_klasorler || []).length) k.appendChild(el("div", "Geçersiz klasörler: " + j.gecersiz_klasorler.join(", "), "soluk"));

@@ -6,7 +6,8 @@
 >
 > ✅ **Uygulandı** (2026-10-06): `entegrasyon/musteri_onboard_api.py`. Aşağıdaki akış Docker içinde,
 > gerçek PostgreSQL + RAG ile geçici bir veritabanında uçtan uca denendi (mock şirket 6 sn'de
-> kuruldu; aynı zip ikinci kez yüklenince `atlandi`).
+> kuruldu). **2026-10-16:** kayıtlı şirket artık güncellenir (aşağıya bakın); gerçek veritabanıyla test edildi
+> (`model_eval/tests/test_musteri_guncelle_orkestrasyon.py`).
 
 ## Bu nedir?
 
@@ -111,7 +112,9 @@ bir süre kalabilir. Şirket `durum`:
 |---|---|---|
 | `bekliyor` / `calisiyor` | Sırada / işleniyor | Bekle (mock şirket ~6 sn; gerçek veri, fatura sayısına göre daha uzun) |
 | `kuruldu` | Şema, mizan, RAG tamam; VKN anahtarın kapsamına eklendi | `ozet`'te mizan satırı ve fatura eşleşme oranına bak |
-| `atlandi` | Şirket zaten kurulu — **hiçbir şey değişmedi** | Güncelleme gerekiyorsa bu uç nokta kullanılmaz |
+| `guncellendi` | Kayıtlı şirket: fark bulundu, **yalnızca fark** uygulandı (`ozet`'te parça parça) | Geçmiş tablosuna bak |
+| `degismedi` | Kayıtlı şirket, gelen veri mevcutla aynı — hiçbir şey yazılmadı | Normal |
+| `atlandi` | Kayıtlı şirket ama anahtar o VKN'ye yetkili değil — hiçbir şey değişmedi | Yetki gerekiyorsa `vkn-ekle` |
 | `hata` | Bu şirket kurulamadı; diğerleri etkilenmedi. Neden `ayrinti`'de | Aşağıdaki "Sorun giderme" |
 
 `ozet` örneği: `{"mizan_satir_sayisi": 21, "fatura_eslesme": "2/2", "yon_belirsiz": 0, "nace_kodlari": ["107101"]}`.
@@ -123,7 +126,10 @@ Kurulumdan sonra fatura işlemeye hazır olduğunu şöyle doğrula:
 
 ## Güvenlik ve davranış kuralları
 
-- **Mevcut şirket asla ezilmez.** Onboarding mizanı silip yeniden yazdığı için, kayıtlı bir VKN gelirse `atlandi`.
+- **Kayıtlı şirket GÜNCELLENİR, ezilmez** (2026-10-16): anahtar o VKN adına yetkiliyse gelen veri mevcutla karşılaştırılır; aynıysa hiçbir şey yazılmaz,
+  farklıysa yalnızca fark uygulanır, eski değer + zaman `onboarding_guncelleme_gecmisi` tablosuna loglanır. Yetkisizse `atlandi`.
+  Kısmi zip mümkün (yalnız `mizan.xlsx` / `nace.txt` / `faturalar`+`yevmiye`). Mizan tam hesap planı sayılır: dosyada olmayan hesap silinir (eski değeri
+  geçmişte), ama dosya boşsa ya da hesapların >%50'si silinecekse uygulanmaz (`uyari`). RAG emsalleri yalnızca eklenir/güncellenir, hiç silinmez.
 - **Yarım kalan kurulum:** Bir şirket ortada hata verirse "yarım" olarak işaretlenir. Aynı anahtarla zip'i
   düzeltip yeniden yüklerseniz kurulum **tamamlanır** (başka anahtar bunu yapamaz, `atlandi` alır).
 - **Zip güvenli açılır:** `../` yolları, parola korumalı zip, 20.000'den fazla girdi, tek dosya >100 MB, açılmış
@@ -174,3 +180,18 @@ Birim ve entegrasyon testleri (veritabanı/Ollama gerektirmeden): `entegrasyon/t
 | 200 MB zip sınırı (gövde belleğe alınmaz) | `entegrasyon/security.py` |
 | İş durumu (kalıcı) | `ONBOARD_DATA_DIR` → compose'ta `efatura-onboarding` volume'ü (`/app/data/onboarding`) |
 | Env değişkenleri | [`servisler-ve-portlar.md`](../reference/servisler-ve-portlar.md) |
+
+## Güncelleme geçmişini sorgulama (kayıtlı şirket)
+
+Her güncellemede eski değer + yeni değer + zaman + iş/anahtar, şirketin **kendi şemasındaki** `onboarding_guncelleme_gecmisi` tablosuna yazılır
+(varsayılan şirkette `public`). Örnek (sunucuda):
+
+```bash
+docker exec efatura-sistemi-postgres-1 psql -U efatura -d efatura_kdv -c "
+  SET search_path TO tenant_<VKN>, public;
+  SELECT guncelleme_zamani, alan, islem, anahtar, eski_deger, yeni_deger, istemci
+  FROM onboarding_guncelleme_gecmisi ORDER BY id DESC LIMIT 20;"
+```
+
+`alan`: `nace` | `mizan` | `rag`; `islem`: `eklendi` | `guncellendi` | `silindi`. İlk KURULUMDAKİ toplu yazma loglanmaz (geçmiş yalnızca güncellemeleri izler).
+Mizanda değişen satırın `updated_at` sütunu da yenilenir.

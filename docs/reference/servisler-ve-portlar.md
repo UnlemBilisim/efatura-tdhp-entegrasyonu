@@ -114,6 +114,7 @@ tablosuna dokunmazlar:
 | `islenmis_faturalar` | Mcp_mimarisi | Claim tablosu (aynı fatura iki kez işlenmesin) |
 | `model_eval_sonuclar` | model_eval | Tahmin sonuçları + onay kayıtları |
 | `model_eval_bekleyen_tahminler` | model_eval | Süreli, sunucu taraflı onay kayıtları |
+| `onboarding_guncelleme_gecmisi` | entegrasyon (zip güncelleme) | Kayıtlı şirket güncellemelerinin geçmişi: alan (`nace`/`mizan`/`rag`), işlem, anahtar, ESKİ değer, yeni değer, güncellenme zamanı, iş/istemci. **Şirketin kendi şemasında** (varsayılan şirkette `public`), ilk kullanımda otomatik oluşur |
 | `api_anahtarlari` | entegrasyon | Şirkete bağlı API anahtarlarının sha256 özeti + izinli VKN listesi (her zaman `public` şemada) |
 
 > ✅ **Uygulandı** (2026-07-28): Bu tabloların tam yedeği `pg_dump -F c` ile
@@ -215,3 +216,7 @@ docker compose logs -f app | grep -A 45 "DIŞ EKİP JSON"
 > (`entegrasyon/toplu_fatura_api.py`) — sözleşme: `entegrasyon/docs/reference/dis-ekip-api-kullanimi.md` §10. İş durumu ve sonuçlar
 > `ONBOARD_DATA_DIR/toplu/` altında (onboarding ile aynı `efatura-onboarding` volume'ü). Her istek ayrıca `entegrasyon.istek` logger'ıyla
 > hata mesajı dahil tek JSON satırı olarak loglanır (`entegrasyon/istek_gunlugu.py`; panel: `izleme/`).
+
+> ✅ **Uygulandı** (2026-10-16): Kayıtlı şirket zip ile **güncellenir** (`degismedi`/`guncellendi`; yetkisiz anahtar `atlandi`) —
+> `model_eval/core/onboarding_guncelleme.py`, `scripts/musteri_onboard_toplu.py::musteriyi_guncelle`. Yeni env değişkeni yok.
+> Ayrıntı: kök `CLAUDE.md` 2026-10-16 notu, `docs/how-to/musteri-onboard-zip.md`.
