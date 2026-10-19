@@ -13,13 +13,15 @@ ARSIV_DIZINI = "/app/data/onboarding/arsiv"
 ISLER_DIZINI = "/app/data/onboarding/isler"
 TOPLU_DIZINI = "/app/data/onboarding/toplu"
 
-IZINLI_DOSYALAR = ("gelen.zip", "istek.xml", "cevap.json", "meta.json")
+IZINLI_DOSYALAR = ("gelen.zip", "istek.xml", "cevap.json", "iz.json", "meta.json")
 # DİKKAT: `$` sondaki "\n"den önce de eşleşir (re.match("^x$", "x\n") başarılı!) — kabuğa satır sonu sızmasın diye fullmatch.
 ID_DESENI = re.compile(r"[0-9a-f]{12,32}")
 IS_ID_DESENI = re.compile(r"[0-9a-f]{32}")
 # Tarayıcıda önizlenecek metin dosyalarında üst sınır (bayt): büyük cevap panelin/SSH'in boğulmasına yol açmasın.
 ONIZLEME_BAYT = 262144
 ONIZLEME_SONUC_BAYT = 2097152
+# Karar izi (iz.json): istemler (prompt) ve ham model cevapları yüzünden birkaç yüz KB olabilir; panel bunu ayrıştırıp yapılandırılmış gösterir.
+IZ_BAYT = 4194304
 TOPLU_SONUC_DOSYASI = "sonuclar.jsonl"  # arşivde değil, toplu işin dizininde (bizim fatura başına verdiğimiz cevaplar)
 
 

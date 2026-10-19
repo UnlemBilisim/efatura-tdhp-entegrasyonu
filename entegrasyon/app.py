@@ -61,7 +61,10 @@ from istek_gunlugu import IstekGunluguMiddleware
 
 from mcp_mimarisi_istemcisi import McpMimarisiErisilemezHatasi, fatura_kontrol_et
 from model_eval_koprusu import (
+    KARAR_IZI,
     BekleyenTahminHatasi,
+    iz_adim,
+    yeni_karar_izi,
     bekleyen_tahmin_kaydet,
     bekleyen_tahmini_onayla,
     fatura_kur_bilgisi,
@@ -377,19 +380,28 @@ def fatura_isle(
     vkn_yetkisini_dogrula(kimlik, istek.satici_vkn)
     rid = mevcut_request_id()
     istemci_ip = request.client.host if request.client else None
+    # Karar izi: yalnızca gelen-istek arşivi açıkken toplanır; dış API cevabına GİRMEZ (istemler iç bilgidir), `iz.json` olarak arşive yazılır.
+    iz = yeni_karar_izi() if istek_arsivi.aktif() else None
+    jeton = KARAR_IZI.set(iz)
     try:
         with fatura_isle_sirasi():
             cevap = _fatura_isle_ic(istek)
     except HTTPException as exc:  # 400/404/502… — gelen XML ve hata nedeni de incelenebilsin
+        iz_adim("hata", "İstek reddedildi", "kural", sonuc=f"HTTP {exc.status_code}", neden=str(exc.detail)[:400])
         istek_arsivi.fatura_kaydet(rid, istek.fatura_xml, None, {"durum": exc.status_code, "detay": str(exc.detail)[:300]},
-                                   kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi)
+                                   kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi, iz=iz.to_dict() if iz else None)
         raise
     except Exception:  # noqa: BLE001
+        iz_adim("hata", "Beklenmeyen hata", "sistem", sonuc="HTTP 500", neden="İşlem sırasında beklenmeyen bir hata oluştu (ayrıntı sunucu logunda).")
         istek_arsivi.fatura_kaydet(rid, istek.fatura_xml, None, {"durum": 500, "detay": "beklenmeyen hata"},
-                                   kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi)
+                                   kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi, iz=iz.to_dict() if iz else None)
         raise
+    finally:
+        KARAR_IZI.reset(jeton)
+    if iz is not None:  # (bağlam reset edildi: son adım doğrudan toplayıcıya yazılır; ekle() hatalarını kendi içinde yutar)
+        iz.ekle("sonuc", "İstek tamamlandı", "sistem", f"aşama: {cevap.asama}", cevap.mesaj, asama=cevap.asama, yon=cevap.yon)
     istek_arsivi.fatura_kaydet(rid, istek.fatura_xml, cevap.model_dump(mode="json"), None,
-                               kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi)
+                               kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi, iz=iz.to_dict() if iz else None)
     _test_kaydini_logla(istek, cevap)
     _audit_logla(istek, cevap, request, kimlik)
     return cevap
@@ -469,12 +481,19 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
         istek.satici_vkn, istek.satici_nace_kodlari, fatura_boyutu, istek.onay,
     )
 
+    iz_adim("istek", "İstek alındı", "sistem", sonuc=f"VKN {istek.satici_vkn}, XML {fatura_boyutu} bayt",
+            neden="Dış sistem POST /fatura/isle ile fatura XML'ini gönderdi; API anahtarı doğrulandı ve anahtarın bu VKN adına yetkisi var.",
+            satici_vkn=istek.satici_vkn, satici_nace_kodlari=istek.satici_nace_kodlari, xml_bayt=fatura_boyutu, onay=istek.onay,
+            kur_secimi=istek.kur_secimi, dosya_adi=istek.dosya_adi, gonderen_kullanici=istek.gonderen_kullanici)
+
     # Onboard edilmemiş şirket reddedilir (2026-09-28): önceden kabul
     # ediliyor, kayıtları sessizce public şemaya (Akyüzlü'nün verisine)
     # yazılıyordu. model_eval hazır değilse bu kontrol yapılamaz; o durumda
     # akış zaten tahmin/kayıt üretmeden "model_eval_hazir_degil" ile biter.
     if model_eval_hazir_mi()[0] and not sirket_kayitli_mi(istek.satici_vkn):
         _logger.warning("[1/5] ŞİRKET KAYITLI DEĞİL — own_vkn=%s", istek.satici_vkn)
+        iz_adim("sirket", "Şirket kaydı kontrolü", "kural", sonuc="kayıtlı değil → 404",
+                neden=f"VKN {istek.satici_vkn} için şirket şeması (tenant) yok; önce onboard edilmeli. Aksi halde kayıtlar başka şirketin verisine karışırdı.")
         raise HTTPException(
             status_code=404,
             detail=(
@@ -483,6 +502,8 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
             ),
         )
 
+    iz_adim("sirket", "Şirket kaydı kontrolü", "kural", sonuc="kayıtlı",
+            neden=f"VKN {istek.satici_vkn} için şirket şeması (mizan, RAG, geçmiş) mevcut; tahmin bu şirketin kendi verisiyle yapılır.")
     _logger.info("[2/5] YÖN TESPİTİ — fatura kendi VKN'imizin satıcı/alıcı tarafında olduğu tespit ediliyor")
     try:
         # Parse edilmiş invoice burada saklanır ve model_eval'e (tdhp_tahmini_yap)
@@ -493,6 +514,8 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
         parsed_invoice = faturayi_parse_et_ve_yonu_dogrula(istek.fatura_xml, istek.satici_vkn)
         yon = parsed_invoice["direction"]
     except FaturaYonuBelirsizHatasi as exc:
+        iz_adim("yon", "Yön tespiti", "kural", sonuc="belirsiz → 400",
+                neden=f"Kendi VKN'miz ({istek.satici_vkn}) faturanın ne satıcı ne alıcı tarafında bulundu; yanlış VKN gönderilmiş olabilir. {exc}")
         _logger.warning("[2/5] YÖN BELİRSİZ — %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except ET.ParseError as exc:
@@ -505,6 +528,11 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
             detail=f"Geçersiz XML — belge ayrıştırılamadı: {exc}",
         ) from exc
     _logger.info("[2/5] YÖN TESPİT EDİLDİ — %s", yon)
+    iz_adim("yon", "Yön tespiti (alış/satış)", "kural", sonuc=f"{yon} ({'biz kestik: satış' if yon == 'outbox' else 'bize geldi: alış'})",
+            neden=(f"Kendi VKN'miz ({istek.satici_vkn}) faturada " + ("SATICI" if yon == "outbox" else "ALICI") + " tarafında; karşı taraf "
+                   f"{parsed_invoice['header'].get('account_title')} (VKN {parsed_invoice['header'].get('account_tax_number')}). "
+                   "Yön XML'den tespit edilir, kullanıcıya sorulmaz."),
+            kendi_vkn=istek.satici_vkn, karsi_taraf_vkn=parsed_invoice["header"].get("account_tax_number"), yon=yon)
 
     if yon == "inbox":
         # Kullanıcı kararı (2026-07-22): dışarıdan gelen faturalarda
@@ -512,6 +540,8 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
         # sadece bizim kestiğimiz (outbox) faturalar için tasarlandı (bkz.
         # Mcp_mimarisi/project.md §3.9). İnbox'ta doğrudan TDHP tahminine geçilir.
         _logger.info("[3/5] ÖN FİLTRE ATLANDI — inbox fatura, Mcp_mimarisi hiç çağrılmıyor")
+        iz_adim("on_filtre", "KDV/NACE ön filtresi", "kural", sonuc="atlandı (inbox)",
+                neden="Başkasının kestiği faturanın KDV mevzuat sorumluluğu bizde değil; ön filtre yalnızca bizim kestiğimiz (outbox) faturalara uygulanır, doğrudan hesap tahminine geçilir.")
 
         hazir, hazir_mesaji = model_eval_hazir_mi()
         if not hazir:
@@ -523,6 +553,8 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
 
         kur_cevabi = _kur_onayi_gerekiyor_mu(istek, yon)
         if kur_cevabi is not None:
+            iz_adim("kur", "Döviz kuru kontrolü", "kural", sonuc="kullanıcı seçimi bekleniyor",
+                    neden="Fatura TL dışında bir para biriminde ve kur bilgisi taşıyor; kur çevirisi asla sessizce yapılmaz, kullanıcıya sorulur (kur_secimi).")
             return kur_cevabi
 
         _logger.info("[4/5] MODEL_EVAL'A GÖNDERİLİYOR — predict_single_invoice() çağrılıyor (RAG + LLM, uzun sürebilir)")
@@ -571,6 +603,15 @@ def _fatura_isle_ic(istek: FaturaIsleIstegi) -> FaturaIsleCevabi:
     devam_etsin = genel_karar == "uygun" or (
         genel_karar == "insan_incelemesi_gerekli" and istek.onay is True
     )
+    iz_adim("on_filtre", "KDV/NACE ön filtresi (Mcp_mimarisi)", "kural", sonuc=f"genel karar: {genel_karar}",
+            neden="Satıcının NACE kodlarının izin verdiği KDV oranları ile faturadaki beyan edilen oranlar deterministik kuralla karşılaştırıldı (KDV uygunluğu modele sorulmaz). "
+                  f"{len(on_filtre.get('satir_sonuclari', []))} kalem kontrol edildi.",
+            on_filtre=on_filtre)
+    iz_adim("devam", "Devam kararı", "kural", sonuc="TDHP tahminine geçildi" if devam_etsin else "durduruldu: insan onayı bekleniyor",
+            neden=("Ön filtre 'uygun' dedi." if genel_karar == "uygun" else
+                   ("Ön filtre 'insan incelemesi gerekli' dedi ve kullanıcı onay=true ile devam etmeyi seçti." if devam_etsin else
+                    "Ön filtre 'insan incelemesi gerekli' dedi ve onay verilmedi; kullanıcı onayı olmadan hesap tahmini yapılmaz.")),
+            genel_karar=genel_karar, onay=istek.onay)
 
     if not devam_etsin:
         _logger.info(

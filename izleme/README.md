@@ -16,7 +16,7 @@ Ek kurulum gerekmez (yalnızca Python 3 standart kütüphanesi). Sunucuya **paro
 | Sekme | İçerik |
 |---|---|
 | **İstekler** | Zaman, yöntem+yol, durum kodu, süre, istemci (API anahtarı etiketi) / IP, **hata mesajı**. Satıra tıklayınca tüm alanlar açılır |
-| **Gelen dosyalar** | Sunucunun arşivlediği gelen istekler (zip / tek fatura): indirme düğmeleri; satıra tıklayınca zip içeriği, **bizim verdiğimiz cevap**, başlatılan iş (toplu işte fatura başına sonuçlar), o isteğe ait loglar. Ayrıntı: [`docs/how-to/gelen-dosyalari-inceleme.md`](../docs/how-to/gelen-dosyalari-inceleme.md) |
+| **Gelen dosyalar** (tek faturada ayrıca **Karar izi**: nasıl işlendi, kim karar verdi, hangi istem/kural, neden — bkz. how-to) | Sunucunun arşivlediği gelen istekler (zip / tek fatura): indirme düğmeleri; satıra tıklayınca zip içeriği, **bizim verdiğimiz cevap**, başlatılan iş (toplu işte fatura başına sonuçlar), o isteğe ait loglar. Ayrıntı: [`docs/how-to/gelen-dosyalari-inceleme.md`](../docs/how-to/gelen-dosyalari-inceleme.md) |
 | **Onboarding işleri** | Her iş için yüzde çubuğu; şirket bazında durum (`kuruldu`/`atlandi`/`hata`), adım ve hata nedeni; **mizan okuma raporu** (dosyada kaç satır vardı, kaçı alındı, atlananların sebebi, ek sayfa/geçersiz kod uyarıları) |
 | **Hata logları** | Uyarı/hata satırları (yetki reddi, beklenmeyen hata, Python hata izi) |
 | **Ham log** | Son satırlar, filtresiz |

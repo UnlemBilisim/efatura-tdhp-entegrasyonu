@@ -712,6 +712,17 @@ bir mimari denetim geçirdi:**
 > tek şirketin verisiyle ölçüldü; hâlâ ~%15 müşteri insana kalır (ağır farklı yazım); mizanda 25 çift aynı adlı mükerrer kart var (120) — o müşteriler her zaman belirsiz çıkar, mizan
 > temizlenirse düzelir.
 
+> ✅ **Uygulandı** (2026-10-19, kullanıcı isteği — "gelen veriler nasıl işlendi, kim karar verdi, niye, hangi prompt, hangi kural"): **Karar izi.** Tek fatura isteklerinde (`POST /fatura/isle`)
+> işlemin adım adım kaydı gelen-istek arşivine `iz.json` olarak yazılır ve izleme panelinde (Gelen dosyalar → istek detayı → "Karar izi") gösterilir. Kayıt: `model_eval/core/iz.py::KararIzi`
+> (toplayıcı), `core/single.py` (`predict_single_invoice(iz=...)`, `_alt_kirilim_uygula(iz=...)`, `_cari_esle_ayrintili().adaylar_ayrintili`), `entegrasyon/model_eval_koprusu.py` (`KARAR_IZI` bağlamı, `iz_adim`,
+> doğrulama + "nihai kayıtlar: kim/neden" özeti), `entegrasyon/app.py` (istek, şirket kontrolü, yön, ön filtre, devam kararı adımları), `entegrasyon/istek_arsivi.py` (`iz.json`). Her adımda **kim karar verdi**
+> (`sistem` / `kural` / `llm` / `rag` / `dogrulama`), **sonuç**, **neden** ve ayrıntı (modele giden SİSTEM ve KULLANICI istemleri, modelin ham cevabı, RAG emsalleri ve few-shot bloğu, ipuçları, alt kırılım
+> adaylarının her biri için kabul/ret NEDENİ, modelin seçimlerinin mizana karşı doğrulaması, KDV oran düzeltmesi, doğrulama kuralları) bulunur. **Garantiler:** (1) iz toplamak sonucu DEĞİŞTİRMEZ (`iz=None` iken kod yolu aynı;
+> testle doğrulandı), (2) iz hatası işlemi BOZMAZ (her adım `_iz_dene` ile hata-yutan), (3) dış API cevabına GİRMEZ (istemler iç bilgidir; testle doğrulandı), (4) arşiv kapalıyken (`GELEN_ARSIV_GUN=0`) toplanmaz.
+> **Gizlilik:** iz, istemler aracılığıyla fatura içeriğini (karşı taraf adı, kalemler) ve mizan seçeneklerini içerir — gelen XML ile aynı saklama süresi ve erişim (yalnızca panel/SSH). **Sınırlar:** yalnızca TEK fatura
+> (`/fatura/isle`); toplu fatura (zip) ve onboarding için henüz yok; dağıtımdan ÖNCE işlenen istekler için iz yoktur. Testler: `model_eval/tests/test_iz.py` (15), `entegrasyon/tests/test_istek_arsivi.py` (karar izi 4),
+> `izleme/tests/test_arsiv.py` (iz 4). Nasıl kullanılır: [`../docs/how-to/gelen-dosyalari-inceleme.md`](../docs/how-to/gelen-dosyalari-inceleme.md) "Karar izi".
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),

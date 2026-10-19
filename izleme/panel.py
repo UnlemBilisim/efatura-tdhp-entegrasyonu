@@ -161,6 +161,21 @@ def _istek_loglari(kaynak: Kaynak, meta: dict, request_id: str) -> dict:
         return {"istekler": [], "hatalar": [], "ham": [], "log_hatasi": str(exc)[:200]}
 
 
+def _karar_izi(kaynak: Kaynak, meta: dict, request_id: str):
+    """`iz.json` (karar izi): nasıl işlendi, kim karar verdi, hangi istem/kural, neden. Yoksa None; okunamazsa {"hata": ...}."""
+    boyut = (meta.get("dosyalar") or {}).get("iz.json")
+    if boyut is None:
+        return None
+    try:
+        ham = kaynak.metin_oku(arsiv.dosya_yolu(request_id, "iz.json"), arsiv.IZ_BAYT)
+        iz = _json_ya_da_yok(ham)
+        if not isinstance(iz, dict):
+            return {"hata": "iz.json ayrıştırılamadı" + (" (dosya önizleme sınırından büyük, indirip inceleyin)" if boyut > arsiv.IZ_BAYT else ""), "bayt": boyut}
+        return iz
+    except Exception as exc:  # noqa: BLE001
+        return {"hata": str(exc)[:200], "bayt": boyut}
+
+
 def arsiv_detayi(kaynak: Kaynak, request_id: str) -> dict:
     """Bir istek için: meta, gelen metin dosyalarının (XML) ve bizim cevabımızın önizlemesi, bağlı iş ve o isteğe ait log satırları."""
     meta = _json_ya_da_yok(kaynak.metin_oku(arsiv.dosya_yolu(request_id, "meta.json"), 262144))
@@ -176,7 +191,8 @@ def arsiv_detayi(kaynak: Kaynak, request_id: str) -> dict:
                             "kesildi": boyut > arsiv.ONIZLEME_BAYT, "bayt": boyut}
         except Exception as exc:  # noqa: BLE001
             onizleme[ad] = {"metin": None, "hata": str(exc)[:200], "bayt": boyut}
-    return {"meta": meta, "onizleme": onizleme, "is": _is_ve_sonuclar(kaynak, meta), "log": _istek_loglari(kaynak, meta, request_id)}
+    return {"meta": meta, "onizleme": onizleme, "iz": _karar_izi(kaynak, meta, request_id), "is": _is_ve_sonuclar(kaynak, meta),
+            "log": _istek_loglari(kaynak, meta, request_id)}
 
 
 def sunucu_olustur(kaynak: Kaynak, port: int) -> ThreadingHTTPServer:

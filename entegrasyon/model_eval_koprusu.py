@@ -149,6 +149,7 @@ def tdhp_tahmini_yap(
         convert_to_try=convert_to_try,
         parsed_invoice=parsed_invoice,
         rag_collection=tenant_kaynaklari["rag_collection"],
+        iz=KARAR_IZI.get(),
     )
 
     # Dis ekip semasi (2026-07-27 sozlesmesi): ayni kayitlarin onlarin
@@ -185,6 +186,7 @@ def tdhp_tahmini_yap(
         validation = validate_prediction(sonuc, invoice, own_vkn)
         sonuc["validation_errors"] = validation["errors"]
         sonuc["approvable"] = validation["valid"] and not sonuc.get("error")
+        _dogrulama_izi_yaz(sonuc)
     except Exception as exc:  # noqa: BLE001
         # Zarf uretimi ANA tahmini etkilemez - records[] zaten hazir, sadece
         # ust bilgiler eksik kalir (alt kirilim adiminin fallback deseniyle
@@ -196,6 +198,55 @@ def tdhp_tahmini_yap(
             "message": "Deterministik dogrulama tamamlanamadi.",
         }]
     return sonuc
+
+
+_KAYNAK_ETIKETLERI = {
+    "fuzzy_cari": "kural: cari ad eşleştirme",
+    "fuzzy_kalem": "kural: kalem adı eşleştirme",
+    "llm": "model (LLM)",
+    "cari_belirsiz": "kural: belirsiz (mükerrer kart) → insan",
+}
+
+
+def _dogrulama_izi_yaz(sonuc: dict) -> None:
+    """Karar izine iki adım ekler: deterministik doğrulamanın sonucu ve 'nihai hesap kayıtları kim/neden' özeti. Toplayıcı yoksa ya da hata olursa sessiz."""
+    if KARAR_IZI.get() is None:
+        return
+    try:
+        hatalar = sonuc.get("validation_errors") or []
+        iz_adim(
+            "dogrulama", "Deterministik doğrulama", "dogrulama",
+            sonuc="ONAYLANABİLİR" if sonuc.get("approvable") else "ONAYLANAMAZ",
+            neden=("Başarısız kurallar: " + ", ".join(sorted({h.get("code", "?") for h in hatalar})) + " — kayıt /fatura/onayla ile onaylanamaz, insan kontrolü gerekir."
+                   if hatalar else "Tüm kurallar geçti: kod biçimi, TDHP ana kodu, alt hesabın şirket mizanında varlığı, Borç/Alacak yönü, pozitif tutar, "
+                                   "borç=alacak, borç toplamı faturanın ödenecek (ya da KDV dahil) tutarına eşit, çözülemeyen karşı taraf yok."),
+            kontroller=["hesap kodu biçimi", "TDHP ana kodu listede", "alt hesap şirket mizanında var", "yön Borç/Alacak", "tutar pozitif",
+                        "borç = alacak", "borç toplamı = ödenecek tutar (tevkifatta KDV dahil toplam)", "çözülemeyen karşı taraf uyarısı yok"],
+            hatalar=hatalar, borc_toplam=sonuc.get("borc_toplam"), alacak_toplam=sonuc.get("alacak_toplam"),
+        )
+        entries = sonuc.get("entries") or []
+        records = (sonuc.get("dis_sema") or {}).get("records") or sonuc.get("records") or []
+        kayitlar = []
+        for i, e in enumerate(entries):
+            iz_k = e.get("secim_kaynagi") or {}
+            kod = str(e.get("account_code", ""))
+            if iz_k.get("kaynak") in _KAYNAK_ETIKETLERI:
+                alt_karar = _KAYNAK_ETIKETLERI[iz_k["kaynak"]]
+            elif "." in kod:
+                alt_karar = "model (ana model doğrudan alt kodlu yazdı)"
+            else:
+                alt_karar = "çözülemedi / alt kırılım yok → insan kontrolü" if e.get("uyari") else "alt kırılım gerekmedi"
+            kayit = records[i] if len(records) == len(entries) else {}
+            kayitlar.append({
+                "hesap": kod, "hesap_adi": e.get("account_description"), "yon": e.get("dc"), "tutar": e.get("amount"),
+                "ana_kod_karari": "model (LLM): geçmiş emsaller + ipuçları + fatura içeriği", "alt_kirilim_karari": alt_karar,
+                "gerekce": kayit.get("account_code_reason"), "uyari": e.get("uyari"), "onerilen_yeni_kod": e.get("onerilen_yeni_kod"),
+            })
+        iz_adim("kayit_ozeti", "Nihai hesap kayıtları: kim, neden", "sistem",
+                sonuc=f"{len(kayitlar)} kayıt", neden="Her satır için 3 haneli ana kodu model, alt kırılımı (varsa) kural ya da model belirledi; gerekçe dış şemadaki account_code_reason ile aynıdır.",
+                kayitlar=kayitlar)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def faturayi_onayla(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict, onaylandi_zamani: str) -> None:
@@ -253,6 +304,33 @@ def faturayi_onayla(fatura_xml: str, own_vkn: str, tdhp_tahmini: dict, onaylandi
 
 
 _tahmin_ttl_dakika: contextvars.ContextVar = contextvars.ContextVar("tahmin_ttl_dakika", default=30)
+
+# Karar izi (2026-10-19, kullanici istegi): bir /fatura/isle isteginin nasil islendigini (kim karar verdi, hangi kural/istem, neden) kaydeden toplayici.
+# Istek basinda app.py::fatura_isle olusturup bu degiskene koyar; entegrasyon adimlari `iz_adim`, model_eval ise `predict_single_invoice(iz=...)` ile ayni toplayiciya
+# yazar. Toplayici yoksa (toplu fatura, testler) hicbir sey yapilmaz. Ayrinti: model_eval/core/iz.py.
+KARAR_IZI: contextvars.ContextVar = contextvars.ContextVar("karar_izi", default=None)
+
+
+def yeni_karar_izi():
+    """model_eval'in KararIzi toplayicisini olusturur; model_eval import edilemezse None (iz kapali, islem etkilenmez)."""
+    try:
+        model_eval_yolunu_ekle()
+        from core.iz import KararIzi
+
+        return KararIzi()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def iz_adim(tur, baslik, karar_veren, sonuc=None, neden=None, **detay):
+    """Mevcut istegin karar izine bir adim ekler; toplayici yoksa ya da bir hata olursa sessizce gecer (iz yardimci kayittir)."""
+    iz = KARAR_IZI.get()
+    if iz is None:
+        return
+    try:
+        iz.ekle(tur, baslik, karar_veren, sonuc, neden, **detay)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def tahmin_ttl_ayarla(dakika: int):

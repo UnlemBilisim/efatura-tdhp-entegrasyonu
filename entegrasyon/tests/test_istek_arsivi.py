@@ -312,3 +312,79 @@ def test_fatura_isle_yetkisiz_vkn_403_arsivlenmez(monkeypatch):
     r = _fatura_istemci(monkeypatch, lambda i: None).post("/fatura/isle", json={"fatura_xml": "<a/>", "satici_vkn": "2222222222"}, headers=H)
     assert r.status_code == 403
     assert not ia.kok().exists() or not list(ia.kok().iterdir())
+
+
+# ---------------- karar izi (iz.json) ----------------
+
+def _gercek_akis_istemcisi(monkeypatch, sahte_tdhp=None, kontrol=None):
+    """_fatura_isle_ic GERÇEK çalışır; yalnızca dış bağımlılıklar (Mcp, model_eval, DB) sahtelenir."""
+    import api_anahtarlari
+    import app as A
+
+    kimlik = IstemciKimligi("musavir", False, frozenset({VKN_A}), False)
+    monkeypatch.setattr(api_anahtarlari, "anahtari_dogrula", lambda a: kimlik if a == "gecerli" else None)
+    monkeypatch.setattr(A, "model_eval_hazir_mi", lambda: (True, ""))
+    monkeypatch.setattr(A, "sirket_kayitli_mi", lambda v: True)
+    monkeypatch.setattr(A, "faturayi_parse_et_ve_yonu_dogrula",
+                        lambda xml, vkn: {"direction": "outbox", "header": {"account_title": "ÖRNEK MÜŞTERİ A.Ş.", "account_tax_number": "9990000000"}})
+    monkeypatch.setattr(A, "fatura_kontrol_et", kontrol or (lambda *a, **k: {"genel_karar": "uygun", "fatura_no": "F1", "satir_sonuclari": [{"kalem": "x", "karar": "uygun"}]}))
+    monkeypatch.setattr(A, "fatura_kur_bilgisi", lambda *a, **k: {"exchange_rate": None})
+    monkeypatch.setattr(A, "bekleyen_tahmin_kaydet", lambda *a, **k: "pid-1")
+    monkeypatch.setattr(A, "_test_kaydini_logla", lambda *a, **k: None)
+
+    def varsayilan_tdhp(xml, own_vkn, convert_to_try=False, parsed_invoice=None):
+        A.iz_adim("ana_llm", "Ana model: 3 haneli hesap kodları", "llm", sonuc="120 Borc 100.00", sistem_istemi="GIZLI-SISTEM-ISTEMI", kullanici_istemi="GIZLI-KULLANICI-ISTEMI")
+        return {"invoice_id": "F1", "direction": "outbox", "currency": "TRY", "entries": [], "records": [], "balanced": True, "borc_toplam": 0.0,
+                "alacak_toplam": 0.0, "self_corrected": False, "self_correct_reason": None, "error": None, "approvable": True, "validation_errors": []}
+
+    monkeypatch.setattr(A, "tdhp_tahmini_yap", sahte_tdhp or varsayilan_tdhp)
+    return TestClient(A.app, raise_server_exceptions=False)
+
+
+def test_karar_izi_iz_json_olarak_arsivlenir_ve_dis_cevaba_girmez(monkeypatch):
+    cl = _gercek_akis_istemcisi(monkeypatch)
+    r = cl.post("/fatura/isle", json={"fatura_xml": "<Invoice/>", "satici_vkn": VKN_A, "dosya_adi": "f1.xml"}, headers=H)
+    assert r.status_code == 200, r.text
+    # ---- dış cevap: istemler (prompt) ve iz asla sızmaz
+    assert "GIZLI-SISTEM-ISTEMI" not in r.text and "adimlar" not in r.text and "karar_izi" not in r.text
+    # ---- arşiv: iz.json
+    d = ia.kok() / r.headers["X-Request-ID"]
+    iz = json.loads((d / "iz.json").read_text(encoding="utf-8"))
+    turler = [a["tur"] for a in iz["adimlar"]]
+    assert turler == ["istek", "sirket", "yon", "on_filtre", "devam", "ana_llm", "sonuc"]
+    adim = {a["tur"]: a for a in iz["adimlar"]}
+    assert adim["istek"]["detay"]["satici_vkn"] == VKN_A and adim["istek"]["detay"]["dosya_adi"] == "f1.xml"
+    assert adim["yon"]["karar_veren"] == "kural" and adim["yon"]["sonuc"].startswith("outbox") and VKN_A in adim["yon"]["neden"]
+    assert adim["on_filtre"]["karar_veren"] == "kural" and adim["on_filtre"]["detay"]["on_filtre"]["genel_karar"] == "uygun"
+    assert adim["devam"]["sonuc"] == "TDHP tahminine geçildi"
+    assert adim["ana_llm"]["detay"]["sistem_istemi"] == "GIZLI-SISTEM-ISTEMI"          # istem arşivde VAR
+    assert adim["sonuc"]["detay"]["asama"] == "tdhp_tahmini_tamamlandi"
+    meta = json.loads((d / "meta.json").read_text(encoding="utf-8"))
+    assert "iz.json" in meta["dosyalar"] and meta["dosyalar"]["iz.json"] == (d / "iz.json").stat().st_size
+
+
+def test_karar_izi_reddedilen_istekte_nerede_durdugunu_gosterir(monkeypatch):
+    cl = _gercek_akis_istemcisi(monkeypatch, kontrol=lambda *a, **k: (_ for _ in ()).throw(ValueError("VKN uyuşmazlığı")))
+    r = cl.post("/fatura/isle", json={"fatura_xml": "<Invoice/>", "satici_vkn": VKN_A}, headers=H)
+    assert r.status_code == 400
+    iz = json.loads((ia.kok() / r.headers["X-Request-ID"] / "iz.json").read_text(encoding="utf-8"))
+    assert [a["tur"] for a in iz["adimlar"]][-1] == "hata"
+    assert "VKN uyuşmazlığı" in iz["adimlar"][-1]["neden"] and iz["adimlar"][-1]["sonuc"] == "HTTP 400"
+
+
+def test_karar_izi_arsiv_kapaliyken_toplanmaz(monkeypatch):
+    monkeypatch.setenv("GELEN_ARSIV_GUN", "0")
+    cl = _gercek_akis_istemcisi(monkeypatch)
+    r = cl.post("/fatura/isle", json={"fatura_xml": "<Invoice/>", "satici_vkn": VKN_A}, headers=H)
+    assert r.status_code == 200 and not ia.kok().exists()
+
+
+def test_karar_izi_toplanamazsa_islem_yine_calisir(monkeypatch):
+    import app as A
+
+    cl = _gercek_akis_istemcisi(monkeypatch)
+    monkeypatch.setattr(A, "yeni_karar_izi", lambda: None)  # model_eval import edilemedi senaryosu: iz kapalı
+    r = cl.post("/fatura/isle", json={"fatura_xml": "<Invoice/>", "satici_vkn": VKN_A}, headers=H)
+    assert r.status_code == 200
+    d = ia.kok() / r.headers["X-Request-ID"]
+    assert (d / "istek.xml").exists() and not (d / "iz.json").exists()

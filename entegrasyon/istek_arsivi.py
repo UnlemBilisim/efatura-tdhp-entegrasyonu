@@ -3,6 +3,9 @@
 Neden: Zip'ler ve faturalar iş bitince silindiği için (dış ekibe verilen söz) bir sorun çıktığında (örn. eksik mizan) orijinal dosyaya bakmak mümkün
 olmuyordu. Bu modül, gelen dosyayı ve cevabı **sınırlı süre** (varsayılan 7 gün) ayrı bir dizinde tutar, süre dolunca ve boyut tavanı aşılınca otomatik siler.
 
+Dosyalar: `gelen.zip` (zip uçları), `istek.xml` + `cevap.json` (tek fatura), `iz.json` (KARAR İZİ, yalnızca tek fatura: işlem adım adım — kim karar verdi, hangi istem/kural, neden;
+bkz. model_eval/core/iz.py), `meta.json`. İstemler fatura içeriği taşıdığı için `iz.json` de XML ile aynı süre/erişimle saklanır, dış API cevabına GİRMEZ.
+
 Güvenlik/gizlilik kararları (2026-10-19, kullanıcı isteğiyle):
   * Arşive yalnızca izleme paneli SSH üzerinden erişir; API'ye yeni bir uç nokta EKLENMEDİ (dışarıdan erişilemez).
   * Saklama süresi `GELEN_ARSIV_GUN` (0 = kapalı), toplam boyut tavanı `GELEN_ARSIV_MAX_MB` (varsayılan 2048): aşılınca en eskiler silinir.
@@ -29,7 +32,7 @@ from typing import Optional
 
 _logger = logging.getLogger("entegrasyon.arsiv")
 
-IZINLI_DOSYALAR = ("gelen.zip", "istek.xml", "cevap.json", "meta.json")
+IZINLI_DOSYALAR = ("gelen.zip", "istek.xml", "cevap.json", "iz.json", "meta.json")
 ID_DESENI = re.compile(r"[0-9a-f]{12,32}")  # fullmatch ile kullanılır (`$` sondaki "\n"i de kabul ederdi)
 TEMIZLIK_ARALIGI_SN = 300
 ZIP_ICERIK_MAX = 300  # meta.json'a yazılacak en fazla dosya adı (panelde "zip'in içinde ne var" görünümü için)
@@ -152,8 +155,8 @@ def hata_yaz(request_id: str, durum: int, detay: str) -> None:
 
 
 def fatura_kaydet(request_id: str, xml: str, cevap: Optional[dict], hata: Optional[dict], istemci: Optional[str],
-                  ip: Optional[str], vkn: Optional[str], dosya_adi: Optional[str]) -> None:
-    """Tek-fatura isteği: gelen XML + bizim cevabımız (ya da hata)."""
+                  ip: Optional[str], vkn: Optional[str], dosya_adi: Optional[str], iz: Optional[dict] = None) -> None:
+    """Tek-fatura isteği: gelen XML + bizim cevabımız (ya da hata) + karar izi (`iz.json`: nasıl işlendi, kim karar verdi, hangi istem/kural, neden)."""
     if not aktif():
         return
     try:
@@ -165,6 +168,9 @@ def fatura_kaydet(request_id: str, xml: str, cevap: Optional[dict], hata: Option
         if cevap is not None:
             (d / "cevap.json").write_text(json.dumps(cevap, ensure_ascii=False, indent=1), encoding="utf-8")
             dosyalar["cevap.json"] = (d / "cevap.json").stat().st_size
+        if iz:
+            (d / "iz.json").write_text(json.dumps(iz, ensure_ascii=False), encoding="utf-8")
+            dosyalar["iz.json"] = (d / "iz.json").stat().st_size
         t = (cevap or {}).get("tdhp_tahmini") or {}
         meta_yaz(
             request_id, tip="fatura_isle", zaman=_simdi(), istemci=istemci, ip=ip, yol="/fatura/isle",

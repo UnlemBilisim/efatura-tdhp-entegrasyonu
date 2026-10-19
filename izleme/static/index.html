@@ -48,6 +48,21 @@
   .onizleme { max-height:380px; overflow:auto; background:var(--kod); border-radius:8px; padding:10px; }
   .rozet { display:inline-block; padding:0 7px; border-radius:6px; font-size:11px; font-weight:600; background:var(--kod); color:var(--soluk); margin-right:4px; }
   .geri { margin-bottom:10px; }
+  /* Karar izi */
+  .iz-aciklama { font-size:12px; color:var(--soluk); margin-bottom:10px; }
+  .adim { border:1px solid var(--cizgi); border-left-width:5px; border-radius:8px; padding:9px 12px; margin-bottom:8px; background:var(--kart); }
+  .adim.kv-kural { border-left-color:#2f5bea; } .adim.kv-llm { border-left-color:#9b4dca; } .adim.kv-rag { border-left-color:#0e9aa7; }
+  .adim.kv-dogrulama { border-left-color:#d9822b; } .adim.kv-sistem { border-left-color:#8a94a6; } .adim.kv-kullanici { border-left-color:#12805c; }
+  .adim-baslik { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .adim-no { display:inline-block; min-width:22px; text-align:center; border-radius:11px; background:var(--kod); font-size:12px; padding:0 6px; color:var(--soluk); }
+  .rozet.kv-kural { background:#e3eafd; color:#2f5bea; } .rozet.kv-llm { background:#f1e4fa; color:#9b4dca; } .rozet.kv-rag { background:#dff4f6; color:#0e8791; }
+  .rozet.kv-dogrulama { background:#fdebd9; color:#b8650f; } .rozet.kv-sistem { background:var(--kod); color:var(--soluk); } .rozet.kv-kullanici { background:var(--ok-bg); color:var(--ok); }
+  .adim-sonuc { margin:4px 0 2px; font-weight:600; } .adim-neden { color:var(--yazi); margin:2px 0 4px; font-size:13px; }
+  .adim details { margin:4px 0; } .adim details > summary { cursor:pointer; color:var(--ana); font-size:12px; }
+  .adim details > pre, .adim .alt-adim { margin:4px 0 4px; background:var(--kod); border-radius:6px; padding:8px 10px; max-height:420px; overflow:auto; }
+  .adim table { margin:4px 0; font-size:12px; } .adim table th { position:static; }
+  .alt-adim { border-left:3px solid var(--cizgi); }
+  .hata-satiri td { background:var(--hata-bg); }
 </style>
 </head>
 <body>

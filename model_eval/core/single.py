@@ -192,14 +192,44 @@ def _unvan_ilk_parca_esit(unvan, aday):
     return len(_ayirt_edici(ilk)) >= 2 and _unvan_ayirt_edici_uyusuyor(ilk, aday)
 
 
+def _eslesmeyen_kelimeler(hedef, aday):
+    """Karar izi aciklamasi icin: hedef unvanin ayirt edici kelimelerinden adayda karsiligi OLMAYANLAR ve adayin ayirt edici kelimelerinden hedefte karsiligi OLMAYANLAR."""
+    h_eksik = [x[0] for x in _ayirt_edici(hedef) if not any(_unvan_kelime_uyar(x, y) for y in aday)]
+    a_eksik = [y[0] for y in _ayirt_edici(aday) if not any(_unvan_kelime_uyar(y, x) for x in hedef)]
+    return h_eksik, a_eksik
+
+
+def _cari_aday_nedeni(hedef, aday, oran, ayirt, kesilmis, ilk_parca, uyar):
+    """Bir cari kart adayinin neden KABUL edildigini ya da neden REDDEDILDIGINI insan okunur bir cumleyle anlatir (karar izi)."""
+    if uyar:
+        if ayirt:
+            return f"Kabul: ayırt edici kelimelerin hepsi iki unvanda da karşılık buluyor (benzerlik %{oran * 100:.0f})."
+        if ilk_parca:
+            return "Kabul: unvanın ayıraçtan (tire/eğik çizgi) önceki kısmı kart adıyla birebir uyuşuyor."
+        return "Kabul: kart adı, unvanın başındaki ayırt edici kelimelerin kesilmiş/kısaltılmış hali."
+    if _unvan_form_celisiyor(hedef, aday):
+        formlar = lambda t: "/".join(sorted(k for k, _ in t if k in UNVAN_HUKUKI_FORMLAR))  # noqa: E731
+        return f"Ret: hukuki form farklı (fatura: {formlar(hedef)}, kart: {formlar(aday)})."
+    h_eksik, a_eksik = _eslesmeyen_kelimeler(hedef, aday)
+    parcalar = []
+    if h_eksik:
+        parcalar.append(f"faturadaki {', '.join(h_eksik)} kartta yok")
+    if a_eksik:
+        parcalar.append(f"kartta {', '.join(a_eksik)} var, faturada yok")
+    if parcalar:
+        return f"Ret: ayırt edici kelimeler uyuşmuyor ({'; '.join(parcalar)}); benzerlik %{oran * 100:.0f}."
+    return f"Ret: benzerlik %{oran * 100:.0f} eşiğin ({CARI_FUZZY_ESIK * 100:.0f}) altında ve kesilmiş/ilk-parça kuralları da sağlanmıyor."
+
+
 def _cari_esle_ayrintili(karsi_taraf_unvani, alt_secenekler):
-    """Karsi taraf unvanini (kod, ad) cari kartlariyla eslestirir. Doner: {"durum", "kod", "oran", "adaylar"}.
+    """Karsi taraf unvanini (kod, ad) cari kartlariyla eslestirir. Doner: {"durum", "kod", "oran", "adaylar", "adaylar_ayrintili"}.
       "eslesti"   : kurallardan (yukaridaki 1-3) en az birini saglayan TEK en iyi kart; "kod" dolu.
       "belirsiz"  : birden fazla kart esit derecede uyuyor (mukerrer kart) -> kart SECILMEZ; "adaylar" = [(kod, ad), ...].
-      "eslesmedi" : uygun kart yok; "oran" = en yuksek HAM benzerlik (bilgi amacli)."""
+      "eslesmedi" : uygun kart yok; "oran" = en yuksek HAM benzerlik (bilgi amacli).
+    `adaylar_ayrintili` (karar izi icin): en yuksek benzerlikli 5 kart, her biri icin kabul/ret NEDENI."""
     from difflib import SequenceMatcher
 
-    bos = {"durum": "eslesmedi", "kod": None, "oran": 0.0, "adaylar": []}
+    bos = {"durum": "eslesmedi", "kod": None, "oran": 0.0, "adaylar": [], "adaylar_ayrintili": []}
     if not karsi_taraf_unvani or not alt_secenekler:
         return bos
     hedef = _unvan_tokenla(karsi_taraf_unvani)
@@ -207,26 +237,36 @@ def _cari_esle_ayrintili(karsi_taraf_unvani, alt_secenekler):
         return bos
     hedef_metin = " ".join(k for k, _ in hedef)
     ayirt_edici_h = len(_ayirt_edici(hedef))
-    en_iyi_ham, gecenler = 0.0, []
+    en_iyi_ham, gecenler, puanlar = 0.0, [], []
     for kod, ad in alt_secenekler:
         aday = _unvan_tokenla(ad)
         oran = SequenceMatcher(None, hedef_metin, " ".join(k for k, _ in aday)).ratio()
         en_iyi_ham = max(en_iyi_ham, oran)
-        uyar = False
-        if _unvan_ayirt_edici_uyusuyor(hedef, aday):
-            uyar = oran >= CARI_FUZZY_ESIK or (ayirt_edici_h >= 2 and len(_ayirt_edici(aday)) >= 2)
+        ayirt = _unvan_ayirt_edici_uyusuyor(hedef, aday)
+        uyar = ayirt and (oran >= CARI_FUZZY_ESIK or (ayirt_edici_h >= 2 and len(_ayirt_edici(aday)) >= 2))
+        kesilmis = ilk_parca = False
         if not uyar:
-            uyar = _unvan_kesilmis_mi(hedef, aday) or _unvan_ilk_parca_esit(karsi_taraf_unvani, aday)
+            kesilmis = _unvan_kesilmis_mi(hedef, aday)
+            ilk_parca = _unvan_ilk_parca_esit(karsi_taraf_unvani, aday)
+            uyar = kesilmis or ilk_parca
         if uyar:
             gecenler.append((oran, kod, ad))
+        puanlar.append((oran, kod, ad, aday, ayirt, kesilmis, ilk_parca, uyar))
+    en_yakin = sorted(puanlar, key=lambda p: -p[0])[:5]
+    ayrintili = [
+        {"kod": kod, "ad": ad, "benzerlik": round(oran, 3), "kabul": bool(uyar),
+         "neden": _cari_aday_nedeni(hedef, aday, oran, ayirt, kesilmis, ilk_parca, uyar)}
+        for oran, kod, ad, aday, ayirt, kesilmis, ilk_parca, uyar in en_yakin
+    ]
     if not gecenler:
-        return {**bos, "oran": en_iyi_ham}
+        return {**bos, "oran": en_iyi_ham, "adaylar_ayrintili": ayrintili}
     gecenler.sort(key=lambda t: -t[0])
     en = gecenler[0]
     esitler = [g for g in gecenler[1:] if en[0] - g[0] <= CARI_BELIRSIZLIK_FARKI and g[1] != en[1]]
     if esitler:
-        return {"durum": "belirsiz", "kod": None, "oran": en[0], "adaylar": [(k, a) for _o, k, a in [en] + esitler][:5]}
-    return {"durum": "eslesti", "kod": en[1], "oran": en[0], "adaylar": []}
+        return {"durum": "belirsiz", "kod": None, "oran": en[0], "adaylar": [(k, a) for _o, k, a in [en] + esitler][:5],
+                "adaylar_ayrintili": ayrintili}
+    return {"durum": "eslesti", "kod": en[1], "oran": en[0], "adaylar": [], "adaylar_ayrintili": ayrintili}
 
 
 def _cari_fuzzy_esles(karsi_taraf_unvani, alt_secenekler):
@@ -413,6 +453,7 @@ def predict_single_invoice(
     convert_to_try=False,
     alt_kirilim=True,
     parsed_invoice=None,
+    iz=None,
 ):
     """Ham bir UBL-TR XML faturasi (string) icin TDHP tahmini uretir.
 
@@ -483,6 +524,10 @@ def predict_single_invoice(
     )
     if convert_to_try:
         invoice = convert_invoice_to_try(invoice)
+    _iz_dene(iz, lambda: _izle(iz, "fatura_ozeti", "Fatura ayrıştırıldı", "sistem",
+          sonuc=f"{invoice.get('direction')} fatura — {invoice['header'].get('account_title')}",
+          neden="Ham UBL-TR XML'den üst bilgiler, vergiler ve kalemler çıkarıldı; karşı taraf, yöne göre satıcı/alıcı olarak seçildi (ihracatta BuyerCustomerParty öncelikli).",
+          fatura=_fatura_ozeti(invoice), kur_cevrimi=bool(convert_to_try)))
 
     rag_similar = None
     rag_block = ""
@@ -501,14 +546,46 @@ def predict_single_invoice(
         rag_similar = rag_common.retrieve_similar(collection, invoice, k=rag_k)
         block = rag_common.format_few_shot_block(rag_similar)
         rag_block = f"\n{block}\n" if block else ""
+        if iz is not None:
+            _iz_dene(iz, lambda: _izle(iz, "rag", "Geçmiş benzer faturalar (RAG)", "rag",
+                  sonuc=f"{len(rag_similar)} emsal bulundu" + (f", en yakın mesafe {min(r['distance'] for r in rag_similar):.3f}" if rag_similar else ""),
+                  neden="Bu şirketin onaylanmış/yüklenmiş geçmiş faturalarından, karşı taraf ve kalem adlarına göre en benzerleri bulundu (önce aynı karşı tarafın geçmişi). "
+                        "Ana modele few-shot örnek olarak verildi; tutarlar ve kodlar benzerlik aramasına dahil edilmez.",
+                  sorgu_metni=rag_common.build_retrieval_text(invoice),
+                  emsaller=[{"fatura_no": r["invoice_id"], "mesafe": round(r["distance"], 3), "karsi_taraf": r["account_title"], "yon": r["direction"],
+                             "hesaplar": [f"{e.get('code')} {e.get('dc')}" for e in r["entries"]]} for r in rag_similar],
+                  guclu_emsal=(rag_common.strongest_precedent(rag_similar) or {}).get("invoice_id"),
+                  few_shot_blogu=block))
+    elif iz is not None:
+        _izle(iz, "rag", "Geçmiş benzer faturalar (RAG)", "rag", sonuc="kapalı", neden="Bu çağrıda RAG (emsal araması) kapatılmış.")
 
     user_prompt = build_user_prompt(
         invoice, sector, tevkifat_hint=tevkifat_hint, rag_block=rag_block, iade_hint=iade_hint,
         ihrac_kayitli_hint=ihrac_kayitli_hint,
     )
 
+    if iz is not None:
+        try:
+            from .prompting import compute_iade_hint, compute_ihrac_kayitli_hint, compute_tevkifat_hint
+
+            ipuclari = []
+            for ad, acik, fonk in (("tevkifat", tevkifat_hint, compute_tevkifat_hint), ("iade", iade_hint, compute_iade_hint),
+                                   ("ihraç kayıtlı (istisna 701-704)", ihrac_kayitli_hint, compute_ihrac_kayitli_hint)):
+                if acik:
+                    metin = fonk(invoice)
+                    if metin:
+                        ipuclari.append({"kural": ad, "metin": metin})
+            _izle(iz, "ipuclari", "Deterministik ipuçları", "kural",
+                  sonuc=", ".join(i["kural"] for i in ipuclari) if ipuclari else "bu faturada ipucu gerekmedi",
+                  neden="Faturanın içeriğine göre (tevkifat, iade, ihraç kayıtlı) kural tabanlı olarak üretilen muhasebe ipuçları ana modelin istemine eklenir; "
+                        "modelin zayıf olduğu aritmetiği kurallar üstlenir.", ipuclari=ipuclari)
+        except Exception:  # noqa: BLE001 — iz yardimci kayittir
+            pass
+
     raw, latency, err = call_model(spec, system_prompt, user_prompt, temperature, timeout)
     if err:
+        _iz_dene(iz, lambda: _izle(iz, "ana_llm", "Ana model: 3 haneli hesap kodları", "llm", sonuc=f"HATA: {err}", neden="Model çağrısı başarısız oldu; tahmin üretilemedi.",
+                                   model=spec.get("model"), saglayici=spec.get("provider"), sistem_istemi=system_prompt, kullanici_istemi=user_prompt, sicaklik=temperature))
         return {
             "invoice_id": invoice["invoice_id"],
             "direction": invoice["direction"],
@@ -525,6 +602,8 @@ def predict_single_invoice(
 
     entries, parse_err = parse_model_output(raw)
     if parse_err:
+        _iz_dene(iz, lambda: _izle(iz, "ana_llm", "Ana model: 3 haneli hesap kodları", "llm", sonuc=f"AYRIŞTIRILAMADI: {parse_err}", neden="Model cevabı beklenen JSON biçiminde değil.",
+                                   model=spec.get("model"), saglayici=spec.get("provider"), sistem_istemi=system_prompt, kullanici_istemi=user_prompt, ham_cevap=raw, sure_sn=latency))
         return {
             "invoice_id": invoice["invoice_id"],
             "direction": invoice["direction"],
@@ -540,6 +619,12 @@ def predict_single_invoice(
         }
 
     entry_dicts, totals = _normalize_entries(entries)
+    _iz_dene(iz, lambda: _izle(iz, "ana_llm", "Ana model: 3 haneli hesap kodları", "llm",
+          sonuc=" | ".join(f"{e['account_code']} {e['dc']} {e['amount']:.2f}" for e in entry_dicts) or "kayıt üretilmedi",
+          neden="Model, fatura içeriğine, ipuçlarına ve (varsa) geçmiş emsallere bakarak hangi 3 haneli hesaplara hangi yönde ve ne kadar yazılacağına karar verdi. "
+                "Bu aşamada alt hesap (cari kart vb.) seçilmez; o ayrıca, kural ve mizanla yapılır.",
+          model=spec.get("model"), saglayici=spec.get("provider"), sistem_istemi=system_prompt, kullanici_istemi=user_prompt, ham_cevap=raw, sure_sn=latency,
+          sicaklik=temperature, dengeli=totals["balanced"], borc_toplam=totals["borc_toplam"], alacak_toplam=totals["alacak_toplam"]))
 
     self_corrected = False
     self_correct_reason = None
@@ -565,18 +650,24 @@ def predict_single_invoice(
                 spec["base_url"], spec["model"], system_prompt, user_prompt, raw, correction_request,
                 temperature, timeout,
             )
+            corr_parse_err = None
             if not corr_err:
                 corr_entries, corr_parse_err = parse_model_output(corr_raw)
                 if not corr_parse_err:
                     entry_dicts, totals = _normalize_entries(corr_entries)
                     self_corrected = True
                     raw = corr_raw
+            _iz_dene(iz, lambda: _izle(iz, "oz_duzeltme", "Öz düzeltme (ikinci bakış)", "llm",
+                  sonuc="düzeltme uygulandı: " + " | ".join(f"{e['account_code']} {e['dc']}" for e in entry_dicts) if self_corrected else "uygulanmadı (düzeltme cevabı kullanılamadı)",
+                  neden={"balance": "Borç ve alacak toplamları eşit değildi; modele dengeyi düzeltmesi söylendi.",
+                         "precedent_mismatch": "Modelin cevabı, çok yakın bir geçmiş emsalden farklıydı; modele emsali hatırlatıp düzeltme şansı verildi."}.get(self_correct_reason),
+                  neden_kodu=self_correct_reason, duzeltme_istemi=correction_request, ham_cevap=corr_raw, hata=corr_err or corr_parse_err, uygulandi=self_corrected))
         if not self_corrected:
             self_correct_reason = None
 
     if alt_kirilim and entry_dicts:
         entry_dicts = _alt_kirilim_uygula(
-            invoice, entry_dicts, spec, system_prompt, temperature, timeout, own_vkn,
+            invoice, entry_dicts, spec, system_prompt, temperature, timeout, own_vkn, iz=iz,
         )
 
     return {
@@ -594,7 +685,88 @@ def predict_single_invoice(
     }
 
 
-def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, timeout, own_vkn):
+def _izle(iz, tur, baslik, karar_veren, sonuc=None, neden=None, **detay):
+    """Karar izi toplayicisi varsa adim ekler (iz=None ise HICBIR sey yapmaz; bkz. core/iz.py). Toplayicinin her hatasi yutulur: iz yardimci kayittir."""
+    if iz is not None:
+        try:
+            iz.ekle(tur, baslik, karar_veren, sonuc, neden, **detay)
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _iz_dene(iz, hesapla):
+    """`hesapla` (argumansiz fonksiyon) YALNIZCA iz toplaniyorsa calistirilir ve her hatasi yutulur: iz argumanlarinin hesaplanmasi (bicimlendirme, ozetleme)
+    uretim akisini ASLA bozmamali, iz=None iken de bir maliyeti olmamali."""
+    if iz is None:
+        return
+    try:
+        hesapla()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _fatura_ozeti(invoice):
+    """Karar izi icin faturanin ozeti (tum fatura degil): ust bilgiler, KDV oranlari, kalemler."""
+    h = invoice.get("header", {})
+    return {
+        "fatura_no": invoice.get("invoice_id"), "yon": invoice.get("direction"), "yon_belirsiz": invoice.get("direction_uncertain"),
+        "karsi_taraf": h.get("account_title"), "karsi_taraf_vkn": h.get("account_tax_number"), "tip": h.get("invoice_type"),
+        "para_birimi": h.get("currency"), "tarih": h.get("issue_date"), "matrah": h.get("tax_exclusive"),
+        "kdv_dahil_toplam": h.get("tax_inclusive"), "odenecek": h.get("payable"),
+        "kdv_oranlari": sorted(_fatura_kdv_oranlari(invoice)),
+        "vergiler": [{"ad": t.get("name"), "oran": t.get("percent"), "tutar": t.get("tax"), "istisna": (t.get("exemption") or {}).get("code") or None}
+                     for t in invoice.get("taxes", [])][:12],
+        "kalemler": [{"ad": ln.get("product_name"), "miktar": ln.get("quantity"), "tutar": ln.get("total")} for ln in invoice.get("lines", [])][:30],
+        "kalem_sayisi": len(invoice.get("lines", [])),
+    }
+
+
+def _alt_kirilim_izi_yaz(iz, ilgili, ana_koddan_alt_koda, kod_kaynagi, iz_detay, karsi_taraf_unvani):
+    """Alt kirilim adiminin HER ana kod icin sonucunu (kim karar verdi, hangi kural, neden) karar izine yazar. Hatasi yutulur (iz yardimci kayittir)."""
+    _iz_dene(iz, lambda: _alt_kirilim_izi_yaz_ic(iz, ilgili, ana_koddan_alt_koda, kod_kaynagi, iz_detay, karsi_taraf_unvani))
+
+
+def _alt_kirilim_izi_yaz_ic(iz, ilgili, ana_koddan_alt_koda, kod_kaynagi, iz_detay, karsi_taraf_unvani):
+    ad_of = {k: a for secenekler in ilgili.values() for k, a in secenekler}
+    for kod in ilgili:
+        detay = dict(iz_detay.get(kod, {}))
+        secilen = ana_koddan_alt_koda.get(kod)
+        kaynak = (kod_kaynagi.get(kod) or {}).get("kaynak")
+        if kod in CARI_HESAP_KODLARI:
+            esleme = detay.pop("esleme", None) or {}
+            detay.update({"karsi_taraf_unvani": karsi_taraf_unvani, "esik": CARI_FUZZY_ESIK, "kart_sayisi": len(ilgili[kod]),
+                          "adaylar": esleme.get("adaylar_ayrintili", []),
+                          "kurallar": ["ayırt edici kelime çifti (genel/hukuki kelimeler sayılmaz, noktalı kısaltma önek sayılır, hukuki form çelişmemeli)",
+                                       "kesilmiş kart (kartta ≥3 ayırt edici kelime ya da noktalı kısaltma)",
+                                       "ilk parça (unvan 'KİŞİ - TİCARİ AD' ise tireden önceki kısım)",
+                                       "iki farklı kart aynı skoru alırsa seçilmez (belirsiz)"]})
+            if esleme.get("durum") == "eslesti":
+                _izle(iz, "alt_kirilim", f"{kod} cari kartı", "kural", sonuc=f"{secilen} {ad_of.get(secilen, '')}".strip(),
+                      neden=f"Faturadaki karşı taraf '{karsi_taraf_unvani}', mizandaki '{ad_of.get(secilen)}' kartıyla eşleşti (benzerlik %{esleme.get('oran', 0) * 100:.0f}). "
+                            "Cari kartı model değil deterministik ad eşleştirme bağlar.", **detay)
+            elif esleme.get("durum") == "belirsiz":
+                _izle(iz, "alt_kirilim", f"{kod} cari kartı", "kural", sonuc="belirsiz → seçilmedi (insan kontrolü)",
+                      neden="Birden fazla kart eşit derecede uyuyor (mükerrer cari kart olabilir): " + ", ".join(f"{k} {a}" for k, a in esleme.get("adaylar", [])) +
+                            ". Yanlış karta bağlamamak için kart seçilmedi.", **detay)
+            else:
+                _izle(iz, "alt_kirilim", f"{kod} cari kartı", "kural", sonuc="bulunamadı → ana kodda kaldı (insan kontrolü)",
+                      neden=f"'{karsi_taraf_unvani}' ünvanı mizandaki {len(ilgili[kod])} cari kartın hiçbiriyle eşleşmedi (en yüksek ham benzerlik %{esleme.get('oran', 0) * 100:.0f}). "
+                            "Modele sorulmadı: karşı taraf mizanda yokken model 'en yakın isimli başka müşteriyi' seçebiliyordu (canlıda görüldü). "
+                            "Yeni müşteri/tedarikçi olabilir; yeni kart önerisi uyarıda.", **detay)
+        elif kaynak == "fuzzy_kalem":
+            _izle(iz, "alt_kirilim", f"{kod} alt kırılımı", "kural", sonuc=f"{secilen} {ad_of.get(secilen, '')}".strip(),
+                  neden=f"Faturadaki kalem adı, '{ad_of.get(secilen)}' alt kırılım adıyla tam olarak BİR seçenekte anlamlı kelime eşleşmesi gösterdi; model çağrılmadan seçildi.", **detay)
+        elif kaynak == "llm":
+            duzeltildi = (kod_kaynagi.get(kod) or {}).get("oran_duzeltildi")
+            _izle(iz, "alt_kirilim", f"{kod} alt kırılımı", "llm", sonuc=f"{secilen} {ad_of.get(secilen, '')}".strip(),
+                  neden="Model, mizandaki alt kırılım seçenekleri arasından faturaya uygun olanı seçti; seçim mizan listesine karşı doğrulandı."
+                        + (" KDV oranı faturadaki orana göre kural tarafından düzeltildi." if duzeltildi else ""), **detay)
+        else:
+            _izle(iz, "alt_kirilim", f"{kod} alt kırılımı", "kural", sonuc="çözülemedi → ana kodda kaldı (insan kontrolü)",
+                  neden="Ne ad/kalem eşleştirme ne de model mizandaki seçeneklerden geçerli bir seçim üretti; uydurma alt kod atamak yerine 3 haneli kodda bırakıldı.", **detay)
+
+
+def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, timeout, own_vkn, iz=None):
     """entry_dicts'teki her benzersiz 3 haneli account_code icin, mizan'daki
     alt kirilim secenekleri varsa (kod mizanda hic yoksa o kod atlanir) TEK
     bir ek LLM cagrisiyla dogru alt kirilimi sectirir ve entry_dicts'i GUNCEL
@@ -621,8 +793,11 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
         kod: alt_kirilimlar_tumu[kod] for kod in benzersiz_kodlar if kod in alt_kirilimlar_tumu
     }
     if not ilgili_alt_kirilimlar:
+        _izle(iz, "alt_kirilim", "Alt kırılım", "sistem", sonuc="uygulanmadı",
+              neden=f"Mizanda {', '.join(sorted(benzersiz_kodlar))} kodları için alt kırılım (alt hesap) yok; kodlar 3 haneli kaldı.")
         return entry_dicts
 
+    iz_detay = {}
     ana_koddan_alt_koda = {}
     # Her cozulen kodun NEREDEN cozuldugunun izi (2026-07-27) - disa aktarim
     # katmani (core/disa_aktarim.py) bunu insan-okur gerekceye cevirir.
@@ -642,6 +817,7 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
     for kod in list(ilgili_alt_kirilimlar):
         if kod in CARI_HESAP_KODLARI:
             esleme = _cari_esle_ayrintili(karsi_taraf_unvani, ilgili_alt_kirilimlar[kod])
+            iz_detay[kod] = {"yontem": "cari_ad_esleme", "esleme": esleme}
             if esleme["durum"] == "eslesti":
                 ana_koddan_alt_koda[kod] = esleme["kod"]
                 kod_kaynagi[kod] = {"kaynak": "fuzzy_cari", "benzerlik": esleme["oran"], "oran_duzeltildi": False}
@@ -664,12 +840,16 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
             continue
         secenekler = ilgili_alt_kirilimlar[kod]
         if any(_kdv_orani_isimden(ad) is not None for _kod, ad in secenekler):
+            iz_detay[kod] = {"yontem": "kdv_modele_birakildi", "not": "KDV hesabı: alt kırılım adı orana göre, ürün adına göre değil; modele sorulur ve oran faturadan doğrulanır"}
             continue
         secilen, oran = _kalem_fuzzy_esles(kalem_adlari, secenekler)
+        iz_detay[kod] = {"yontem": "kalem_adi_esleme", "kalem_adlari": kalem_adlari, "secenek_sayisi": len(secenekler), "en_iyi_oran": round(oran, 3),
+                         "secilen": secilen}
         if secilen:
             ana_koddan_alt_koda[kod] = secilen
             kod_kaynagi[kod] = {"kaynak": "fuzzy_kalem", "benzerlik": oran, "oran_duzeltildi": False}
 
+    # (karar izi: LLM'e gidilmeyen yol da kayda gecer — asagidaki `if not llm_kodlari` dali)
     # LLM'e sadece fuzzy'nin cozemedigi kodlar sorulur (cozulmus kodlari cikar). CARI kodlar (120/320/...) LLM'e SORULMAZ
     # (CARI_HESAPTA_LLM_SECIMI=False): cozulemeyen cari 3 haneli kalir + "karsi taraf mizanda bulunamadi" + yeni kart onerisi.
     llm_kodlari = {
@@ -679,6 +859,10 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
 
     # 2) LLM ALT KIRILIM ADIMI (kalan kodlar icin - mevcut davranis, degismedi).
     if not llm_kodlari:
+        if iz is not None:
+            _izle(iz, "alt_kirilim_llm", "Alt kırılım modeli", "sistem", sonuc="çağrılmadı",
+                  neden="Alt kırılım adımında modele sorulacak kod kalmadı: kodlar ad/kalem eşleştirmesiyle çözüldü ya da cari hesap (modele sorulmaz).")
+            _alt_kirilim_izi_yaz(iz, ilgili_alt_kirilimlar, ana_koddan_alt_koda, kod_kaynagi, iz_detay, karsi_taraf_unvani)
         return _entry_dicts_uygula(
             entry_dicts, ana_koddan_alt_koda, alt_kirilimlar_tumu, kod_kaynagi,
         )
@@ -688,18 +872,23 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
     fatura_kdv_oranlari = _fatura_kdv_oranlari(invoice)
 
     user_prompt = build_alt_kirilim_user_prompt(invoice, entry_dicts, llm_kodlari)
+    llm_izi = {"sistem_istemi": ALT_KIRILIM_SYSTEM_PROMPT, "kullanici_istemi": user_prompt, "model": spec.get("model"),
+               "modele_sorulan_kodlar": {k: len(v) for k, v in llm_kodlari.items()}, "denemeler": []}
     for _deneme in range(2):
         # LLM turunda yeni cozulen kodlar (retry karari fuzzy'nin cozdukleriyle
         # karismasin diye ayri sozlukte tutulur - fuzzy zaten kod cozmusse
         # "ana_koddan_alt_koda dolu" olmasi LLM'in bos donusunu maskelemesin).
         llm_secimleri = {}
         raw, latency, err = call_model(spec, ALT_KIRILIM_SYSTEM_PROMPT, user_prompt, temperature, timeout)
+        deneme_izi = {"deneme": _deneme + 1, "sure_sn": latency, "hata": err, "ham_cevap": raw, "degerlendirme": []}
+        llm_izi["denemeler"].append(deneme_izi)
         if err:
             continue
 
         parsed = extract_json_block(raw)
         secimler = parsed.get("secimler") if isinstance(parsed, dict) else None
         if not isinstance(secimler, list):
+            deneme_izi["not"] = "cevap beklenen JSON biçiminde değil (secimler listesi yok)"
             continue
 
         for secim in secimler:
@@ -714,15 +903,25 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
             # olabilir, bu durumda o secim yok sayilir (3 haneli kodda kalinir).
             secenekler = llm_kodlari.get(ana_kod, [])
             gecerli_alt_kodlar = {kod for kod, _ad in secenekler}
+            alt_kod_ham = alt_kod
             if alt_kod not in gecerli_alt_kodlar and ana_kod not in CARI_HESAP_KODLARI:
                 # "kod: ad" biciminde yazilmis cevabi toparla (canlida 391.20 bu yuzden reddedilmisti). Cari kodlarda YAPILMAZ:
                 # orada ": ad" bicimini kabul etmek yanlis musteri secimini de kabul etmek olurdu (bkz. CARI_HESAPTA_LLM_SECIMI).
                 alt_kod = _alt_kod_temizle(alt_kod)
+            degerlendirme = {"ana_kod": ana_kod, "modelin_yazdigi": alt_kod_ham, "temizlenen": alt_kod if alt_kod != alt_kod_ham else None}
+            deneme_izi["degerlendirme"].append(degerlendirme)
+            if alt_kod not in gecerli_alt_kodlar:
+                degerlendirme["sonuc"] = "REDDEDİLDİ: bu kod, mizanda o ana kod için listelenen seçeneklerden biri değil (model uydurmuş olabilir)" \
+                    if ana_kod in llm_kodlari else "REDDEDİLDİ: bu ana kod modele sorulmamıştı"
             if alt_kod in gecerli_alt_kodlar:
                 # KDV oran duzeltmesi (2026-07-27): LLM'in sectigi KDV alt kodunun
                 # ORANI faturadaki KDV oraniyla celisiyorsa, ayni tur icinde dogru
                 # orana cevir (turu koru). KDV disi kodlarda hicbir sey degismez.
                 duzeltilmis = _kdv_oranini_duzelt(alt_kod, secenekler, fatura_kdv_oranlari)
+                degerlendirme["sonuc"] = "KABUL (mizan listesinde var)"
+                degerlendirme["fatura_kdv_oranlari"] = sorted(fatura_kdv_oranlari)
+                if duzeltilmis != alt_kod:
+                    degerlendirme["kdv_oran_duzeltmesi"] = f"{alt_kod} → {duzeltilmis} (modelin seçtiği KDV oranı faturadaki orana uymuyordu; aynı türde doğru orana çevrildi)"
                 llm_secimleri[ana_kod] = duzeltilmis
                 kod_kaynagi[ana_kod] = {
                     "kaynak": "llm",
@@ -733,6 +932,13 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
         if llm_secimleri:
             ana_koddan_alt_koda.update(llm_secimleri)
             break
+
+    if iz is not None:
+        _izle(iz, "alt_kirilim_llm", "Alt kırılım modeli", "llm",
+              sonuc=("seçim yapıldı: " + ", ".join(f"{k}→{v}" for k, v in llm_secimleri.items())) if llm_secimleri else "geçerli seçim üretilemedi",
+              neden="Ad/kalem eşleştirmesinin çözemediği KDV ve gider/gelir kodları için model, mizandaki alt kırılım seçenekleri arasından seçti "
+                    "(cari kodlar modele sorulmaz). Seçimler mizan listesine karşı doğrulanır, KDV oranı faturadan düzeltilir.", **llm_izi)
+        _alt_kirilim_izi_yaz(iz, ilgili_alt_kirilimlar, ana_koddan_alt_koda, kod_kaynagi, iz_detay, karsi_taraf_unvani)
 
     return _entry_dicts_uygula(
         entry_dicts, ana_koddan_alt_koda, alt_kirilimlar_tumu, kod_kaynagi,

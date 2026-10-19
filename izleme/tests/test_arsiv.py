@@ -17,6 +17,7 @@ import panel  # noqa: E402
 
 RID = "0123456789ab"
 IS_ID = "a" * 32
+IZ_RID, BOZUK_IZ_RID = "d" * 12, "e" * 12
 
 
 # ---------------- doğrulama (güvenlik) ----------------
@@ -104,6 +105,16 @@ class SahteKaynak(panel.Kaynak):
             self.dosyalar[arsiv.dosya_yolu(rid, "meta.json")] = json.dumps(m).encode()
         self.dosyalar[f"{arsiv.ISLER_DIZINI}/{IS_ID}.json"] = json.dumps({"is_id": IS_ID, "durum": "bitti", "olusturulma": "2026-10-19T09:52:08+00:00", "sirketler": {}}).encode()
         self.dosyalar[f"{arsiv.TOPLU_DIZINI}/{'c' * 32}/is.json"] = json.dumps({"is_id": "c" * 32, "durum": "bitti", "toplam": 2, "tamamlanan": 2}).encode()
+
+    def iz_ekle(self):
+        """Karar izi (iz.json) taşıyan iki tek-fatura kaydı ekler: biri geçerli, biri yarım kalmış (bozuk) JSON."""
+        iz = {"surum": 1, "adimlar": [{"sira": 1, "sn": 0.0, "tur": "istek", "baslik": "İstek alındı", "karar_veren": "sistem", "sonuc": "x", "neden": "y", "detay": {}}]}
+        for rid, icerik in ((IZ_RID, json.dumps(iz).encode()), (BOZUK_IZ_RID, b'{"surum": 1, "adimlar": [{"sira"')):
+            self.metalar[rid] = {"request_id": rid, "zaman": "2026-10-19T07:00:00+00:00", "tip": "fatura_isle", "durum": 200,
+                                 "dosyalar": {"istek.xml": 4, "iz.json": len(icerik)}}
+            self.dosyalar[arsiv.dosya_yolu(rid, "meta.json")] = json.dumps(self.metalar[rid]).encode()
+            self.dosyalar[arsiv.dosya_yolu(rid, "iz.json")] = icerik
+            self.dosyalar[arsiv.dosya_yolu(rid, "istek.xml")] = b"<a/>"
 
     def arsiv_metalari(self, adet=500):
         return "\n".join(json.dumps(m, indent=1) for m in self.metalar.values())
@@ -226,3 +237,31 @@ def test_uzak_komut_yalniz_dogrulanmis_yollarla_kurulur(monkeypatch):
     assert gorulen[0][-1] == f"docker exec kap head -c 100 /app/data/onboarding/arsiv/{RID}/cevap.json"
     with pytest.raises(ValueError):
         arsiv.dosya_yolu(RID + "; id", "cevap.json")
+
+
+def test_detay_karar_izini_ayristirip_dondurur(sunucu):
+    kaynak, url = sunucu
+    kaynak.iz_ekle()
+    j = json.loads(_al(f"{url}/api/arsiv/detay?id={IZ_RID}")[2])
+    assert j["iz"]["adimlar"][0]["tur"] == "istek" and j["iz"]["surum"] == 1
+
+
+def test_detay_bozuk_iz_paneli_cokertmez_hata_doner(sunucu):
+    kaynak, url = sunucu
+    kaynak.iz_ekle()
+    kod, _, govde = _al(f"{url}/api/arsiv/detay?id={BOZUK_IZ_RID}")
+    assert kod == 200 and "ayrıştırılamadı" in json.loads(govde)["iz"]["hata"]
+
+
+def test_iz_olmayan_kayitta_iz_none(sunucu):
+    _, url = sunucu
+    assert json.loads(_al(f"{url}/api/arsiv/detay?id={RID}")[2])["iz"] is None
+
+
+def test_iz_json_indirilebilir_ve_ozette_gorunur(sunucu):
+    kaynak, url = sunucu
+    kaynak.iz_ekle()
+    kod, h, govde = _al(f"{url}/api/arsiv/indir?id={IZ_RID}&ad=iz.json")
+    assert kod == 200 and json.loads(govde)["surum"] == 1 and h["Content-Disposition"].endswith('iz.json"')
+    ozet_kayit = next(k for k in json.loads(_al(url + "/api/arsiv")[2])["kayitlar"] if k["request_id"] == IZ_RID)
+    assert "iz.json" in ozet_kayit["dosyalar"]

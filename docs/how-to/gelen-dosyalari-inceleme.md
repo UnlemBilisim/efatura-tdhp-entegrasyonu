@@ -23,6 +23,24 @@ python3 izleme/panel.py            # sunucuyu izler  →  http://127.0.0.1:8300
 
 Örnek: "mizanım eksik" şikâyeti → `/musteri/onboard` satırı → `gelen.zip`'i indir → `mizan.xlsx`'i aç, dosyanın kendisi mi eksikti yoksa okuyucu mu hesapları attı karşılaştır.
 
+## Karar izi — bir fatura nasıl işlendi, kim karar verdi, neden
+
+Tek fatura isteklerinde (`/fatura/isle`) istek detayında **"Karar izi"** bölümü görünür. İki parça:
+
+1. **Nihai hesap kayıtları — kim karar verdi, neden:** her kayıt için hesap, ad, yön, tutar, **ana kodu kim seçti** (model, emsaller ve ipuçlarıyla), **alt kırılımı kim seçti** (kural: cari ad eşleştirme /
+   kalem adı eşleştirme, ya da model; çözülemediyse "insan kontrolü") ve gerekçe.
+2. **Adım adım zaman çizelgesi** (rozetler: Kural / Model (LLM) / Emsal (RAG) / Doğrulama / Sistem): istek alındı → şirket kaydı → yön tespiti (neden outbox/inbox) → KDV/NACE ön filtresi (veya neden atlandı) →
+   fatura ayrıştırma → emsal arama (bulunan geçmiş faturalar, few-shot bloğu) → deterministik ipuçları (tevkifat/iade/ihraç) → **ana model** (modele giden **sistem ve kullanıcı istemi (prompt)**, modelin ham cevabı,
+   süre) → öz düzeltme (tetiklendiyse neden) → her cari/gider/KDV kodu için alt kırılım kararı (cari: ünvan ↔ en benzer 5 kart, **her adayın neden kabul/ret edildiği**; gider/gelir: kalem adı eşleşmesi; KDV: model + oran
+   düzeltmesi; modelin her seçiminin mizana karşı doğrulaması) → deterministik doğrulama (hangi kural başarısız → neden onaylanamaz) → sonuç. Uzun metinler (istemler, ham cevaplar) açılır bölümlerdedir.
+
+Neden/kim sorusunun örnekleri: *"120 neden çözülmedi?"* → cari adım: aday kartlar ve her birinin ret nedeni ("faturadaki KARAGOZ kartta yok…", "hukuki form farklı…"); *"391 hangi orana göre seçildi?"* → alt kırılım modeli adımı:
+modelin seçimi + "KDV oranı faturadaki orana göre düzeltildi"; *"model neden 320 dedi?"* → ana model adımı: istem + ham cevap + bulunan emsaller.
+
+**Sınırlar:** yalnızca tek fatura (`/fatura/isle`); toplu fatura (zip) ve onboarding işleri için karar izi henüz yok; dağıtımdan önce işlenen isteklerde `iz.json` yoktur. İz, **dış API cevabında YOKTUR** (istemler iç bilgidir),
+yalnızca bu arşivde durur ve aynı süre (`GELEN_ARSIV_GUN`) sonra silinir. İstemler fatura içeriğini (karşı taraf adı, kalemler) içerir — arşivdeki XML ile aynı gizlilik düzeyi. İz toplanması sonucu değiştirmez,
+hatası işlemi bozmaz; arşiv kapalıysa (`GELEN_ARSIV_GUN=0`) toplanmaz. Ham dosya: `iz.json` indirme düğmesi.
+
 ## Ne kadar süre saklanır?
 
 | Ayar (env, sunucu) | Varsayılan | Anlamı |

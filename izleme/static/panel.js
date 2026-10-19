@@ -167,6 +167,97 @@ function dosyalar() {
   t.appendChild(tb); kap.appendChild(t); return kap;
 }
 
+// ---------------------------------------------------------------------------
+// Karar izi (sunucuda entegrasyon/model_eval tarafından iz.json olarak kaydedilir): gelen veri nasıl işlendi, KİM karar verdi, NEDEN, modele hangi istem gitti.
+// Sunucudan gelen her metin güvenilmeyen veridir: yalnızca textContent ile basılır.
+// ---------------------------------------------------------------------------
+const KARAR_VEREN = {
+  sistem: "Sistem", kural: "Kural (deterministik)", llm: "Model (LLM)", rag: "Emsal (RAG)", dogrulama: "Doğrulama", kullanici: "İnsan",
+};
+const ISTEM_ETIKETLERI = {
+  sistem_istemi: "Modele giden SİSTEM istemi (prompt)", kullanici_istemi: "Modele giden KULLANICI istemi (prompt)", ham_cevap: "Modelin ham cevabı",
+  duzeltme_istemi: "Modele giden düzeltme istemi", few_shot_blogu: "Prompt'a eklenen emsal bloğu", sorgu_metni: "Emsal arama sorgusu",
+};
+const ALAN_ETIKETLERI = {
+  fatura: "Fatura özeti", model: "Model", saglayici: "Sağlayıcı", sure_sn: "Süre (sn)", sicaklik: "Sıcaklık", dengeli: "Borç=Alacak", borc_toplam: "Borç toplamı",
+  alacak_toplam: "Alacak toplamı", emsaller: "Bulunan emsaller", guclu_emsal: "Güçlü emsal", ipuclari: "İpuçları", adaylar: "Aday kartlar (en benzer 5)",
+  karsi_taraf_unvani: "Karşı taraf ünvanı", esik: "Benzerlik eşiği", kart_sayisi: "Mizandaki kart sayısı", kurallar: "Uygulanan kurallar", denemeler: "Model çağrıları",
+  degerlendirme: "Her seçimin değerlendirmesi", modele_sorulan_kodlar: "Modele sorulan kodlar (seçenek sayısı)", hatalar: "Doğrulama hataları", kontroller: "Yapılan kontroller",
+  on_filtre: "Ön filtre cevabı", yontem: "Yöntem", kalem_adlari: "Kalem adları", secenek_sayisi: "Seçenek sayısı", en_iyi_oran: "En iyi oran", secilen: "Seçilen",
+};
+const alanEtiketi = (k) => ALAN_ETIKETLERI[k] || k.replace(/_/g, " ");
+
+function skalerMi(v) { return v === null || ["string", "number", "boolean"].includes(typeof v); }
+function skalerMetin(v) { return v === null || v === undefined ? "—" : v === true ? "✓" : v === false ? "✗" : String(v); }
+
+function listeTablosu(liste) {
+  const anahtarlar = []; liste.forEach((o) => Object.keys(o).forEach((k) => { if (!anahtarlar.includes(k)) anahtarlar.push(k); }));
+  const t = el("table"), h = el("thead"), hr = el("tr"); anahtarlar.forEach((k) => hr.appendChild(el("th", alanEtiketi(k)))); h.appendChild(hr); t.appendChild(h);
+  const tb = el("tbody");
+  liste.forEach((o) => {
+    const tr = el("tr"); if (o.kabul === true) tr.style.fontWeight = "600";
+    anahtarlar.forEach((k) => { const v = o[k]; tr.appendChild(el("td", Array.isArray(v) ? v.map((x) => skalerMetin(x)).join(", ") : (v !== null && typeof v === "object") ? JSON.stringify(v) : skalerMetin(v))); });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); return t;
+}
+
+function detayCiz(detay, kap) {
+  const skaler = el("div", undefined, "kv"); let skalerVar = false;
+  Object.entries(detay || {}).forEach(([k, v]) => {
+    if (v === null || v === undefined || v === "" || (Array.isArray(v) && !v.length)) return;
+    if (typeof v === "string" && (ISTEM_ETIKETLERI[k] || v.length > 240)) {
+      const d = el("details"); d.appendChild(el("summary", (ISTEM_ETIKETLERI[k] || alanEtiketi(k)) + "  (" + v.length + " karakter)"));
+      d.appendChild(el("pre", v)); kap.appendChild(d);
+    } else if (skalerMi(v)) {
+      skalerVar = true; skaler.appendChild(el("span", alanEtiketi(k))); skaler.appendChild(el("span", skalerMetin(v)));
+    } else if (Array.isArray(v) && v.every(skalerMi)) {
+      skalerVar = true; skaler.appendChild(el("span", alanEtiketi(k))); skaler.appendChild(el("span", v.map(skalerMetin).join("; ")));
+    } else if (Array.isArray(v) && v.every((x) => x && typeof x === "object" && !Array.isArray(x))) {
+      const basit = v.every((o) => Object.values(o).every((y) => skalerMi(y) || (Array.isArray(y) && y.every(skalerMi))) && Object.values(o).every((y) => typeof y !== "string" || y.length <= 240));
+      if (basit) { const b = el("div"); b.appendChild(el("div", alanEtiketi(k) + " (" + v.length + ")", "soluk")); b.appendChild(listeTablosu(v)); kap.appendChild(b); }
+      else v.forEach((o, i) => { const d = el("details"); d.open = k === "denemeler"; d.appendChild(el("summary", alanEtiketi(k) + " #" + (i + 1)));
+        const a = el("div", undefined, "alt-adim"); detayCiz(o, a); d.appendChild(a); kap.appendChild(d); });
+    } else if (typeof v === "object") {
+      const d = el("details"); d.appendChild(el("summary", alanEtiketi(k))); const a = el("div", undefined, "alt-adim"); detayCiz(v, a); d.appendChild(a); kap.appendChild(d);
+    } else { skalerVar = true; skaler.appendChild(el("span", alanEtiketi(k))); skaler.appendChild(el("span", String(v))); }
+  });
+  if (skalerVar) kap.insertBefore(skaler, kap.firstChild);
+}
+
+function izAdimi(a) {
+  const kv = KARAR_VEREN[a.karar_veren] ? a.karar_veren : "sistem";
+  const kart = el("div", undefined, "adim kv-" + kv);
+  const b = el("div", undefined, "adim-baslik");
+  b.appendChild(el("span", a.sira, "adim-no")); b.appendChild(el("b", a.baslik));
+  b.appendChild(el("span", KARAR_VEREN[kv], "rozet kv-" + kv)); b.appendChild(el("span", "+" + a.sn + " sn", "soluk"));
+  kart.appendChild(b);
+  if (a.sonuc) kart.appendChild(el("div", "→ " + a.sonuc, "adim-sonuc"));
+  if (a.neden) kart.appendChild(el("div", a.neden, "adim-neden"));
+  const detay = el("div"); detayCiz(a.detay, detay); kart.appendChild(detay);   // ayrıntılar başlığın/gerekçenin ALTINDA
+  return kart;
+}
+
+function izBolumu(iz) {
+  const kap = el("div");
+  if (iz.hata) { kap.appendChild(panelKutusu("Karar izi", el("div", "Karar izi okunamadı: " + iz.hata, "hata-metni"))); return kap; }
+  const adimlar = iz.adimlar || [];
+  const ozet = adimlar.find((a) => a.tur === "kayit_ozeti");
+  if (ozet && ozet.detay && (ozet.detay.kayitlar || []).length) {
+    const satirlar = ozet.detay.kayitlar.map((k) => ({
+      hesap: k.hesap, "ad": k.hesap_adi, yön: k.yon, tutar: k.tutar, "ana kod kararı": k.ana_kod_karari, "alt kırılım kararı": k.alt_kirilim_karari,
+      gerekçe: k.gerekce, uyarı: k.uyari,
+    }));
+    kap.appendChild(panelKutusu("Nihai hesap kayıtları — kim karar verdi, neden", listeTablosu(satirlar)));
+  }
+  const aciklama = el("div", "Rozetler: Kural = deterministik kural · Model = dil modeli · Emsal = geçmiş benzer faturalar (RAG) · Doğrulama = deterministik kontrol · Sistem = girdi/özet. " +
+    "İstemler (prompt) ve modelin ham cevapları açılır bölümlerdedir.", "iz-aciklama");
+  const liste = el("div");
+  adimlar.filter((a) => a.tur !== "kayit_ozeti").forEach((a) => liste.appendChild(izAdimi(a)));
+  kap.appendChild(panelKutusu("Karar izi — gelen veri nasıl işlendi (" + adimlar.length + " adım)", aciklama, liste));
+  return kap;
+}
+
 function detaySayfasi() {
   const kap = el("div");
   const geri = el("button", "← Listeye dön", "geri"); geri.addEventListener("click", () => { detayId = null; detayVeri = null; detayHatasi = null; arsivYukle(); ciz(); });
@@ -188,6 +279,8 @@ function detaySayfasi() {
     (() => { const d = el("div"); d.style.marginTop = "10px"; Object.keys(meta.dosyalar || {}).forEach((ad) => d.appendChild(indirDugmesi(id, ad, "⬇ " + ad + " (" + bayt(meta.dosyalar[ad]) + ")")));
       if (meta.tip === "fatura_toplu" && meta.is_id) d.appendChild(indirDugmesi(id, "sonuclar.jsonl", "⬇ sonuclar.jsonl (fatura başına cevaplarımız)"));
       return d; })()));
+
+  if (detayVeri.iz) kap.appendChild(izBolumu(detayVeri.iz));
 
   if ((meta.zip_icerik || []).length) {
     const t = el("table"), hr = el("tr"); ["Dosya", "Boyut"].forEach((b) => hr.appendChild(el("th", b))); const h = el("thead"); h.appendChild(hr); t.appendChild(h);
