@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?><Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>TR1.2</cbc:CustomizationID>
+  <cbc:ProfileID>TICARIFATURA</cbc:ProfileID>
+  <cbc:ID>UNS2026000000042</cbc:ID>
+  <cbc:CopyIndicator>false</cbc:CopyIndicator>
+  <cbc:UUID>32a7e60a-4adf-435b-a1aa-b060be0bb664</cbc:UUID>
+  <cbc:IssueDate>2026-09-10</cbc:IssueDate>
+  <cbc:IssueTime>00:00:00.0000000+03:00</cbc:IssueTime>
+  <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
+  <cbc:LineCountNumeric>1</cbc:LineCountNumeric>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="VKN">5544332211</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>UN SANAYİ VE TİCARET A.Ş.</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Test Adres</cbc:StreetName>
+        <cbc:CityName>İSTANBUL</cbc:CityName>
+        <cac:Country><cbc:Name>TÜRKİYE</cbc:Name></cac:Country>
+      </cac:PostalAddress>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyIdentification>
+        <cbc:ID schemeID="VKN">6677889900</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>ANADOLU FIRIN VE UNLU MAMÜLLER SANAYİ A.Ş.</cbc:Name>
+      </cac:PartyName>
+      <cac:PostalAddress>
+        <cbc:StreetName>Test Adres</cbc:StreetName>
+        <cbc:CityName>İSTANBUL</cbc:CityName>
+        <cac:Country><cbc:Name>TÜRKİYE</cbc:Name></cac:Country>
+      </cac:PostalAddress>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="TRY">250.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="TRY">25000.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="TRY">250.00</cbc:TaxAmount>
+      <cbc:CalculationSequenceNumeric>1</cbc:CalculationSequenceNumeric>
+      <cbc:Percent>1.00</cbc:Percent>
+      <cac:TaxCategory><cac:TaxScheme><cbc:Name>KDV</cbc:Name><cbc:TaxTypeCode>0015</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="TRY">25000.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="TRY">25000.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="TRY">25250.00</cbc:TaxInclusiveAmount>
+    <cbc:AllowanceTotalAmount currencyID="TRY">0.00</cbc:AllowanceTotalAmount>
+    <cbc:PayableAmount currencyID="TRY">25250.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="C62">5000.000000</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="TRY">25000.00</cbc:LineExtensionAmount>
+    <cac:TaxTotal>
+      <cbc:TaxAmount currencyID="TRY">250.00</cbc:TaxAmount>
+      <cac:TaxSubtotal>
+        <cbc:TaxableAmount currencyID="TRY">25000.00</cbc:TaxableAmount>
+        <cbc:TaxAmount currencyID="TRY">250.00</cbc:TaxAmount>
+        <cbc:CalculationSequenceNumeric>1</cbc:CalculationSequenceNumeric>
+        <cbc:Percent>1.00</cbc:Percent>
+        <cac:TaxCategory><cac:TaxScheme><cbc:Name>KDV</cbc:Name><cbc:TaxTypeCode>0015</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory>
+      </cac:TaxSubtotal>
+    </cac:TaxTotal>
+    <cac:Item>
+      <cbc:Name>BUĞDAY UNU (TİP 550, 50 KG ÇUVAL)</cbc:Name>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="TRY">5.000000</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>
+</Invoice>

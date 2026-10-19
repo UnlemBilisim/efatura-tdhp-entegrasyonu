@@ -33,6 +33,9 @@ model_eval/vector_db/
 # XML'ler — gerçek fatura verisi içerir, git'e gömülmez.
 pdfler/
 *.xml
+# İSTİSNA: onboarding_test/ altındaki UYDURMA mock şirket faturaları (sahte VKN, kurgusal fırın şirketi) — güncelleme/orkestrasyon
+# testleri (model_eval/tests/test_musteri_guncelle_orkestrasyon.py) bunlara bağlı; commit'lenmezse temiz klonda/CI'da testler düşer.
+!onboarding_test/**/*.xml
 
 # Muhtemelen hassas/kişisel veri — içeriği doğrulanmadan commit'lenmiyor
 Archive2/
