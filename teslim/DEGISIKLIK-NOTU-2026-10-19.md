@@ -112,9 +112,13 @@ dosyada olmayan hesap silinir (eski değeri kayıtta kalır). Dosya boşsa ya da
 - KDV oranı düzeltmesi (fatura oranıyla çelişen KDV alt kodunun aynı tür içinde düzeltilmesi) 2 parçalı hesap planlarında da çalışır.
 - **Müşteri/tedarikçi (cari) hesabı yalnızca ad eşleşmesiyle bağlanır.** Karşı taraf mizanda yoksa `account_code` 3 haneli kalır (`120`), `validation_errors` içinde
   `UNRESOLVED_COUNTERPARTY` döner, `records[].onerilen_yeni_kod` yeni cari kart numarası önerir ve `approvable: false` olur — bu kayıt `/fatura/onayla` ile onaylanamaz, muhasebe kontrolü gerekir.
-  Önceden model, mizanda olmayan bir müşteri için en yakın isimli **başka** bir müşteri kartını seçebiliyordu; bu artık yapılmıyor. Faturadaki ünvan mizandaki adla büyük ölçüde farklı yazılmışsa
-  (benzerlik %85'in altı, örn. çok kısaltılmış ad) mizanda olsa bile "bulunamadı" sayılabilir; muhasebe kartının adını faturadaki ünvanla aynı yazmak en güvenli yoldur. Yeni kart açıldıktan sonra
-  mizanı yeniden gönderin (§2), fatura bir sonraki işlemede kartı bulur.
+  Önceden model, mizanda olmayan bir müşteri için en yakın isimli **başka** bir müşteri kartını seçebiliyordu; bu artık yapılmıyor.
+  **Kartı bulma kuralı:** Faturadaki ünvan ile mizandaki cari kart adı; büyük/küçük harf, Türkçe karakter ve şirket eki farkları (`A.Ş.` / `Anonim Şirketi`, `Ltd.Şti.` / `Limited Şirketi`) yok sayılarak
+  karşılaştırılır. Kart adı ünvanın **noktalı kısaltması ya da kesilmiş hali** ise de bulunur (`TAHA KALIP MAKİNA OTOM.LTD.ŞTİ.`, `GENÇBEY HAYVANCILIK VE TAR.LTD.ŞTİ.`). Kişi adı ile ticari ad birlikte
+  yazılmışsa (`MEHMET ALİ ŞAHİN - ŞAHİN TAKOGRAF`) tireden önceki kısım karta uyuyorsa bulunur. **Bulunmaz:** ayırt edici bir kelimesi farklıysa (`FARUK KARAGÖZ` ≠ `FARUK KARAMAN`, `ANADOLU FIRIN A.Ş.` ≠
+  `ANADOLU UN A.Ş.`), hukuki form farklıysa (`Ltd.Şti.` ≠ `A.Ş.`) ya da noktasız kısaltma varsa. **Aynı adlı birden fazla kart varsa** (mükerrer cari kart) hangisinin kullanılacağı belirsizdir: kart seçilmez,
+  `UNRESOLVED_COUNTERPARTY` döner, uyarıda aday kartlar listelenir ve yeni kart önerilmez. Gerçek verinizle ölçüm (faturalarınızdaki 990 cari satır): kartı doğru bulma %83, yanlış karta bağlama ~%0,
+  geri kalan %17 muhasebe kontrolüne düşer. Mükerrer kartları mizanda tekilleştirirseniz belirsiz sonuçlar da çözülür. Yeni kart açıldıktan sonra mizanı yeniden gönderin (§2), fatura bir sonraki işlemede kartı bulur.
 - KDV ve gider/gelir alt hesap seçimi, model cevabını farklı biçimde yazdığında bazen çözülemiyordu; düzeltildi.
 
 ## 4. DEĞİŞİKLİK: Gönderdiğiniz dosyaların saklanması

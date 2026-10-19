@@ -51,6 +51,12 @@ def _gerekce_uret(entry, emsal_sayisi=0, karsi_taraf_vkn=None):
     # 3 haneli kaldiysa (alt kirilim cozulemedi) - en bilgilendirici durum,
     # cunku muhasebecinin elle mudahale etmesi gerekebilir.
     if "." not in str(kod):
+        if kaynak == "cari_belirsiz":
+            adaylar = ", ".join(f"{k} {a}" for k, a in iz.get("adaylar", []))
+            return (
+                f"Karşı taraf mizandaki birden fazla karta eşit derecede benziyor ({adaylar}); "
+                "hangisinin kullanılacağı belirsiz olduğundan ana hesap kodunda bırakıldı — muhasebeci seçmeli."
+            )
         if entry.get("uyari"):
             return (
                 f"{kod} için mizanda eşleşen alt kırılım (cari kart) bulunamadı; "

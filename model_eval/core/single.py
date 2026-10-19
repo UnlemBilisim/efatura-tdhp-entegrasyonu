@@ -16,6 +16,8 @@ yardimciya cikarmak, run_model()'in test edilmis davranisini bozma riski
 tasidigi icin bilincli olarak yapilmadi - bkz. GOREV_MIMARI_DUZELTME
 benzeri gorev notunda birakilan tercih)."""
 
+import re
+
 from .constants import DEFAULT_OLLAMA_HOST, DEFAULT_OWN_VKN, DEFAULT_SECTOR, SYSTEM_PROMPT
 from .parsing import (
     convert_invoice_to_try,
@@ -83,52 +85,154 @@ CARI_FUZZY_ESIK = 0.85
 CARI_HESAPTA_LLM_SECIMI = False
 
 
-def _unvan_normalize(s):
-    """Turkce unvanlari karsilastirma icin normalize eder: buyuk harfe cevirir,
-    Turkce karakterleri ASCII'ye indirger, yaygin sirket eki kisaltmalarini
-    ("SAN", "TIC", "LTD", "STI", "AS" ...) tam bicimine acar ki "San.Tic.Ltd.Sti"
-    ile "Sanayi Ve Ticaret Limited Sirketi" yuksek benzerlik alsin, noktalama/
-    fazla bosluklari temizler."""
+# Unvan kisaltmalari (normalize sirasinda tam bicime acilir).
+UNVAN_KISALTMALARI = {
+    "SAN": "SANAYI", "TIC": "TICARET", "LTD": "LIMITED", "STI": "SIRKETI",
+    "AS": "ANONIM", "A": "ANONIM", "S": "SIRKETI",
+    "INS": "INSAAT", "ITH": "ITHALAT", "IHR": "IHRACAT", "MUH": "MUHENDISLIK",
+    "NAK": "NAKLIYE", "HIZM": "HIZMETLERI", "END": "ENDUSTRIYEL",
+    "VE": "VE",
+}
+
+
+def _unvan_tokenla(s):
+    """Unvani [(kelime, noktali_mi), ...] listesine cevirir: buyuk harfe cevirir, Turkce karakterleri ASCII'ye indirger, noktalamayi atar, yaygin sirket eki
+    kisaltmalarini ("SAN", "TIC", "LTD", "STI", "AS" ...) tam bicimine acar. `noktali_mi`: kelimenin ham halinde NOKTAYLA bitmesi ("MOB.", "OTOM.", "TAR.") —
+    muhasebe programlarinda kisaltmalar noktayla yazilir; nokta yoksa ("KOC" ile "KOCAK") kisaltma sayilmaz (2026-10-19, gercek veriyle olculdu)."""
     if not s:
-        return ""
+        return []
     s = s.upper()
     for a, b in [("İ", "I"), ("Ş", "S"), ("Ğ", "G"), ("Ü", "U"), ("Ö", "O"), ("Ç", "C"), ("I", "I")]:
         s = s.replace(a, b)
-    # noktalama -> bosluk
-    s = "".join(ch if ch.isalnum() else " " for ch in s)
-    kelimeler = s.split()
-    kisaltma = {
-        "SAN": "SANAYI", "TIC": "TICARET", "LTD": "LIMITED", "STI": "SIRKETI",
-        "STİ": "SIRKETI", "AS": "ANONIM", "A": "ANONIM", "S": "SIRKETI",
-        "INS": "INSAAT", "ITH": "ITHALAT", "IHR": "IHRACAT", "MUH": "MUHENDISLIK",
-        "NAK": "NAKLIYE", "HIZM": "HIZMETLERI", "END": "ENDUSTRIYEL",
-        "VE": "VE",
-    }
-    kelimeler = [kisaltma.get(k, k) for k in kelimeler]
-    return " ".join(kelimeler)
+    sonuc = []
+    for m in re.finditer(r"[^\W_]+\.?", s):
+        kelime = m.group(0)
+        noktali = kelime.endswith(".")
+        kelime = kelime.rstrip(".")
+        sonuc.append((UNVAN_KISALTMALARI.get(kelime, kelime), noktali))
+    return sonuc
+
+
+def _unvan_normalize(s):
+    """Turkce unvanlari karsilastirma icin normalize eder (bkz. _unvan_tokenla): "San.Tic.Ltd.Sti" ile "Sanayi Ve Ticaret Limited Sirketi" yuksek benzerlik alir."""
+    return " ".join(k for k, _ in _unvan_tokenla(s))
+
+
+# --- Cari eslemede "ayirt edici kelime" kontrolu (2026-10-19) -----------------------------------------------------------------------------------------
+# Yalnizca karakter benzerligi (SequenceMatcher) yetmiyor: ortak UZUN hukuki ek ("ANONIM SIRKETI") kisa ayirt edici kelimenin etkisini bastiriyor ve FARKLI firmalar
+# esik ustu cikiyor (olculdu: "ANADOLU FIRIN A.S." ~ "ANADOLU UN A.S." 0.906; gercek mizanda "Ozdisan Elektronik San Ve Tic.A.S." ~ "Demsay Elektronik Sanayi Ve
+# Ticaret Anonim Sirketi" 0.93; mizandaki kartlarin %18'inin (120) / %10'unun (320) baska bir kartla >=%85 benzeyen komsusu var). Tersine, mizandaki kart adlari cogu
+# zaman unvanin KISALTILMIS/KESILMIS hali ("TAHA KALIP MAKINA OTOM.LTD.STI.") ve yalnizca benzerlik bunlari kaciriyor (gercek 990 cari satirda dogru: yalniz benzerlik %48,
+# bu kurallarla %83; yanlis baglanma %1,7 -> ~%0). Bu yuzden asagidaki kurallar kullanilir:
+#   1) ayirt edici kelime cifti (_unvan_ayirt_edici_uyusuyor): genel/hukuki kelimeler sayilmadan kalan kelimelerin HER IKI unvanda da karsiligi olmali
+#      (ARTIK noktali kisaltma onek sayilir: "TAR." ~ "TARIM"); hukuki form ikisinde de varsa ayni olmali ("Ltd.Sti." != "A.S."). Ratio >= esik VEYA ikisinde de >=2 ayirt edici kelime.
+#   2) kesilmis kart (_unvan_kesilmis_mi): kart adi, unvanin BASINDAKI ayirt edici kelimelerin sirayla kesilmis hali; kartta >=3 ayirt edici kelime ya da noktali
+#      kisaltma olmali ("MEHMET ALI" karti "MEHMET ALI YILMAZ" faturasina baglanmasin).
+#   3) ilk parca (_unvan_ilk_parca_esit): unvan "KISI ADI - TICARI AD" gibi devam ediyorsa kart, ayiractan ONCEKI kisimla birebir uyusmali.
+# Is kolu kelimeleri (NAKLIYE, INSAAT, ELEKTRONIK, FIRIN ...) BILEREK ayirt edici sayilir: "ABC NAKLIYE LTD" ile "ABC INSAAT LTD" ayni firma degildir.
+UNVAN_GENEL_KELIMELER = {
+    "ANONIM", "SIRKETI", "SIRKET", "LIMITED", "KOLLEKTIF", "KOMANDIT", "VE", "ILE", "SANAYI", "TICARET",
+    "A", "S", "AS", "LTD", "STI", "SAN", "TIC",
+}
+# Hukuki form: iki unvanda da bir form varsa AYNI olmali ("X LTD.STI." ile "X A.S." ayni ticari ad olsa da ayri firma olabilir). Yalnizca birinde varsa sorun degil.
+UNVAN_HUKUKI_FORMLAR = {"LIMITED", "ANONIM", "KOLLEKTIF", "KOMANDIT"}
+# En iyi iki aday arasindaki fark bu kadar ya da daha azsa (ornek: ayni adli mukerrer kartlar) hangisinin dogru oldugu BELIRSIZDIR -> kart secilmez.
+CARI_BELIRSIZLIK_FARKI = 0.01
+
+
+def _unvan_kelime_uyar(x, y):
+    """Iki (kelime, noktali_mi) ayni mi? Esit ya da biri NOKTALI kisaltma (en az 3 harf) ve digerinin oneki ("TAR." ~ "TARIM"). Noktasiz onek ("KOC" ~ "KOCAK") ayni sayilmaz."""
+    (a, a_noktali), (b, b_noktali) = x, y
+    if a == b:
+        return True
+    kisa, uzun, kisa_noktali = (a, b, a_noktali) if len(a) <= len(b) else (b, a, b_noktali)
+    return kisa_noktali and len(kisa) >= 3 and uzun.startswith(kisa)
+
+
+def _unvan_form_celisiyor(hedef, aday):
+    form_h = {k for k, _ in hedef if k in UNVAN_HUKUKI_FORMLAR}
+    form_a = {k for k, _ in aday if k in UNVAN_HUKUKI_FORMLAR}
+    return bool(form_h and form_a and form_h != form_a)
+
+
+def _ayirt_edici(kelimeler):
+    return [x for x in kelimeler if x[0] not in UNVAN_GENEL_KELIMELER]
+
+
+def _unvan_ayirt_edici_uyusuyor(hedef, aday):
+    """Her iki unvanin AYIRT EDICI kelimeleri (genel/hukuki kelimeler sayilmadan) karsi tarafta karsilik bulmali; iki tarafin da ayirt edici kelimesi yoksa
+    dogrulanamaz -> False (muhafazakar). hedef/aday: _unvan_tokenla ciktilari."""
+    if _unvan_form_celisiyor(hedef, aday):
+        return False
+    h, a = _ayirt_edici(hedef), _ayirt_edici(aday)
+    if not h or not a:
+        return False
+    return (all(any(_unvan_kelime_uyar(x, y) for y in aday) for x in h)
+            and all(any(_unvan_kelime_uyar(y, x) for x in hedef) for y in a))
+
+
+def _unvan_kesilmis_mi(hedef, aday):
+    """Kart adi (aday), unvanin (hedef) BASINDAKI ayirt edici kelimelerin sirayla kesilmis/kisaltilmis hali mi? (kural 2)"""
+    if _unvan_form_celisiyor(hedef, aday):
+        return False
+    dh, da = _ayirt_edici(hedef), _ayirt_edici(aday)
+    if len(da) < 2 or len(da) > len(dh):
+        return False
+    if not (len(da) >= 3 or any(noktali for _, noktali in da)):
+        return False
+    return all(_unvan_kelime_uyar(dh[i], da[i]) for i in range(len(da)))
+
+
+def _unvan_ilk_parca_esit(unvan, aday):
+    """Unvan "KISI ADI - TICARI AD" / "KISI ADI / TICARI AD" gibi ayiracla devam ediyorsa, kart adi ayiractan ONCEKI kisimla birebir uyusmali (ayirt edici >=2 kelime). (kural 3)"""
+    parcalar = re.split(r"\s+[-\u2013\u2014]\s+|\s+/\s+", unvan or "", maxsplit=1)
+    if len(parcalar) < 2:
+        return False
+    ilk = _unvan_tokenla(parcalar[0])
+    return len(_ayirt_edici(ilk)) >= 2 and _unvan_ayirt_edici_uyusuyor(ilk, aday)
+
+
+def _cari_esle_ayrintili(karsi_taraf_unvani, alt_secenekler):
+    """Karsi taraf unvanini (kod, ad) cari kartlariyla eslestirir. Doner: {"durum", "kod", "oran", "adaylar"}.
+      "eslesti"   : kurallardan (yukaridaki 1-3) en az birini saglayan TEK en iyi kart; "kod" dolu.
+      "belirsiz"  : birden fazla kart esit derecede uyuyor (mukerrer kart) -> kart SECILMEZ; "adaylar" = [(kod, ad), ...].
+      "eslesmedi" : uygun kart yok; "oran" = en yuksek HAM benzerlik (bilgi amacli)."""
+    from difflib import SequenceMatcher
+
+    bos = {"durum": "eslesmedi", "kod": None, "oran": 0.0, "adaylar": []}
+    if not karsi_taraf_unvani or not alt_secenekler:
+        return bos
+    hedef = _unvan_tokenla(karsi_taraf_unvani)
+    if not hedef:
+        return bos
+    hedef_metin = " ".join(k for k, _ in hedef)
+    ayirt_edici_h = len(_ayirt_edici(hedef))
+    en_iyi_ham, gecenler = 0.0, []
+    for kod, ad in alt_secenekler:
+        aday = _unvan_tokenla(ad)
+        oran = SequenceMatcher(None, hedef_metin, " ".join(k for k, _ in aday)).ratio()
+        en_iyi_ham = max(en_iyi_ham, oran)
+        uyar = False
+        if _unvan_ayirt_edici_uyusuyor(hedef, aday):
+            uyar = oran >= CARI_FUZZY_ESIK or (ayirt_edici_h >= 2 and len(_ayirt_edici(aday)) >= 2)
+        if not uyar:
+            uyar = _unvan_kesilmis_mi(hedef, aday) or _unvan_ilk_parca_esit(karsi_taraf_unvani, aday)
+        if uyar:
+            gecenler.append((oran, kod, ad))
+    if not gecenler:
+        return {**bos, "oran": en_iyi_ham}
+    gecenler.sort(key=lambda t: -t[0])
+    en = gecenler[0]
+    esitler = [g for g in gecenler[1:] if en[0] - g[0] <= CARI_BELIRSIZLIK_FARKI and g[1] != en[1]]
+    if esitler:
+        return {"durum": "belirsiz", "kod": None, "oran": en[0], "adaylar": [(k, a) for _o, k, a in [en] + esitler][:5]}
+    return {"durum": "eslesti", "kod": en[1], "oran": en[0], "adaylar": []}
 
 
 def _cari_fuzzy_esles(karsi_taraf_unvani, alt_secenekler):
-    """Karsi taraf unvanini, verilen (kod, ad) alt kirilim secenekleriyle isim
-    benzerligine gore karsilastirir. En yuksek benzerlikli aday CARI_FUZZY_ESIK
-    (0.85) uzerindeyse (kod, oran) doner; degilse (None, en_iyi_oran) doner.
-
-    Ek bagimlilik yok - difflib.SequenceMatcher (standart kutuphane) kullanilir."""
-    from difflib import SequenceMatcher
-
-    if not karsi_taraf_unvani or not alt_secenekler:
-        return None, 0.0
-    hedef = _unvan_normalize(karsi_taraf_unvani)
-    if not hedef:
-        return None, 0.0
-    en_iyi_kod, en_iyi_oran = None, 0.0
-    for kod, ad in alt_secenekler:
-        oran = SequenceMatcher(None, hedef, _unvan_normalize(ad)).ratio()
-        if oran > en_iyi_oran:
-            en_iyi_oran, en_iyi_kod = oran, kod
-    if en_iyi_oran >= CARI_FUZZY_ESIK:
-        return en_iyi_kod, en_iyi_oran
-    return None, en_iyi_oran
+    """Geriye uyumlu sarmalayici: (kod, oran) doner; eslesme yoksa ya da belirsizse (None, oran). Ayrinti: _cari_esle_ayrintili."""
+    r = _cari_esle_ayrintili(karsi_taraf_unvani, alt_secenekler)
+    return r["kod"], r["oran"]
 
 
 # Cari OLMAYAN (gelir/gider/stok) hesaplarda kalem adi <-> alt kirilim adi
@@ -537,10 +641,13 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
     karsi_taraf_unvani = invoice["header"].get("account_title")
     for kod in list(ilgili_alt_kirilimlar):
         if kod in CARI_HESAP_KODLARI:
-            secilen, oran = _cari_fuzzy_esles(karsi_taraf_unvani, ilgili_alt_kirilimlar[kod])
-            if secilen:
-                ana_koddan_alt_koda[kod] = secilen
-                kod_kaynagi[kod] = {"kaynak": "fuzzy_cari", "benzerlik": oran, "oran_duzeltildi": False}
+            esleme = _cari_esle_ayrintili(karsi_taraf_unvani, ilgili_alt_kirilimlar[kod])
+            if esleme["durum"] == "eslesti":
+                ana_koddan_alt_koda[kod] = esleme["kod"]
+                kod_kaynagi[kod] = {"kaynak": "fuzzy_cari", "benzerlik": esleme["oran"], "oran_duzeltildi": False}
+            elif esleme["durum"] == "belirsiz":
+                # Birden fazla kart esit uyuyor (mukerrer kart): SECILMEZ, aday kartlar insana gosterilir (uyari + records[].account_code_reason).
+                kod_kaynagi[kod] = {"kaynak": "cari_belirsiz", "benzerlik": esleme["oran"], "adaylar": esleme["adaylar"]}
 
     # 1b) DETERMINISTIK KALEM-ADI FUZZY ESLEME (2026-09-30, kullanici karari -
     # mock test: "EKMEK (TAZE, 350 GR)" kalemi olan bir faturada 600 ana kodda
@@ -664,7 +771,13 @@ def _entry_dicts_uygula(entry_dicts, ana_koddan_alt_koda, alt_kirilimlar_tumu=No
             yeni_e["secim_kaynagi"] = iz
         # 3 haneli KALDI mi (nokta yok)? Alt kirilim hic cozulemedi demektir.
         if "." not in yeni_kod:
-            if yeni_kod in CARI_HESAP_KODLARI:
+            if yeni_kod in CARI_HESAP_KODLARI and (iz or {}).get("kaynak") == "cari_belirsiz":
+                adaylar = ", ".join(f"{k} {a}" for k, a in iz.get("adaylar", []))
+                yeni_e["uyari"] = (
+                    f"Karşı taraf mizanda birden fazla karta eşit derecede benziyor ({adaylar}) — hangisinin kullanılacağı belirsiz, "
+                    "muhasebeci seçmeli (mükerrer cari kart olabilir). Yeni kart önerilmez: müşteri mizanda var."
+                )
+            elif yeni_kod in CARI_HESAP_KODLARI:
                 yeni_e["uyari"] = (
                     f"Karşı taraf mizanda bulunamadı — {yeni_kod} için alt kırılım "
                     "(cari kart) açılmamış olabilir, muhasebeci kontrol etmeli (yeni "

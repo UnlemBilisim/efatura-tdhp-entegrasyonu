@@ -828,3 +828,89 @@ class TestCariLlmSecimiKapali:
     ])
     def test_alt_kod_temizle(self, ham, beklenen):
         assert single._alt_kod_temizle(ham) == beklenen
+
+
+class TestCariEslemeKurallari:
+    """Cari eslemenin gercek veriyle olculen kurallari (2026-10-19): ayirt edici kelime, hukuki form, noktali kisaltma, kesilmis kart, ilk parca, belirsizlik.
+    Ornek adlarin hepsi GERCEK mizandan/faturalardan (Orhan Bey'in 990 etiketli cari satiri). Gercek veride dogru: yalniz benzerlik %48 -> bu kurallarla %83."""
+
+    def _esles(self, unvan, *kart_adlari):
+        secenekler = [(f"120.{i:04d}", ad) for i, ad in enumerate(kart_adlari, 1)]
+        r = single._cari_esle_ayrintili(unvan, secenekler)
+        return r["durum"], (dict(secenekler)[r["kod"]] if r["kod"] else None)
+
+    @pytest.mark.parametrize("unvan,kart", [
+        ("UN SAN.VE TİC.A.Ş.", "Un Sanayi Ve Ticaret Anonim Şirketi"),
+        ("CANSARP NAKLİYE LOJİSTİK TİCARET LİMİTED ŞİRKETİ", "Cansarp Nakliye Loj.Tic.Ltd.Şti."),
+        ("Faruk Karagöz", "FARUK KARAGÖZ"),
+        ("ANADOLU FIRIN VE UNLU MAMÜLLER SANAYİ A.Ş.", "ANADOLU FIRIN VE UNLU MAMULLER SAN. A.Ş."),
+    ])
+    def test_ayni_firma_farkli_yazim_eslesir(self, unvan, kart):
+        assert self._esles(unvan, "BASKA BIR FIRMA LTD.ŞTİ.", kart) == ("eslesti", kart)
+
+    @pytest.mark.parametrize("unvan,kart", [
+        ("GENÇBEY HAYVANCILIK VE TARIM GIDA ÜRÜNLERİ SANAYİ TİCARET LİMİTED ŞİRKETİ", "GENÇBEY HAYVANCILIK VE TAR.LTD.ŞTİ."),
+        ("TAHA KALIP MAKİNA OTOMOTİV YEDEK PARÇA İTHALAT İHRACAT SANAYİ TİCARET LİMİTED ŞİRKETİ", "TAHA KALIP MAKİNA OTOM.LTD.ŞTİ."),
+        ("AYKUT TİCARET İNŞAAT MALZEMELERİ TAAHHÜT VE TURİZM LİMİTED ŞİRKETİ", "AYKUT TİCARET İNŞ.MALZ.LTD.ŞTİ."),
+        ("EKAS BÜRO MOBİLYALARI SANAYİ TİCARET LİMİTED ŞİRKETİ", "EKAS BÜRO MOB. SAN.TİC.LTD.ŞTİ."),
+    ])
+    def test_kesilmis_kisaltilmis_kart_adi_eslesir(self, unvan, kart):
+        """Mizandaki kart adlari genellikle unvanin noktali kisaltilmis/kesilmis hali; yalniz benzerlik (0.64-0.77) bunlari kaciriyordu."""
+        assert self._esles(unvan, "BASKA BIR FIRMA LTD.ŞTİ.", kart) == ("eslesti", kart)
+
+    @pytest.mark.parametrize("unvan,kart", [
+        ("MEHMET ALİ ŞAHİN - ŞAHİN TAKOGRAF", "MEHMET ALİ ŞAHİN"),
+        ("RAMAZAN KÜÇÜKŞAHİN - ŞAHİNLER OTO ELEKTRİK", "RAMAZAN KÜÇÜKŞAHİN"),
+    ])
+    def test_kisi_adi_tire_ticari_ad_ilk_parca_eslesir(self, unvan, kart):
+        assert self._esles(unvan, "BASKA KISI", kart) == ("eslesti", kart)
+
+    @pytest.mark.parametrize("unvan,kart", [
+        ("ANADOLU FIRIN A.Ş.", "ANADOLU UN A.Ş."),                      # ortak uzun hukuki ek benzerligi sisiriyordu: 0.906
+        ("Özdisan Elektronik San Ve Tic.A.Ş.", "Demsay Elektronik Sanayi Ve Ticaret Anonim Şirketi"),   # gercek mizan: 0.93
+        ("FARUK KARAGÖZ", "FARUK KARAMAN"),                             # canli bulgu (LLM bunu secmisti): 0.77
+        ("FARUK KARAGÖZ", "FARUK KARAGÖZLER"),
+        ("POÇAN LOJİSTİK HİZMETLERİ ANONİM ŞİRKETİ", "Cansarp Nakliye Loj.Tic.Ltd.Şti."),   # canli bulgu
+        ("Endüstriyel Elektrik Ltd.Şti.", "ENDÜSTRİYEL ELEKTRİK A.Ş."),     # ayni ticari ad, FARKLI hukuki form
+        ("MEHMET ALİ KOÇAK", "MEHMET ALİ KOÇ"),                         # noktasiz onek kisaltma degil (farkli soyad)
+        ("EGE TRANSPORT NAK.LTD.ŞTİ.", "EGE TRANS NAK.LTD.ŞTİ."),        # 'TRANS' noktasiz
+        ("MEHMET ALİ YILMAZ", "MEHMET ALİ"),                            # iki kelimelik kisi karti, ayiraci yok: kesilmis sayilmaz
+        ("ABC NAKLİYE LTD.ŞTİ.", "ABC İNŞAAT LTD.ŞTİ."),                # is kolu kelimeleri ayirt edici
+    ])
+    def test_farkli_firma_eslesmez(self, unvan, kart):
+        durum, secilen = self._esles(unvan, kart)
+        assert durum == "eslesmedi" and secilen is None
+
+    def test_ayni_adli_mukerrer_kartlarda_belirsiz_doner_kart_secilmez(self):
+        r = single._cari_esle_ayrintili("Necati Polat", [("120.1027", "Necati Polat"), ("120.1563", "NECATİ POLAT"), ("120.0001", "BASKA KISI")])
+        assert r["durum"] == "belirsiz" and r["kod"] is None
+        assert {k for k, _ in r["adaylar"]} == {"120.1027", "120.1563"}
+
+    def test_tam_eslesme_yakin_adaydan_ustun_gelir(self):
+        """Biri birebir (1.0), digeri yakin ama farkli ise belirsiz DEGIL: birebir olan secilir."""
+        durum, secilen = self._esles("MURAT ÜÇÜCÜ", "Murat Üçücü", "Murat Üçücü İnşaat Ltd.Şti.")
+        assert (durum, secilen) == ("eslesti", "Murat Üçücü")
+
+    def test_tokenlama_noktali_kisaltmayi_isaretler_ve_normalize_ayni_kalir(self):
+        assert single._unvan_tokenla("MOB. SAN.TİC.LTD.ŞTİ.") == [("MOB", True), ("SANAYI", True), ("TICARET", True), ("LIMITED", True), ("SIRKETI", True)]
+        assert single._unvan_normalize("Cansarp Nakliye Loj.Tic.Ltd.Şti.") == "CANSARP NAKLIYE LOJ TICARET LIMITED SIRKETI"
+        assert single._unvan_normalize(None) == "" and single._unvan_tokenla("") == []
+
+    def test_belirsiz_kart_akista_secilmez_uyari_aday_gosterir_yeni_kart_onerilmez(self, monkeypatch):
+        """Uc halka birden: eslestirici -> _alt_kirilim_uygula -> entry. Mukerrer kartlarda 320 3 haneli kalir, uyari adaylari sayar,
+        musteri mizanda VAR oldugu icin yeni kart ONERILMEZ, secim_kaynagi='cari_belirsiz' (dis semada gerekce)."""
+        spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
+        mizan = {"320": [("320.01.00001", "ORNEK TEDARIKCI A.S."), ("320.01.00002", "Ornek Tedarikci A.Ş.")]}
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: mizan)
+        with patch.object(single, "call_model", side_effect=[_balanced_response()]):
+            sonuc = single.predict_single_invoice(
+                SAMPLE_XML, model=spec, own_vkn=OWN_VKN, rag=False, self_correct=False, tevkifat_hint=False, iade_hint=False, alt_kirilim=True,
+            )
+        cari = next(e for e in sonuc["entries"] if e["account_code"].startswith("320"))
+        assert cari["account_code"] == "320"
+        assert "birden fazla" in cari["uyari"] and "320.01.00001" in cari["uyari"] and "320.01.00002" in cari["uyari"]
+        assert "onerilen_yeni_kod" not in cari and cari["secim_kaynagi"]["kaynak"] == "cari_belirsiz"
+        from core.disa_aktarim import kayitlari_disa_aktar
+
+        kayit = next(r for r in kayitlari_disa_aktar(sonuc) if r["account_code"] == "320")
+        assert "belirsiz" in kayit["account_code_reason"] and "320.01.00001" in kayit["account_code_reason"]

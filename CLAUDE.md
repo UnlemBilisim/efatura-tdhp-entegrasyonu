@@ -197,6 +197,22 @@ indeksini de güncelle.
 > `_alt_kod_temizle` baştaki kodu alır (KDV/gider/gelir için; seçim yine mizan listesine karşı doğrulanır, uydurma kod reddedilir; cari'de YAPILMAZ — `": ad"` kabulü yanlış müşteri seçimini de
 > kabul etmek olurdu). Testler: `tests/test_single.py::TestCariLlmSecimiKapali` (düzeltme olmadan 6 test düşüyor, doğrulandı).
 
+> ✅ **Uygulandı** (2026-10-19, kullanıcı kararı — "ayırt edici kelime kontrolü" + "belirsizlikte insana bırak"): **cari eşleştirme kuralları gerçek veriyle ölçülerek yeniden yazıldı**
+> (`core/single.py::_cari_esle_ayrintili` + `_unvan_*` yardımcıları). Önceki kural yalnızca `SequenceMatcher >= %85` idi; iki sorun ölçüldü: (1) ortak uzun hukuki ek ("ANONİM ŞİRKETİ")
+> benzerliği şişirip FARKLI firmaları eşleştiriyordu (`ANADOLU FIRIN A.Ş.` ~ `ANADOLU UN A.Ş.` 0,906; gerçek mizanda `Özdisan Elektronik…` ~ `Demsay Elektronik…` 0,93; mizandaki
+> kartların %18'inin (120) / %10'unun (320) başka bir kartla ≥%85 benzeyen komşusu var), (2) mizandaki kart adları çoğunlukla unvanın NOKTALI KISALTILMIŞ/KESİLMİŞ hali
+> (`TAHA KALIP MAKİNA OTOM.LTD.ŞTİ.`) ve yalnızca benzerlik bunları kaçırıyordu. Yeni kural: (1) **ayırt edici kelime çifti** — genel/hukuki kelimeler (`UNVAN_GENEL_KELIMELER`) sayılmadan
+> kalan kelimelerin iki unvanda da karşılığı olmalı; **noktayla biten** kısaltma önek sayılır (`TAR.`~`TARIM`), noktasız önek sayılmaz (`KOÇ`≠`KOÇAK`); hukuki form ikisinde de varsa aynı
+> olmalı (`Ltd.Şti.`≠`A.Ş.`); (2) **kesilmiş kart** — kart adı unvanın başındaki ayırt edici kelimelerin sırayla kesilmiş hali, kartta ≥3 ayırt edici kelime ya da noktalı kısaltma
+> (`MEHMET ALİ` kartı `MEHMET ALİ YILMAZ` faturasına bağlanmasın); (3) **ilk parça** — unvan `KİŞİ - TİCARİ AD` gibi devam ediyorsa kart ayıraçtan önceki kısımla birebir uyuşmalı;
+> (4) **belirsizlik** — iki farklı kart aynı skoru alırsa (mükerrer kart) kart SEÇİLMEZ: `secim_kaynagi.kaynak="cari_belirsiz"`, uyarı adayları sayar, yeni kart ÖNERİLMEZ (müşteri mizanda var),
+> `UNRESOLVED_COUNTERPARTY` → `approvable=False`. **Ölçüm (7610928437, Orhan Bey'in zip'indeki 990 GERÇEK cari satır, yevmiyedeki kart etiket):** doğru bağlanan yalnız-benzerlikte 476 (%48) →
+> **826 (%83)**; yanlış bağlanma 17 (%1,7) → 2 (%0,2) ve kalan 2'si gerçek hata değil (biri muhasebecinin kendi kayıt hatası `Murat Güçlü`/`Murat Üçücü`, biri aynı firmanın iki kartı);
+> bulunamadı/belirsiz 497 → 162. "Kart yokmuş gibi" (her kart havuzdan çıkarılıp adı kalanlara karşı eşleştirilir): yanlış bağlanma 120'de %14,0 → %0,3, 320'de %9,5 → %0,8 (kalanlar aynı
+> firmanın iki kartı). Kendi adıyla eşleşme %97-99, kayıp yok (kalanı mükerrer → belirsiz). Testler: `tests/test_single.py::TestCariEslemeKurallari` (gerçek ad çiftleriyle). **Sınırlar:**
+> tek şirketin verisiyle ölçüldü; hâlâ ~%15 müşteri insana kalır (ağır farklı yazım); mizanda 25 çift aynı adlı mükerrer kart var (120) — o müşteriler her zaman belirsiz çıkar, mizan
+> temizlenirse düzelir.
+
 ## Çalıştırmak için gerekenler (sık atlanan)
 
 > ✅ **Uygulandı** (2026-09-28, kullanıcı kararı): `baslat.sh` kaldırıldı,
