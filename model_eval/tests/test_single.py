@@ -721,3 +721,42 @@ class TestKdvOraniDuzelt:
 
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+class TestDuzHesapPlani:
+    """2 parcali (duz) hesap plani destegi (2026-10-19): `191.01` = "%20 Ind. KDV", `600.01` = bir satis kalemi. Once mizan okuyucusu bu
+    hesaplari atiyordu; okununca KDV oran duzeltmesi ve yeni kod onerisi de 3 parcali varsayimla calismamali."""
+
+    ALT_191 = [
+        ("191.01", "%20 İnd. KDV"),
+        ("191.02", "%10 İnd. KDV"),
+        ("191.03", "%01 İnd. KDV"),
+        ("191.04", "%20 İADE İNDİRİLECEK KDV"),
+    ]
+
+    def test_kdv_orani_duz_planda_ayni_tur_icinde_duzeltilir(self):
+        assert single._kdv_oranini_duzelt("191.01", self.ALT_191, {10}) == "191.02"
+        assert single._kdv_oranini_duzelt("191.02", self.ALT_191, {1}) == "191.03"
+
+    def test_kdv_orani_duz_planda_dogru_oran_degismez(self):
+        assert single._kdv_oranini_duzelt("191.01", self.ALT_191, {20}) == "191.01"
+
+    def test_kdv_orani_duz_planda_tur_korunur_baska_ture_atlamaz(self):
+        """'%20 IADE INDIRILECEK KDV' (191.04) icin fatura %10 ise '%10 Ind. KDV'ye (baska tur) ATLANMAZ — ayni turde %10 yoksa secim kalir."""
+        assert single._kdv_oranini_duzelt("191.04", self.ALT_191, {10}) == "191.04"
+
+    def test_yeni_kod_duz_planda_sira_genisligiyle_onerilir(self):
+        assert single._yeni_alt_kod_oner("600", {"600": [("600.01", "A"), ("600.09", "B")]}) == "600.10"
+        assert single._yeni_alt_kod_oner("600", {"600": [("600.001", "A"), ("600.009", "B")]}) == "600.010"
+        assert single._yeni_alt_kod_oner("191", {"191": self.ALT_191}) == "191.05"
+
+    def test_yeni_kod_uc_parcali_sira_genisligi_mevcut_kodlardan_alinir(self):
+        """Eskiden sira her zaman 5 haneliydi (Akyuzlu); 3 haneli dolgu kullanan sirkette '150.01.00016' yerine '150.01.016' onerilmeli."""
+        mizan = {"150": [("150.01.001", "A"), ("150.01.015", "B"), ("150.01.03", "C")]}
+        assert single._yeni_alt_kod_oner("150", mizan) == "150.01.016"
+
+    def test_yeni_kod_karisik_planda_agirlikli_derinlik_secilir(self):
+        uc_agirlikli = {"320": [("320.01.001", "A"), ("320.01.002", "B"), ("320.05", "C")]}
+        assert single._yeni_alt_kod_oner("320", uc_agirlikli) == "320.01.003"
+        duz_agirlikli = {"320": [("320.01", "A"), ("320.02", "B"), ("320.05.001", "C")]}
+        assert single._yeni_alt_kod_oner("320", duz_agirlikli) == "320.03"

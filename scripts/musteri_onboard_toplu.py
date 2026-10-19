@@ -99,9 +99,9 @@ def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str, ile
     _ilerle("sema", 25)
 
     print(f"\n--- [2/4] {vkn}: mizan yukleniyor ---")
-    from mizan_excel_yukle import yukle as mizan_yukle  # noqa: E402
+    from mizan_excel_yukle import yukle_ayrintili as mizan_yukle  # noqa: E402
 
-    mizan_satir_sayisi = mizan_yukle(vkn, str(mizan_yolu), database_url=database_url)
+    mizan_satir_sayisi, mizan_okuma = mizan_yukle(vkn, str(mizan_yolu), database_url=database_url)
     _ilerle("mizan", 50)
 
     print(f"\n--- [3/4] {vkn}: fatura XML'leri yevmiye ile eslestiriliyor ---")
@@ -132,6 +132,8 @@ def _musteriyi_onboard_et(vkn: str, musteri_dizini: Path, database_url: str, ile
 
     return {
         "vkn": vkn, "mizan_satir_sayisi": mizan_satir_sayisi,
+        # Dosyada kaç kodlu satır vardı, kaçı hangi sebeple alınmadı (2026-10-19): "mizan 17 satır" tek başına eksik mizanı gizliyordu
+        "mizan_okuma": mizan_okuma,
         "fatura_eslesme": f"{ozet['eslesen']}/{ozet['toplam_xml']}",
         "esiy_yevmiyede_var_xml_de_yok": len(ozet["yevmiyede_var_xml_de_yok"]),
         "esiy_xml_de_var_yevmiyede_yok": len(ozet["xml_de_var_yevmiyede_yok"]),
@@ -195,9 +197,11 @@ def musteriyi_guncelle(vkn: str, musteri_dizini: Path, database_url: str, ilerle
         _ilerle("nace", 25)
 
         if mizan_var:
-            from mizan_excel_yukle import mizan_hesap_satirlari  # noqa: E402
+            from mizan_excel_yukle import mizan_oku  # noqa: E402
 
-            ozet["mizan"] = mizan_guncelle(mizan_hesap_satirlari(mizan_yolu), cur, vkn, is_id, istemci)
+            mizan_satirlari, mizan_okuma = mizan_oku(mizan_yolu)
+            ozet["mizan"] = mizan_guncelle(mizan_satirlari, cur, vkn, is_id, istemci)
+            ozet["mizan"]["okuma"] = mizan_okuma
             conn.commit()
         _ilerle("mizan", 50)
 
@@ -271,7 +275,8 @@ def main() -> None:
     print(f"Basarili: {len(basarili)}/{len(musteri_dizinleri)}")
     for s in basarili:
         print(
-            f"  {s['vkn']}: mizan {s['mizan_satir_sayisi']} satir, "
+            f"  {s['vkn']}: mizan {s['mizan_satir_sayisi']} satir "
+            f"(dosyada {s['mizan_okuma']['okunan_satir']} kodlu satir), "
             f"fatura eslesme {s['fatura_eslesme']}, "
             f"esiy(yevmiyede var xml yok)={s['esiy_yevmiyede_var_xml_de_yok']}, "
             f"esiy(xml var yevmiyede yok)={s['esiy_xml_de_var_yevmiyede_yok']}, "

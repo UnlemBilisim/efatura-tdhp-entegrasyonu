@@ -162,3 +162,34 @@ def test_gecersiz_girdiler_acik_hata_verir(ortam, tmp_path):
     shutil.copytree(musteri / "faturalar", yalniz_fatura / "faturalar")
     with pytest.raises(betik.OnboardHatasi, match="BİRLİKTE"):
         betik.musteriyi_guncelle(VKN, yalniz_fatura, TEST_DATABASE_URL)
+
+
+@requires_postgres
+def test_kayitli_sirket_mizanina_iki_parcali_hesaplar_gelince_eklenir_ve_okuma_raporu_doner(ortam):
+    """Gerçek senaryo (2026-10-19): şirket daha önce 3 parçalı hesaplarla kuruldu; mizan yeniden gelirken `770.77` gibi 2 parçalı yaprak
+    hesaplar da içeriyor. Eski okuyucu 2 parçalıları sessizce atardı — şimdi eklenir, geçmişe yazılır ve `ozet.mizan.okuma`
+    neyin alınıp neyin atıldığını söyler. Mock mizanda `600.01.*` ve `191.01.*` zaten var: dosyaya eklenen `600.01` / `191.01` satırları
+    ÜST GRUP sayılır ve alınmaz (altında hesap var), yalnızca gerçek yapraklar eklenir."""
+    musteri, kol, conn, cur = ortam
+    betik = _betik()
+    _guncelle(betik, musteri)  # ilk kurulum (mock mizan, 21 hesap)
+
+    wb = openpyxl.load_workbook(musteri / "mizan.xlsx")
+    ws = wb.worksheets[0]
+    ws.append(["600", "SATIŞLAR (ana kod)"])        # ana kod satırı: alınmaz
+    ws.append(["600.01", "Yurtiçi (üst grup)"])      # altında 600.01.0000x var: üst grup, alınmaz
+    ws.append(["770.77", "Yeni 2 parçalı gider"])    # yaprak: alınır
+    ws.append(["770.78", "Başka 2 parçalı gider"])   # yaprak: alınır
+    ws.append(["120.07.001", "Yeni müşteri"])        # 3 parçalı yaprak: alınır
+    wb.save(musteri / "mizan.xlsx")
+
+    o = _guncelle(betik, musteri)
+    assert o["mizan"]["eklenen"] == 3 and o["mizan"]["degisen"] == 0 and o["mizan"]["silinen"] == 0 and o["mizan"]["uygulandi"]
+    okuma = o["mizan"]["okuma"]
+    assert okuma["okunan_satir"] == 26 and okuma["kabul_edilen"] == 24  # 21 mock + 3 yeni yaprak
+    assert okuma["atlanan"]["ana_kod"] == 1 and okuma["atlanan"]["ust_grup"] == 1
+    assert okuma["derinlik"] == {"3": 22, "2": 2}
+    assert _gecmis_sayisi(cur)["mizan"] == 21 + 3  # yeni 3 hesap geçmişe "eklendi" olarak yazıldı
+    cur.execute(f'SET search_path TO "tenant_{VKN}", public')
+    cur.execute("SELECT hesap_kodu, ana_kod FROM mizan_alt_kirilim WHERE hesap_kodu LIKE '770.7%' ORDER BY 1")
+    assert cur.fetchall() == [("770.77", "770"), ("770.78", "770")]

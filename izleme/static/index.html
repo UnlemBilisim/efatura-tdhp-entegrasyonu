@@ -39,6 +39,15 @@
   .cubuk { height:8px; background:var(--kod); border-radius:5px; overflow:hidden; margin:6px 0 8px; } .cubuk i { display:block; height:100%; background:var(--ana); }
   .sirket { display:grid; grid-template-columns:110px 90px 70px 1fr; gap:8px; padding:3px 0; font-size:13px; }
   .gizli { display:none; }
+  a.dugme, button.dugme { display:inline-block; padding:4px 10px; border:1px solid var(--ana); border-radius:7px; color:var(--ana); background:none; text-decoration:none; cursor:pointer; font-size:12px; margin-right:6px; }
+  a.dugme:hover, button.dugme:hover { background:var(--kod); }
+  .panel { background:var(--kart); border:1px solid var(--cizgi); border-radius:10px; padding:14px 16px; margin-bottom:12px; }
+  .panel h3 { margin:0 0 8px; font-size:14px; }
+  .kv { display:grid; grid-template-columns:150px 1fr; gap:3px 12px; font-size:13px; }
+  .kv span:nth-child(odd) { color:var(--soluk); }
+  .onizleme { max-height:380px; overflow:auto; background:var(--kod); border-radius:8px; padding:10px; }
+  .rozet { display:inline-block; padding:0 7px; border-radius:6px; font-size:11px; font-weight:600; background:var(--kod); color:var(--soluk); margin-right:4px; }
+  .geri { margin-bottom:10px; }
 </style>
 </head>
 <body>
@@ -61,11 +70,13 @@
   <div class="kartlar" id="kartlar"></div>
   <nav id="sekmeler">
     <button data-s="istekler" class="aktif">İstekler</button>
+    <button data-s="dosyalar">Gelen dosyalar</button>
     <button data-s="isler">Onboarding işleri</button>
     <button data-s="hatalar">Hata logları</button>
     <button data-s="ham">Ham log</button>
   </nav>
   <section id="istekler"></section>
+  <section id="dosyalar" class="gizli"></section>
   <section id="isler" class="gizli"></section>
   <section id="hatalar" class="gizli"></section>
   <section id="ham" class="gizli"></section>

@@ -65,11 +65,11 @@ def get_alt_kirilimlar(tenant_vkn=None):
     """3 haneli TDHP koduna gore gruplanmis alt kirilim sozlugu doner:
     {"191": [("191.01.00020", "%20 Indirilecek KDV"), ...], ...}
 
-    Sadece 3-seviyeli kodlar (XXX.YY.ZZZZZ formatinda, ana kodun DOGRUDAN
-    alt kirilimlari) alinir - ust seviye ozet satirlari (orn. sadece "191"
-    ya da "191.01") burada YOK, cunku onlar zaten TDHP_GLOSSARY'de ana
-    kod olarak var; bu sozluk sadece "hangi alt kirilimdan birini secmen
-    gerekiyor" sorusuna cevap veriyor.
+    Tablodaki YAPRAK alt hesaplar gelir (yukleme kurali: mizan_excel_yukle.mizan_oku - her derinlikte,
+    ornek 600.01 ya da 120.01.001; 2026-10-19'dan once yalnizca tam 3 parcali kodlar yuklenirdi) - ana kod
+    satirlari ("191") ve altinda hesap bulunan ust gruplar ("191.01" altinda 191.01.001 varsa) tabloda YOK,
+    cunku onlar zaten TDHP_GLOSSARY'de ana kod olarak var; bu sozluk sadece "hangi alt kirilimdan birini
+    secmen gerekiyor" sorusuna cevap veriyor.
 
     tenant_vkn gecersiz/bos ise (own_vkn belirtilmemis) YA DA bu sirketin
     mizan_alt_kirilim tablosu bossa/DB'ye baglanilamazsa exception FIRLATMAZ,

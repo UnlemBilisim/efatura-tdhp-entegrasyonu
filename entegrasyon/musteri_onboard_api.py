@@ -49,8 +49,10 @@ from typing import Callable, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
+import istek_arsivi
 from api_anahtarlari import IstemciKimligi
 from auth import require_onboard_yetkisi
+from log_ortak import mevcut_request_id
 from security import ONBOARD_MAX_ZIP_BYTES, ONBOARD_YOLU
 
 _logger = logging.getLogger("entegrasyon.onboard")
@@ -195,12 +197,13 @@ class IsDeposu:
         gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=2), encoding="utf-8")
         os.replace(gecici, yol)
 
-    def olustur(self, etiket: str, vknler: list, atlanan_dosya: int, gecersiz_klasorler: list, guncelleme_yetkisiz: Optional[list] = None) -> dict:
+    def olustur(self, etiket: str, vknler: list, atlanan_dosya: int, gecersiz_klasorler: list, guncelleme_yetkisiz: Optional[list] = None,
+                request_id: Optional[str] = None) -> dict:
         is_id = uuid.uuid4().hex
         veri = {
             "is_id": is_id, "etiket": etiket, "olusturulma": _simdi(), "durum": "kuyrukta",
             "atlanan_dosya": atlanan_dosya, "gecersiz_klasorler": gecersiz_klasorler,
-            "guncelleme_yetkisiz": sorted(guncelleme_yetkisiz or []),
+            "guncelleme_yetkisiz": sorted(guncelleme_yetkisiz or []), "request_id": request_id,
             "sirketler": {v: {"durum": "bekliyor", "yuzde": 0, "adim": None, "ayrinti": None, "ozet": None} for v in vknler},
         }
         with self._kilit:
@@ -457,6 +460,7 @@ async def musteri_onboard(request: Request, kimlik: IstemciKimligi = Depends(req
     is_dizini_kok.mkdir(parents=True, exist_ok=True)
     zip_yolu = is_dizini_kok / f"{uuid.uuid4().hex}.zip"
     boyut = 0
+    rid = mevcut_request_id()
     try:
         with open(zip_yolu, "wb") as f:
             async for parca in request.stream():
@@ -464,6 +468,8 @@ async def musteri_onboard(request: Request, kimlik: IstemciKimligi = Depends(req
                 if boyut > ONBOARD_MAX_ZIP_BYTES:
                     raise HTTPException(status_code=413, detail="Zip izin verilen boyutu aşıyor.")
                 f.write(parca)
+        # Gelen dosyanın bir kopyası sınırlı süre arşivlenir (operatör incelemesi; geçersiz zip'ler de — bkz. istek_arsivi.py)
+        istek_arsivi.zip_kaydet(rid, zip_yolu, "musteri_onboard", kimlik.etiket, request.client.host if request.client else None, ONBOARD_YOLU)
         with open(zip_yolu, "rb") as f:
             if f.read(4) != ZIP_IMZASI:
                 raise HTTPException(status_code=400, detail="Gövde bir zip dosyası değil.")
@@ -482,12 +488,16 @@ async def musteri_onboard(request: Request, kimlik: IstemciKimligi = Depends(req
                 detail="Zip içinde işlenecek şirket klasörü bulunamadı. Kökte <10 haneli VKN>/ klasörleri ve "
                        "içlerinde mizan.xlsx, faturalar/*.xml, yevmiye.xlsx|csv bekleniyor.",
             )
+    except HTTPException as exc:
+        istek_arsivi.hata_yaz(rid, exc.status_code, exc.detail)
+        raise
     finally:
         zip_yolu.unlink(missing_ok=True)
 
     # Kayıtlı bir şirket için güncelleme yalnızca anahtar o VKN adına yetkiliyse yapılır; yetkisizler iş kaydında işaretlenir.
     yetkisiz = [v for v in sonuc["vknler"] if c.kurulu_mu(v) and not kimlik.vkn_izinli_mi(v)]
-    is_kaydi = c.depo.olustur(kimlik.etiket, sonuc["vknler"], sonuc["atlanan_dosya"], sonuc["gecersiz_klasorler"], yetkisiz)
+    is_kaydi = c.depo.olustur(kimlik.etiket, sonuc["vknler"], sonuc["atlanan_dosya"], sonuc["gecersiz_klasorler"], yetkisiz, request_id=rid)
+    istek_arsivi.meta_yaz(rid, durum=202, is_id=is_kaydi["is_id"], vknler=sonuc["vknler"])
     # Dosyalar, gerçek iş kimliğine göre adlandırılmış dizine taşınır (çalışan bunu is_id ile bulur).
     hedef = c.is_dizini(is_kaydi["is_id"])
     hedef.parent.mkdir(parents=True, exist_ok=True)
@@ -495,8 +505,10 @@ async def musteri_onboard(request: Request, kimlik: IstemciKimligi = Depends(req
     _audit.info(json.dumps({"olay": "musteri_onboard_basladi", "is_id": is_kaydi["is_id"], "istemci": kimlik.etiket,
                             "vknler": sonuc["vknler"], "zip_bayt": boyut}, ensure_ascii=False))
     c.ekle(is_kaydi["is_id"])
-    return {"is_id": is_kaydi["is_id"], "durum": "kuyrukta", "sirketler": sonuc["vknler"],
-            "atlanan_dosya": sonuc["atlanan_dosya"], "gecersiz_klasorler": sonuc["gecersiz_klasorler"]}
+    yanit = {"is_id": is_kaydi["is_id"], "durum": "kuyrukta", "sirketler": sonuc["vknler"],
+             "atlanan_dosya": sonuc["atlanan_dosya"], "gecersiz_klasorler": sonuc["gecersiz_klasorler"]}
+    istek_arsivi.cevap_yaz(rid, yanit)
+    return yanit
 
 
 @router.get("/musteri/isler/{is_id}")

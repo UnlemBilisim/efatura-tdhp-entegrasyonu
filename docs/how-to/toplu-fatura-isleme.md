@@ -107,7 +107,7 @@ ilerleme için yukarıdaki `GET /fatura/toplu/{id}` kullanılır.)
 | **Hata izolasyonu** | Bozuk bir XML yalnızca kendi satırını `hata` yapar, diğerleri işlenir |
 | **Hız** | Toplu iş bir yuvayı kullanır (`MAX_ESZAMANLI_ISLEM − 1`), bir yuva tek istekler için boş kalır. Fatura başına genelde 10–30 sn → saatte kabaca 120–360 fatura |
 | **Yeniden başlatma** | Uygulama iş sürerken yeniden başlarsa iş **kaldığı yerden** devam eder; işlenenler tekrar işlenmez |
-| **Veri saklama** | Ham XML'ler iş bitince silinir; sonuçlar 14 gün saklanır (saatte bir temizlenir) |
+| **Veri saklama** | Ham XML'ler iş bitince silinir; sonuçlar 14 gün saklanır (saatte bir temizlenir). **Ayrıca** gelen zip'in bir kopyası ve verdiğimiz cevap operatör incelemesi için `GELEN_ARSIV_GUN` (varsayılan 7) gün arşivlenir — bkz. [Gelen dosyaları inceleme](gelen-dosyalari-inceleme.md) |
 | **Başka anahtarın işi** | `404` (varlığı sızdırılmaz) |
 | **Loglama** | Her yükleme/fatura/bitiş `entegrasyon.audit`'e yazılır (kim, hangi VKN, sonuç, red kodları); **ham XML asla yazılmaz** |
 

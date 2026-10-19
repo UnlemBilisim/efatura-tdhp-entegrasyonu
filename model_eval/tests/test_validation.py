@@ -1,3 +1,5 @@
+import pytest
+
 from core.validation import validate_prediction
 
 
@@ -113,3 +115,30 @@ def test_unquantizable_huge_amount_is_rejected_without_crashing(monkeypatch):
         "1234567890",
     )
     assert "INVALID_AMOUNT" in {error["code"] for error in result["errors"]}
+
+
+def _dengeli(kod):
+    return {"entries": [{"account_code": kod, "dc": "Borc", "amount": 100.0}, {"account_code": "320", "dc": "Alacak", "amount": 100.0}]}
+
+
+@pytest.mark.parametrize("kod", ["150.01.001", "150.01.03", "600.01", "120.01.00001", "191.01.001.0002"])
+def test_farkli_derinlik_ve_dolgudaki_mizan_kodlari_gecerli(monkeypatch, kod):
+    """2026-10-19: biçim regex'i yalnızca `XXX.YY.ZZZZZ` kabul ediyordu (Akyüzlü'ye sabit) — başka bir şirketin geçerli
+    `150.01.001` / `600.01` kodları INVALID_ACCOUNT_FORMAT ile reddedilip fatura onaylanamaz oluyordu."""
+    monkeypatch.setattr("core.validation.get_alt_kirilimlar", lambda tenant_vkn: {kod[:3]: [(kod, "Test")]})
+    sonuc = validate_prediction(_dengeli(kod), _invoice("100.00"), "1234567890")
+    assert sonuc["valid"] is True, sonuc["errors"]
+
+
+def test_mizanda_olmayan_alt_hesap_hala_reddedilir(monkeypatch):
+    """Biçim gevşedi ama GERÇEK koruma (şirket mizanında üyelik) aynı: uydurma alt hesap SUBACCOUNT_NOT_IN_LEDGER alır."""
+    monkeypatch.setattr("core.validation.get_alt_kirilimlar", lambda tenant_vkn: {"600": [("600.01", "A")]})
+    sonuc = validate_prediction(_dengeli("600.99"), _invoice("100.00"), "1234567890")
+    assert sonuc["valid"] is False and [e["code"] for e in sonuc["errors"]] == ["SUBACCOUNT_NOT_IN_LEDGER"]
+
+
+@pytest.mark.parametrize("kotu", ["12", "6000", "600.", "600..01", "600.01.", "abc", "600.0 1", "600.01\n", "6001.01"])
+def test_bozuk_hesap_kodu_bicimi_reddedilir(monkeypatch, kotu):
+    monkeypatch.setattr("core.validation.get_alt_kirilimlar", lambda tenant_vkn: {})
+    sonuc = validate_prediction(_dengeli(kotu), _invoice("100.00"), "1234567890")
+    assert "INVALID_ACCOUNT_FORMAT" in [e["code"] for e in sonuc["errors"]]

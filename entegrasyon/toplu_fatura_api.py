@@ -42,8 +42,10 @@ from typing import Callable, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from starlette.concurrency import run_in_threadpool
 
+import istek_arsivi
 from api_anahtarlari import IstemciKimligi
 from auth import require_api_key
+from log_ortak import mevcut_request_id
 from musteri_onboard_api import (  # güvenli zip açmanın ortak parçaları (tek kaynak)
     MAX_ACILMIS_BAYT, MAX_DOSYA_SAYISI, MAX_SIKISTIRMA_ORANI, VKN_DESENI, ZIP_IMZASI, ZipHatasi, _uye_parcalari,
 )
@@ -181,12 +183,13 @@ class TopluDeposu:
         gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(gecici, yol)
 
-    def olustur(self, is_id: str, etiket: str, faturalar: list, onay, kur_secimi, atlanan: int) -> dict:
+    def olustur(self, is_id: str, etiket: str, faturalar: list, onay, kur_secimi, atlanan: int, request_id: Optional[str] = None) -> dict:
         d = self.dizin(is_id)
         veri = {
             "is_id": is_id, "etiket": etiket, "olusturulma": _simdi(), "durum": "kuyrukta",
             "toplam": len(faturalar), "tamamlanan": 0, "sayilar": {k: 0 for k in TUM_KATEGORILER},
             "vknler": sorted({f["vkn"] for f in faturalar}), "onay": onay, "kur_secimi": kur_secimi, "atlanan_dosya": atlanan,
+            "request_id": request_id,
         }
         with self._kilit:
             self._yaz(d / "is.json", veri)
@@ -423,6 +426,7 @@ async def toplu_isle(
     xml_dizini = c.depo.dizin(is_id) / "xml"
     basarili = False
     boyut = 0
+    rid = mevcut_request_id()
     try:
         with open(zip_yolu, "wb") as f:
             async for parca in request.stream():
@@ -430,6 +434,8 @@ async def toplu_isle(
                 if boyut > TOPLU_MAX_ZIP_BYTES:
                     raise HTTPException(status_code=413, detail="Zip izin verilen boyutu aşıyor.")
                 f.write(parca)
+        # Gelen dosyanın bir kopyası sınırlı süre arşivlenir (operatör incelemesi; geçersiz zip'ler de — bkz. istek_arsivi.py)
+        istek_arsivi.zip_kaydet(rid, zip_yolu, "fatura_toplu", kimlik.etiket, request.client.host if request.client else None, TOPLU_YOLU)
         with open(zip_yolu, "rb") as f:
             if f.read(4) != ZIP_IMZASI:
                 raise HTTPException(status_code=400, detail="Gövde bir zip dosyası değil.")
@@ -452,8 +458,12 @@ async def toplu_isle(
         if kayitsiz:
             raise HTTPException(status_code=404, detail=f"Şu VKN'ler için kayıtlı şirket yok (önce onboard edilmeli): {', '.join(kayitsiz)}")
 
-        veri = c.depo.olustur(is_id, kimlik.etiket, sonuc["faturalar"], onay, kur_secimi, sonuc["atlanan_dosya"])
+        veri = c.depo.olustur(is_id, kimlik.etiket, sonuc["faturalar"], onay, kur_secimi, sonuc["atlanan_dosya"], request_id=rid)
+        istek_arsivi.meta_yaz(rid, durum=202, is_id=is_id, vknler=vknler, toplam_fatura=veri["toplam"])
         basarili = True
+    except HTTPException as exc:
+        istek_arsivi.hata_yaz(rid, exc.status_code, exc.detail)
+        raise
     finally:
         zip_yolu.unlink(missing_ok=True)
         if not basarili:
@@ -462,8 +472,10 @@ async def toplu_isle(
     _audit.info(json.dumps({"olay": "toplu_fatura_basladi", "is_id": is_id, "istemci": kimlik.etiket, "vknler": veri["vknler"],
                             "fatura_sayisi": veri["toplam"], "zip_bayt": boyut}, ensure_ascii=False))
     c.ekle(is_id)
-    return {"is_id": is_id, "durum": "kuyrukta", "toplam": veri["toplam"], "vknler": veri["vknler"],
-            "atlanan_dosya": veri["atlanan_dosya"]}
+    yanit = {"is_id": is_id, "durum": "kuyrukta", "toplam": veri["toplam"], "vknler": veri["vknler"],
+             "atlanan_dosya": veri["atlanan_dosya"]}
+    istek_arsivi.cevap_yaz(rid, yanit)
+    return yanit
 
 
 def _is_getir(is_id: str, kimlik: IstemciKimligi) -> dict:

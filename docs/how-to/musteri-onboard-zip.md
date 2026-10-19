@@ -117,6 +117,8 @@ bir süre kalabilir. Şirket `durum`:
 | `atlandi` | Kayıtlı şirket ama anahtar o VKN'ye yetkili değil — hiçbir şey değişmedi | Yetki gerekiyorsa `vkn-ekle` |
 | `hata` | Bu şirket kurulamadı; diğerleri etkilenmedi. Neden `ayrinti`'de | Aşağıdaki "Sorun giderme" |
 
+`ozet`'te ayrıca `mizan_okuma` bulunur (2026-10-19): mizan dosyasında kaç kodlu satır olduğu, kaçının alındığı, atlananların sebebi (`ana_kod`, `ust_grup`, `sayi_bicimli`, `gecersiz_kod`, `tekrar`) ve `uyari` listesi — "mizan 17 satır" tek başına eksik mizanı gizliyordu. Mizan her derinlikteki yaprak hesabı alır (`600.01`, `120.01.001`); yalnızca İLK sayfa okunur.
+
 `ozet` örneği: `{"mizan_satir_sayisi": 21, "fatura_eslesme": "2/2", "yon_belirsiz": 0, "nace_kodlari": ["107101"]}`.
 **`fatura_eslesme` düşükse** (örn. `40/100`) yevmiyedeki `fatura_no`'lar XML'deki `cbc:ID` ile uyuşmuyor
 demektir; `yon_belirsiz` > 0 ise klasör adındaki VKN yanlış olabilir (o faturalar RAG'a yazılmaz).
@@ -134,7 +136,8 @@ Kurulumdan sonra fatura işlemeye hazır olduğunu şöyle doğrula:
   düzeltip yeniden yüklerseniz kurulum **tamamlanır** (başka anahtar bunu yapamaz, `atlandi` alır).
 - **Zip güvenli açılır:** `../` yolları, parola korumalı zip, 20.000'den fazla girdi, tek dosya >100 MB, açılmış
   toplam >1 GB ya da şüpheli sıkıştırma oranı reddedilir; yalnızca izinli dosya adları diske yazılır.
-- **Müşterinin ham verisi iş bitince sunucudan silinir**; yalnızca kurulum sonucu (iş kaydı) kalır.
+- **Müşterinin ham verisi iş bitince sunucudan silinir**; yalnızca kurulum sonucu (iş kaydı) kalır. **İstisna (2026-10-19):** gelen zip'in bir kopyası ve verdiğimiz cevap operatör
+  incelemesi için `GELEN_ARSIV_GUN` (varsayılan 7) gün ayrı bir arşivde tutulur — bkz. [Gelen dosyaları inceleme](gelen-dosyalari-inceleme.md).
 - **Sınırlar:** zip en çok 200 MB (`ONBOARD_MAX_ZIP_BYTES`), aynı anda en çok 5 bekleyen iş (`429`),
   şirketler **sırayla** işlenir.
 - Başka bir anahtarın işini sorgularsanız `404` alırsınız (varlığı sızdırılmaz).

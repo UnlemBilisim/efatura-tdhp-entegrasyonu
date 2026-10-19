@@ -244,6 +244,20 @@ def _kdv_oranini_duzelt(secilen_kod, ana_kod_secenekleri, fatura_oranlari):
     parcalar = secilen_kod.split(".")
     if len(parcalar) < 2:
         return secilen_kod
+    if len(parcalar) == 2:
+        # DUZ (2 parcali) hesap plani (2026-10-19): '191.01' = "%20 Ind. KDV", '191.02' = "%10 Ind. KDV" - tur ile oran ayni duzeyde
+        # durur, "ilk iki seviye" kodun kendisidir. Tur, adin '%N' sonrasi kismidir: ayni kalan metni tasiyan (yalnizca oranı
+        # farkli) kod aranir; tur degismez ('%20 Ind. KDV' -> '%10 Ind. KDV', ama '%10 Iade KDV''ne ATLAMAZ).
+        def _tur(ad):
+            import re
+
+            return re.sub(r"^\s*%\s*\d+\s*", "", ad or "").strip().lower()
+
+        secilen_tur = _tur(ad_by_kod.get(secilen_kod))
+        for kod, ad in ana_kod_secenekleri:
+            if len(kod.split(".")) == 2 and _tur(ad) == secilen_tur and _kdv_orani_isimden(ad) in fatura_oranlari:
+                return kod
+        return secilen_kod
     grup_oneki = ".".join(parcalar[:2]) + "."
 
     # Ayni grupta, faturadaki oranlardan birine uyan kod var mi?
@@ -696,8 +710,19 @@ def _yeni_alt_kod_oner(ana_kod, alt_kirilimlar_tumu):
         return None
     orta_sayaci = Counter()
     en_buyuk_sira_orta_bazinda = {}
+    sira_genisligi_orta_bazinda = {}
+    duz_en_buyuk, duz_genislik, duz_sayi = 0, 0, 0  # DUZ (2 parcali, '600.01') hesap plani (2026-10-19)
     for kod, _ad in secenekler:
         parcalar = kod.split(".")
+        if len(parcalar) == 2:
+            try:
+                sira = int(parcalar[1])
+            except ValueError:
+                continue
+            duz_sayi += 1
+            duz_en_buyuk = max(duz_en_buyuk, sira)
+            duz_genislik = max(duz_genislik, len(parcalar[1]))
+            continue
         if len(parcalar) != 3:
             continue
         orta = parcalar[1]
@@ -707,11 +732,16 @@ def _yeni_alt_kod_oner(ana_kod, alt_kirilimlar_tumu):
             continue
         orta_sayaci[orta] += 1
         en_buyuk_sira_orta_bazinda[orta] = max(en_buyuk_sira_orta_bazinda.get(orta, 0), sira)
+        sira_genisligi_orta_bazinda[orta] = max(sira_genisligi_orta_bazinda.get(orta, 0), len(parcalar[2]))
+    if duz_sayi and duz_sayi > sum(orta_sayaci.values()):
+        # Hesap plani agirlikla 2 parcali: sonraki sira numarasi, mevcut sira numaralarinin GENISLIGIYLE (600.09 -> 600.10, 600.001 -> 600.002)
+        return f"{ana_kod}.{duz_en_buyuk + 1:0{duz_genislik}d}"
     if not orta_sayaci:
         return None
     en_yaygin_orta = orta_sayaci.most_common(1)[0][0]
     yeni_sira = en_buyuk_sira_orta_bazinda[en_yaygin_orta] + 1
-    return f"{ana_kod}.{en_yaygin_orta}.{yeni_sira:05d}"
+    # Sira genisligi o grubun MEVCUT kodlarindan alinir (Akyuzlu 5 hane: 00967; baska sirket 3 hane: 150.01.016) - once sabit 5'ti.
+    return f"{ana_kod}.{en_yaygin_orta}.{yeni_sira:0{sira_genisligi_orta_bazinda[en_yaygin_orta]}d}"
 
 
 def _normalize_entries(entries):

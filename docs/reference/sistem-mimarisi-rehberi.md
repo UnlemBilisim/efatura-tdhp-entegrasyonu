@@ -754,8 +754,9 @@ ground-truth modu ya da `xml` tahmin modu) → `--invoice-type`/
 ### 4.11 `core/mizan.py` — Şirkete Özel Alt Kırılım Listesi
 
 `get_alt_kirilimlar(tenant_vkn=...)`, ilgili tenant şemasındaki PostgreSQL
-`mizan_alt_kirilim` tablosunu okur. Yalnızca 3-seviyeli kodları
-(`XXX.YY.ZZZZZ`) alıp 3 haneli ana koda göre gruplar:
+`mizan_alt_kirilim` tablosunu okur. Tablodaki YAPRAK alt hesapları (her derinlikte:
+`191.05.00005`, `600.01`; yükleme kuralı `mizan_excel_yukle.mizan_oku`, 2026-10-19'dan önce yalnızca
+tam 3 parçalı kodlar yükleniyordu) 3 haneli ana koda göre gruplar:
 `{"191": [("191.05.00005", "%20 5/10 Tevkifatli KDV"), ...]}`. Sonuç
 tenant başına `MIZAN_CACHE_SURESI_SANIYE` (300 sn) boyunca `threading.Lock`
 korumalı cache'te tutulur. `TDHP_GLOSSARY`'den farkı: her tenant'ın listesi

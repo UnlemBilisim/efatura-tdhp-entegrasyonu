@@ -68,6 +68,8 @@ HTTPS ile verilmelidir.
 | `TOPLU_ISCI_SAYISI` | `max(1, MAX_ESZAMANLI_ISLEM - 1)` | `entegrasyon/toplu_fatura_api.py` | Toplu işte aynı anda işlenen fatura (bir yuva tek istekler için boş kalır) |
 | `TOPLU_TAHMIN_TTL_DAKIKA` | `1440` | `entegrasyon/toplu_fatura_api.py` | Toplu işte üretilen tahminlerin onay süresi (tek istekte 30 dk) |
 | `TOPLU_SAKLAMA_GUN` | `14` | `entegrasyon/toplu_fatura_api.py` | Bitmiş toplu iş sonuçlarının saklama süresi |
+| `GELEN_ARSIV_GUN` | `7` | `entegrasyon/istek_arsivi.py` | Gelen zip/XML ve verdiğimiz cevabın arşivde saklanma süresi (gün); `0` = arşiv kapalı. Yalnızca izleme paneli (SSH) okur, API'den erişilemez |
+| `GELEN_ARSIV_MAX_MB` | `2048` | `entegrasyon/istek_arsivi.py` | Arşivin toplam boyut tavanı; aşılınca en eski kayıtlar silinir (`ONBOARD_DATA_DIR/arsiv/`) |
 | `MAX_ESZAMANLI_ISLEM` | `2` | `entegrasyon/es_zamanli_sinir.py` | Aynı anda işlenen fatura sayısı (tek + toplu paylaşır); fazlası sırada bekler |
 | `ONBOARD_MAX_ACILMIS_BYTES` | `1073741824` | `entegrasyon/musteri_onboard_api.py` | Zip'in açılmış toplam boyut sınırı (zip bomb koruması) |
 

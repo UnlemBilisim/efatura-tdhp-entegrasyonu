@@ -52,8 +52,9 @@ from pydantic import BaseModel, Field
 from api_anahtarlari import IstemciKimligi
 from auth import require_api_key, vkn_yetkisini_dogrula
 from security import MAX_REQUEST_BYTES, SecurityMiddleware
-from log_ortak import RequestIdMiddleware, loglamayi_kur
+from log_ortak import RequestIdMiddleware, loglamayi_kur, mevcut_request_id
 from es_zamanli_sinir import fatura_isle_sirasi
+import istek_arsivi
 import musteri_onboard_api
 import toplu_fatura_api
 from istek_gunlugu import IstekGunluguMiddleware
@@ -374,8 +375,21 @@ def fatura_isle(
     ile reddedilir; şirketin kayıtlı olup olmadığı (404) ancak yetki
     doğrulandıktan sonra söylenir."""
     vkn_yetkisini_dogrula(kimlik, istek.satici_vkn)
-    with fatura_isle_sirasi():
-        cevap = _fatura_isle_ic(istek)
+    rid = mevcut_request_id()
+    istemci_ip = request.client.host if request.client else None
+    try:
+        with fatura_isle_sirasi():
+            cevap = _fatura_isle_ic(istek)
+    except HTTPException as exc:  # 400/404/502… — gelen XML ve hata nedeni de incelenebilsin
+        istek_arsivi.fatura_kaydet(rid, istek.fatura_xml, None, {"durum": exc.status_code, "detay": str(exc.detail)[:300]},
+                                   kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi)
+        raise
+    except Exception:  # noqa: BLE001
+        istek_arsivi.fatura_kaydet(rid, istek.fatura_xml, None, {"durum": 500, "detay": "beklenmeyen hata"},
+                                   kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi)
+        raise
+    istek_arsivi.fatura_kaydet(rid, istek.fatura_xml, cevap.model_dump(mode="json"), None,
+                               kimlik.etiket, istemci_ip, istek.satici_vkn, istek.dosya_adi)
     _test_kaydini_logla(istek, cevap)
     _audit_logla(istek, cevap, request, kimlik)
     return cevap

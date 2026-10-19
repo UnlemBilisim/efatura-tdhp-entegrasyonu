@@ -133,7 +133,7 @@ def test_mizan_koruma_bos_dosya_ve_toplu_silme_uygulanmaz(tenant_cur):
     temel = {f"120.01.{i:05d}": f"M{i}" for i in range(1, 13)}
     og.mizan_guncelle(_mizan_satirlari(**temel), cur, VKN, "ilk", "x")
     conn.commit()
-    with pytest.raises(og.GuncellemeHatasi, match="3 seviyeli hesap"):
+    with pytest.raises(og.GuncellemeHatasi, match="alt hesap"):
         og.mizan_guncelle([], cur, VKN, "bos", "x")
     kucuk = _mizan_satirlari(**{"120.01.00001": "M1", "120.01.00002": "M2"})   # 12 hesabın 10'u siliniyor → eşik üstü
     o = og.mizan_guncelle(kucuk, cur, VKN, "eksik", "x")

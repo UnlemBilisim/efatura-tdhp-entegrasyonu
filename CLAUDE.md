@@ -113,7 +113,7 @@ indeksini de güncelle.
 > (`security.py`, gövde belleğe alınmaz). İlerleme yüzdesi (2026-10-06): iş ve şirket bazında `yuzde` + şirketin `adim`ı
 > (`scripts/musteri_onboard_toplu.py::_musteriyi_onboard_et` her adımda `ilerleme(adim, yuzde)` geri çağrısını çağırır;
 > basamaklı: şema 25, mizan 50, eşleştirme 75, RAG 100). İş durumu diskte (`ONBOARD_DATA_DIR`,
-> `efatura-onboarding` volume'ü), müşteri ham verisi iş bitince silinir. Kod değişikliği
+> `efatura-onboarding` volume'ü), müşteri ham verisi iş bitince silinir (2026-10-19'dan beri operatör incelemesi için zip'in bir KOPYASI `GELEN_ARSIV_GUN` gün ayrıca arşivlenir, bkz. aşağıdaki "Gelen-istek arşivi" notu). Kod değişikliği
 > sonrası `docker compose build app` gerekir; `docker/Dockerfile` artık
 > `scripts/musteri_onboard_toplu.py`'yi imaja kopyalıyor. Canlı doğrulama: Docker içinde,
 > geçici veritabanıyla (`model_eval_test`) uçtan uca — mock şirket 6 sn'de kuruldu, aynı
@@ -134,7 +134,7 @@ indeksini de güncelle.
 > (`app.py::_toplu_islem`); iş mantığı çoğaltılmadı. Kararlar: yetki kuyruğa girmeden doğrulanır (zip'teki her VKN yetkili+kayıtlı olmalı, aksi halde hiçbir
 > şey işlenmez); `onay`/`kur_secimi` tüm faturalara uygulanır (verilmezse ilgili faturalar `onay_bekliyor`/`kur_bekliyor` ile biter); **onaylama otomatik değil**
 > (insan kararı) ama toplu tahminler 24 saat (tek istekte 30 dk) onaylanabilir; iş sürerken yeniden başlama kaldığı yerden devam eder; ham XML iş bitince
-> silinir, sonuçlar 14 gün saklanır. Paralel tek istekler zaten desteklenir (en çok 2 aynı anda, fazlası **sırada bekler**, reddedilmez). Her HTTP isteği ayrıca
+> silinir (arşiv kopyası hariç — bkz. 2026-10-19 notu), sonuçlar 14 gün saklanır. Paralel tek istekler zaten desteklenir (en çok 2 aynı anda, fazlası **sırada bekler**, reddedilmez). Her HTTP isteği ayrıca
 > hata mesajıyla tek JSON satırı loglanır (`entegrasyon/istek_gunlugu.py`) ve Mac'te `izleme/panel.py` ile izlenir. **Gerçek LLM ile uçtan uca denenmedi.**
 
 > ✅ **Uygulandı** (2026-10-16, kullanıcı kararı — "kayıtlı VKN tekrar gelirse işleme al, mevcutla karşılaştır; aynıysa işleme alma, değişen varsa güncelle ve
@@ -150,6 +150,41 @@ indeksini de güncelle.
 > değişimi emsali değiştirmez); NACE dosyası yoksa dokunulmaz. Parçalar sırayla ve ayrı işlemlerle uygulanır; sonraki parça hata verirse öncekiler (loglanmış olarak) kalır,
 > tekrar çalıştırmak güvenlidir. Gerçek PostgreSQL ile test edildi (`model_eval/tests/test_onboarding_guncelleme.py`, `test_musteri_guncelle_orkestrasyon.py`,
 > `entegrasyon/tests/test_musteri_onboard.py`). **Gerçek (canlı) LLM/embedding ile uçtan uca henüz denenmedi** — RAG adımı testlerde sahte koleksiyonla çalıştı.
+
+> ✅ **Uygulandı** (2026-10-19, kullanıcı isteği — "bize gelen dosyaları izleme arayüzünden indirip inceleyebileyim, bizim verdiğimiz cevabı da görebileyim"):
+> **Gelen-istek arşivi + izleme panelinde "Gelen dosyalar" sekmesi.** Dış ekip "gönderdik" derken elimizde dosya olmadığı için (zip iş bitince siliniyordu, eksik mizan
+> olayında orijinali inceleyemedik) `entegrasyon/istek_arsivi.py` yetkili isteklerin kopyasını `ONBOARD_DATA_DIR/arsiv/<request_id>/` altında **sınırlı süre** tutar:
+> `gelen.zip` (`/musteri/onboard`, `/fatura/toplu-isle`; geçersiz zip'ler ve reddedilen istekler dahil — hata ayıklamak için), `istek.xml` + `cevap.json`
+> (`/fatura/isle`; hata da yazılır), `cevap.json` (zip uçlarında bizim döndüğümüz 202/hata gövdesi) ve `meta.json` (istemci, IP, VKN, durum, hata nedeni, zip içindeki dosya
+> adları/boyutları, `is_id`). `GELEN_ARSIV_GUN` (varsayılan **7**, `0` = kapalı), `GELEN_ARSIV_MAX_MB` (varsayılan 2048; aşılınca en eskiler silinir). Bağlama: kayıtlar
+> `request_id` ile (log satırlarıyla aynı kimlik), onboarding/toplu iş kayıtlarında `request_id` alanı var. **Arşive API'den erişilemez** — yeni uç nokta eklenmedi; yalnızca
+> `izleme/panel.py` SSH üzerinden okur (`/api/arsiv`, `/api/arsiv/detay`, `/api/arsiv/indir`; kimlik hex deseni + sabit dosya adı beyaz listesi, bkz. `izleme/arsiv.py`).
+> Panelde istek detayı: dosyayı indir, zip içeriği, bizim cevabımız, başlatılan iş (+ toplu işte fatura başına cevaplar, `sonuclar.jsonl` indirilebilir), o isteğe ait loglar.
+> Kararlar/tuzaklar: (1) arşiv hatası isteği ASLA bozmaz (yalnızca uyarı loglanır); (2) yalnızca KİMLİĞİ DOĞRULANMIŞ ve yetkili istekler arşivlenir (anonim/yetkisiz istek diske
+> yazdıramaz); (3) `X-Request-ID`'yi istemci verebildiği için var olan bir kaydın üzerine yazılmaz; (4) kimlik/`is_id` doğrulaması `fullmatch` ile — Python'da `re.match("^x$")`
+> sondaki `\n`'i de kabul eder ve satır sonu uzak SSH komutuna sızabilirdi (testte yakalandı). **Gizlilik etkisi:** arşiv müşteri verisi (fatura içeriği, karşı taraf adları, mizan) içerir;
+> "ham dosyalar iş bitince silinir" ifadesi **dış ekibe verilmiş bir söz** olduğundan, sunucuya dağıtılmadan önce `teslim/*`, `dis-ekip-api-kullanimi.md` §9/§10 ve Orhan'a giden
+> rehberlerdeki ifadeler güncellenmeli (kullanıcıya soruldu; dağıtım ve dış belge güncellemesi onay bekliyor). Testler: `entegrasyon/tests/test_istek_arsivi.py` (28),
+> `izleme/tests/test_arsiv.py` (51), `entegrasyon/tests/conftest.py` (testler gerçek `/tmp`'yi kirletmesin diye `ONBOARD_DATA_DIR` izole). Nasıl kullanılır:
+> [`docs/how-to/gelen-dosyalari-inceleme.md`](docs/how-to/gelen-dosyalari-inceleme.md). **Henüz sunucuya dağıtılmadı; gerçek Docker/SSH ile uçtan uca denenmedi** (panel arayüzü sahte kaynakla
+> tarayıcıda görüldü).
+
+> ✅ **Uygulandı** (2026-10-19, kullanıcı kararı — gerçek müşteri 7610928437'nin mizanında yalnızca `150.01.*` (17 satır) kalmıştı, oysa yevmiyesinde 120/320/153/600/191/391/730/760/770
+> altında yüzlerce alt hesap adı geçiyordu): **mizan okuyucusu her derinlikteki YAPRAK hesabı alır + atılan satırları sayar.** Kök neden (kod okuyarak + sunucu loglarıyla doğrulandı):
+> `model_eval/mizan_excel_yukle.py` yalnızca TAM 3 parçalı kodları (`XXX.YY.ZZZ`) alıyor, `600.01` / `191.01` gibi 2 parçalı hesapları ve ilk sayfadan sonraki sayfaları
+> **uyarısız** atıyordu; kurulum özeti yalnızca alınan sayıyı ("17 satır") verdiği için eksik mizan görünmüyordu. Asıl dosya silindiği için "dış ekip yalnızca 150 mi yolladı, biz mi attık"
+> **kesin bilinemiyor** (bkz. 2026-10-19 arşiv notu — sonraki gönderimler arşivde görünecek). Yeni kural (`mizan_oku`): ilk parçası 3 haneli ana kod, ≥2 parçalı ve dosyada altında başka hesap
+> OLMAYAN her kod alınır (`600.01` alınır; `120.01` altında `120.01.001` varsa üst grup olarak atılır, `320` ana kod satırı atılır). Atılanlar sebebiyle sayılır (`ana_kod`, `ust_grup`,
+> `sayi_bicimli`, `gecersiz_kod`, `tekrar`) + okunmayan ek sayfalar + `uyari` listesi → kurulum özetinde `ozet.mizan_okuma`, güncellemede `ozet.mizan.okuma`; panelin "Onboarding işleri"
+> sekmesinde görünür (`izleme/static/panel.js::mizanRaporu`). **Davranış HÂLÂ yalnızca İLK sayfayı okur** (ek sayfalar artık uyarıda adıyla görünür). Okuyucuyla birlikte 3 yerdeki
+> "3 parçalı" varsayımı da düzeltildi: (1) `core/validation.py::ACCOUNT_CODE_RE` yalnızca `XXX.YY.ZZZZZ` (ortası 2, sonu 5 hane) kabul ediyordu — başka şirketin geçerli `150.01.001` /
+> `600.01` kodları `INVALID_ACCOUNT_FORMAT` ile reddedilip fatura onaylanamaz oluyordu (alt hesabın varlığı zaten `SUBACCOUNT_NOT_IN_LEDGER` mizan üyeliğiyle denetlenir); (2)
+> `core/single.py::_kdv_oranini_duzelt` düz (2 parçalı) planda aynı TÜR içinde oranı düzeltir (`191.01 %20 İnd.` → `191.02 %10 İnd.`, `%10 İade`'ye atlamaz); (3) `_yeni_alt_kod_oner`
+> düz planda `600.10`, sıra genişliğini mevcut kodlardan alır (önceden her zaman 5 hane: `150.01.00016` yerine `150.01.016`). **Mevcut şirketler:** kayıtlı 7610928437'nin düzelmesi için
+> dış ekip mizanı yeniden gönderebilir (kısmi zip, yalnız `mizan.xlsx`) — güncelleme akışı eksik hesapları ekler ve geçmişe yazar. Gerçek PostgreSQL ile test edildi
+> (`model_eval/tests/test_mizan_excel_yukle.py::TestMizanOku`, `test_musteri_guncelle_orkestrasyon.py::...iki_parcali...`, `test_validation.py`, `test_single.py::TestDuzHesapPlani`; model_eval 329, hiçbiri atlanmadan).
+> **Henüz sunucuya dağıtılmadı.** Ek `ozet` alanları (`mizan_okuma`) dış ekibin `GET /musteri/isler/{id}` cevabında görünür (yalnızca ekleme — sözleşmeyi bozmaz); `teslim/*` ve
+> `dis-ekip-api-kullanimi.md` güncellenmedi (dış sözleşme, kullanıcıya soruldu).
 
 ## Çalıştırmak için gerekenler (sık atlanan)
 
@@ -177,8 +212,9 @@ istiyor — ajan açamaz, kullanıcı açmalı.
 
 ```bash
 python3 -m pytest Mcp_mimarisi/test -q          # PostgreSQL varsa 32, yoksa 28 geçer
-python3 -m pytest entegrasyon/tests -q          # 61 test
-(cd model_eval && python3 -m pytest tests -q)   # 242 test
+python3 -m pytest entegrasyon/tests -q          # 138 test (2026-10-19; PostgreSQL yoksa 13'ü skip)
+python3 -m pytest izleme/tests -q               # 60 test (izleme paneli; SSH/Docker gerekmez)
+(cd model_eval && python3 -m pytest tests -q)   # 329 test (2026-10-19; PostgreSQL yoksa 39'u skip)
 ```
 
 Üç paket ayrı ayrı çalıştırılır (her biri kendi `sys.path` düzenini kurar).

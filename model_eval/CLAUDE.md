@@ -676,6 +676,15 @@ bir mimari denetim geçirdi:**
 > Ayrıntı ve güvenlik güvencesi (güncelleme yalnızca anahtar o VKN'ye yetkiliyse): kök `../CLAUDE.md` 2026-10-16 notu. Testler: `tests/test_onboarding_guncelleme.py`
 > (fark kuralları + gerçek PostgreSQL), `tests/test_musteri_guncelle_orkestrasyon.py` (mock şirketle uçtan uca; ChromaDB sahte).
 
+> ✅ **Uygulandı (2026-10-19, kullanıcı kararı) — mizan okuyucusu her derinlikteki yaprak hesabı alır, atlananları raporlar:** `mizan_excel_yukle.py::mizan_oku` (eski `mizan_hesap_satirlari`
+> artık onun ince sarmalayıcısı; `yukle()` → `yukle_ayrintili()` rapor da döndürür). Önceden yalnızca tam 3 parçalı kodlar (`XXX.YY.ZZZ`) alınıyordu: bir müşterinin `600.01`, `191.01` gibi
+> 2 parçalı hesapları ve ek sayfaları SESSİZCE atılıyor, kurulum özeti yalnızca "17 satır" diyordu (eksik mizan fark edilmedi). Kural: ana kod (3 hane) + ≥2 parça + dosyada altında hesap
+> OLMAYAN kod → alınır. `ana_kod`/`ust_grup`/`sayi_bicimli`/`gecersiz_kod`/`tekrar` atlananları sebebiyle sayılır, ek sayfalar `okunmayan_sayfalar`'da, kurulum/güncelleme özetine ve panele gider.
+> Aynı varsayımı taşıyan 3 yer düzeltildi: `core/validation.py::ACCOUNT_CODE_RE` (yalnızca `XXX.YY.ZZZZZ` kabul ediyordu → başka şirketin `150.01.001`/`600.01` kodları fatura onayını
+> engelliyordu), `core/single.py::_kdv_oranini_duzelt` (düz plan için tür-koruyan oran düzeltmesi), `_yeni_alt_kod_oner` (düz plan + sıra genişliği mevcut kodlardan). Ayrıntı ve
+> kanıt zinciri: kök [`../CLAUDE.md`](../CLAUDE.md) 2026-10-19 notu. Testler: `tests/test_mizan_excel_yukle.py::TestMizanOku`, `test_validation.py`, `test_single.py::TestDuzHesapPlani`,
+> `test_musteri_guncelle_orkestrasyon.py` (gerçek PostgreSQL). **Yalnızca İLK sayfa okunmaya devam eder** (ek sayfalar uyarıda görünür).
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),

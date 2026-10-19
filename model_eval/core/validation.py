@@ -10,7 +10,11 @@ from .mizan import get_alt_kirilimlar
 from .parsing import to_float
 
 MONEY_TOLERANCE = Decimal("0.01")
-ACCOUNT_CODE_RE = re.compile(r"^\d{3}(?:\.\d{2}\.\d{5})?$")
+# 3 haneli ana kod + isteğe bağlı herhangi sayıda ".segment" (2026-10-19). Önceden yalnızca tam `XXX.YY.ZZZZZ` (ortası 2, sonu 5 hane)
+# kabul ediliyordu: Akyüzlü'nün biçimine sabitlenmişti, başka bir şirketin geçerli `150.01.001` / `600.01` gibi kodları
+# INVALID_ACCOUNT_FORMAT ile reddedilip fatura onaylanamaz oluyordu. Alt hesabın GERÇEKTEN var olup olmadığı zaten aşağıdaki
+# SUBACCOUNT_NOT_IN_LEDGER (şirket mizanında üyelik) kontrolüyle sağlanır; bu regex yalnızca kaba biçimi denetler.
+ACCOUNT_CODE_RE = re.compile(r"\d{3}(?:\.[0-9A-Za-z]+)*")
 
 
 def _money(value) -> Decimal | None:

@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -62,18 +63,26 @@ def _baslik_satirini_bul(ws):
     )
 
 
-def _mizan_satirlarini_oku(excel_yolu):
+def _mizan_ham_oku(excel_yolu):
     """Excel'i satir satir okuyup (kod, ad) ciftlerine cevirir - HESAP KODU/
     HESAP ADI basliklarini tasiyan satiri otomatik bulup (bkz. _baslik_satirini_bul)
     ondan sonraki satirlardan veri okur. Sutun SIRASI ONBOARDING-VERI-FORMATI.md'de
-    belirtilmedigi icin isme gore bulunur, pozisyona gore degil."""
+    belirtilmedigi icin isme gore bulunur, pozisyona gore degil.
+
+    Donen: (satirlar, sayac, okunmayan_sayfalar). `sayac` bu asamada ATILAN satirlari sebebiyle sayar
+    (sayi_bicimli / gecersiz_kod / tekrar) - onceden bunlar yalnizca loglaniyordu, is kaydina ulasmiyordu.
+    Yalnizca ILK sayfa okunur; diger sayfalar `okunmayan_sayfalar`'da ({"ad","satir"}) raporlanir
+    (2026-10-19: onceden hic soylenmeden yok sayiliyorlardi)."""
     import openpyxl
 
     wb = openpyxl.load_workbook(str(excel_yolu), data_only=True)
     ws = wb[wb.sheetnames[0]]
+    okunmayan_sayfalar = [{"ad": ad, "satir": wb[ad].max_row} for ad in wb.sheetnames[1:]]
     baslik_satiri, kod_idx, ad_idx = _baslik_satirini_bul(ws)
     gorulen = set()
     satirlar = []
+    sayac = {"sayi_bicimli": 0, "gecersiz_kod": 0, "tekrar": 0}
+    ornek = {"sayi_bicimli": [], "gecersiz_kod": [], "tekrar": []}
     for row_no, row in enumerate(ws.iter_rows(min_row=baslik_satiri + 1, values_only=True), start=baslik_satiri + 1):
         kod = row[kod_idx] if row and len(row) > kod_idx else None
         ad = row[ad_idx] if row and len(row) > ad_idx else None
@@ -87,36 +96,125 @@ def _mizan_satirlarini_oku(excel_yolu):
                 "hucreyi Excel'de 'Metin' bicimine cevirin",
                 excel_yolu, row_no, type(kod).__name__, kod,
             )
+            sayac["sayi_bicimli"] += 1
+            ornek["sayi_bicimli"].append(f"satır {row_no}: {kod!r}")
             continue
         if not kod:
             continue
         kod_norm = _kod_normalize(kod)
         if not kod_norm:
             _logger.warning("%s satir %d bos/gecersiz kod, atlandi: %r", excel_yolu, row_no, kod)
+            sayac["gecersiz_kod"] += 1
+            ornek["gecersiz_kod"].append(f"satır {row_no}: {kod!r}")
             continue
         if kod_norm in gorulen:
             _logger.warning("%s satir %d duplike kod, atlandi: %s", excel_yolu, row_no, kod_norm)
+            sayac["tekrar"] += 1
+            ornek["tekrar"].append(kod_norm)
             continue
         gorulen.add(kod_norm)
         satirlar.append((kod_norm, (ad or "").strip()))
-    return satirlar
+    sayac["_ornek"] = ornek
+    return satirlar, sayac, okunmayan_sayfalar
+
+
+def _mizan_satirlarini_oku(excel_yolu):
+    """Geriye uyumlu ince sarmalayici: yalnizca (kod, ad) satirlari (bkz. _mizan_ham_oku)."""
+    return _mizan_ham_oku(excel_yolu)[0]
+
+
+_ANA_KOD_RE = re.compile(r"[0-9]{3}")
+_ORNEK_SAYISI = 5
+
+
+def mizan_oku(excel_yolu):
+    """Excel'deki YAPRAK alt hesapları [(hesap_kodu, ana_kod, hesap_adi)] olarak döner + bir okuma raporu: (satirlar, rapor).
+    `yukle()` (ilk kurulum, TRUNCATE+INSERT) ve `core/onboarding_guncelleme.py::mizan_guncelle` (güncelleme, yalnızca fark)
+    AYNI okuyucuyu/süzgeci kullanır.
+
+    Kabul kuralı (2026-10-19, kullanıcı kararı — gerçek müşteri mizanı `600.01`, `191.01` gibi 2 parçalı hesaplar içeriyordu ve
+    önceki "yalnızca tam 3 parçalı kod" süzgeci bunları SESSİZCE atıyordu): ilk parçası 3 haneli ana kod olan, EN AZ 2 parçalı
+    ve dosyada kendisinin alt hesabı (aynı önekle başlayan daha uzun kod) OLMAYAN her kod. Yani:
+      * `320`            → ana kod satırı: alınmaz (TDHP_GLOSSARY'de zaten var)           [atlanan.ana_kod]
+      * `120.01`         → altında `120.01.001` varsa üst grup: alınmaz, yaprak alınır     [atlanan.ust_grup]
+      * `600.01`         → altında alt hesap yoksa YAPRAK: alınır (2 parçalı hesap planı)
+      * `120.01.001`     → yaprak: alınır;  `120.01.001.0001` (4 parçalı) → yaprak: alınır
+    Atılan satırlar sebebiyle sayılır (`rapor["atlanan"]`), ilk birkaç örnek `rapor["atlanan_ornek"]`'te, okunmayan
+    ek sayfalar `rapor["okunmayan_sayfalar"]`'da; şüpheli durumlar `rapor["uyari"]` listesinde (kurulum özetine ve panele gider)."""
+    ham, sayac, okunmayan_sayfalar = _mizan_ham_oku(excel_yolu)
+    ornek = sayac.pop("_ornek")
+
+    # Her kodun segment sınırlı önekleri: bir kodun önekiyse o kod "üst grup"tur (altında yaprak var).
+    onekler = set()
+    for kod, _ad in ham:
+        parcalar = kod.split(".")
+        for i in range(1, len(parcalar)):
+            onekler.add(".".join(parcalar[:i]))
+
+    atlanan = {"ana_kod": 0, "ust_grup": 0, "sayi_bicimli": sayac["sayi_bicimli"],
+               "gecersiz_kod": sayac["gecersiz_kod"], "tekrar": sayac["tekrar"]}
+    kabul, derinlik = [], {}
+    for kod, ad in ham:
+        parcalar = kod.split(".")
+        if not _ANA_KOD_RE.fullmatch(parcalar[0]):
+            atlanan["gecersiz_kod"] += 1
+            ornek["gecersiz_kod"].append(f"kod: {kod!r}")
+        elif len(parcalar) == 1:
+            atlanan["ana_kod"] += 1
+        elif kod in onekler:
+            atlanan["ust_grup"] += 1
+            ornek.setdefault("ust_grup", []).append(kod)
+        else:
+            kabul.append((kod, parcalar[0], ad))
+            derinlik[str(len(parcalar))] = derinlik.get(str(len(parcalar)), 0) + 1
+
+    uyari = []
+    if okunmayan_sayfalar:
+        uyari.append(
+            f"Mizan dosyasında ilk sayfadan başka {len(okunmayan_sayfalar)} sayfa var "
+            f"({', '.join(s['ad'] for s in okunmayan_sayfalar[:5])}); yalnızca İLK sayfa okunur. "
+            "Hesap planı birden fazla sayfaya bölünmüşse hepsini tek sayfada birleştirin."
+        )
+    if atlanan["sayi_bicimli"]:
+        uyari.append(f"{atlanan['sayi_bicimli']} satırın HESAP KODU hücresi sayı biçiminde — atlandı (hücreyi 'Metin' biçimine çevirin).")
+    if atlanan["gecersiz_kod"]:
+        uyari.append(
+            f"{atlanan['gecersiz_kod']} satırın kodu geçersiz (ilk parça 3 haneli rakam olmalı) — atlandı: "
+            f"{'; '.join(ornek['gecersiz_kod'][:_ORNEK_SAYISI])}"
+        )
+    if atlanan["tekrar"]:
+        uyari.append(f"{atlanan['tekrar']} tekrar eden hesap kodu atlandı (ilk satır geçerli): {'; '.join(ornek['tekrar'][:_ORNEK_SAYISI])}")
+    if not kabul:
+        uyari.append("Mizanda alınabilecek alt hesap bulunamadı (3 haneli ana kod satırları alt kırılım sayılmaz).")
+
+    rapor = {
+        # HESAP KODU hücresi dolu satırların toplamı: ham okumada alınanlar + ham okumada atılanlar
+        "okunan_satir": len(ham) + sayac["sayi_bicimli"] + sayac["gecersiz_kod"] + sayac["tekrar"],
+        "kabul_edilen": len(kabul),
+        "derinlik": derinlik,
+        "atlanan": atlanan,
+        "atlanan_ornek": {k: v[:_ORNEK_SAYISI] for k, v in ornek.items() if v and k in ("ust_grup", "gecersiz_kod", "tekrar", "sayi_bicimli")},
+        "okunmayan_sayfalar": okunmayan_sayfalar,
+        "uyari": uyari,
+    }
+    return kabul, rapor
 
 
 def mizan_hesap_satirlari(excel_yolu):
-    """Excel'deki 3 seviyeli hesapları [(hesap_kodu, ana_kod, hesap_adi)] olarak döner — `yukle()` (ilk kurulum, TRUNCATE+INSERT) ve
-    `core/onboarding_guncelleme.py::mizan_guncelle` (güncelleme, yalnızca fark) AYNI okuyucuyu/süzgeci kullanır."""
-    return [
-        (kod, kod.split(".")[0], ad)
-        for kod, ad in _mizan_satirlarini_oku(excel_yolu)
-        if len(kod.split(".")) == 3 and len(kod.split(".")[0]) == 3
-    ]
+    """Geriye uyumlu ince sarmalayıcı: yalnızca kabul edilen [(hesap_kodu, ana_kod, hesap_adi)] (bkz. `mizan_oku`)."""
+    return mizan_oku(excel_yolu)[0]
 
 
 def yukle(vkn: str, excel_yolu: str, database_url: str | None = None) -> int:
-    """Excel'deki tum satirlari tenant_<vkn>.mizan_alt_kirilim tablosuna
-    yazar (TRUNCATE + INSERT). Sadece 3-seviyeli kodlar (XXX.YY.ZZZZZ) DB'ye
-    yazilir - ust seviye ozet satirlari (sadece "191" gibi) atlanir, get_alt_kirilimlar
-    onlari zaten kullanmiyordu (bkz. core/mizan.py eski gruplama mantigi)."""
+    """Geriye uyumlu sarmalayici: yazilan satir sayisini doner (bkz. `yukle_ayrintili`)."""
+    return yukle_ayrintili(vkn, excel_yolu, database_url)[0]
+
+
+def yukle_ayrintili(vkn: str, excel_yolu: str, database_url: str | None = None):
+    """Excel'deki YAPRAK alt hesaplari tenant_<vkn>.mizan_alt_kirilim tablosuna
+    yazar (TRUNCATE + INSERT) ve (yazilan_satir_sayisi, okuma_raporu) doner. Hangi satirlarin
+    alinip hangilerinin atildigi `mizan_oku` docstring'inde (2026-10-19'dan once yalnizca tam
+    3 parcali kodlar aliniyordu; 2 parcali `600.01` gibi hesaplar sessizce atiliyordu)."""
     import psycopg2
     from psycopg2 import sql
 
@@ -130,7 +228,7 @@ def yukle(vkn: str, excel_yolu: str, database_url: str | None = None) -> int:
         raise SystemExit(f"Gecersiz VKN: {vkn!r} - 10 haneli sayisal olmali")
 
     sema = f"tenant_{vkn}"
-    satirlar = mizan_hesap_satirlari(excel_yolu)
+    satirlar, rapor = mizan_oku(excel_yolu)
 
     from core.db import tenant_kayitli_mi
 
@@ -158,8 +256,12 @@ def yukle(vkn: str, excel_yolu: str, database_url: str | None = None) -> int:
     finally:
         conn.close()
 
-    print(f"Tamamlandı: {sema}.mizan_alt_kirilim'e {len(satirlar)} satır yazıldı.")
-    return len(satirlar)
+    atlanan = {k: v for k, v in rapor["atlanan"].items() if v}
+    print(f"Tamamlandı: {sema}.mizan_alt_kirilim'e {len(satirlar)} satır yazıldı"
+          f" (dosyada {rapor['okunan_satir']} kodlu satır; atlanan: {atlanan or 'yok'}).")
+    for u in rapor["uyari"]:
+        print(f"  Uyarı: {u}")
+    return len(satirlar), rapor
 
 
 def main() -> None:

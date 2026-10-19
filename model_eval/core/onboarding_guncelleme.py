@@ -104,13 +104,13 @@ def mizan_fark(mevcut: dict, yeni: dict) -> dict:
 
 
 def mizan_guncelle(satirlar, cur, vkn, is_id, istemci) -> dict:
-    """satirlar: [(hesap_kodu, ana_kod, hesap_adi)] (yalnızca 3 seviyeli kodlar). Aynı `cur` (tenant search_path'li);
+    """satirlar: [(hesap_kodu, ana_kod, hesap_adi)] (yaprak alt hesaplar — bkz. mizan_excel_yukle.mizan_oku). Aynı `cur` (tenant search_path'li);
     commit çağıranda — değişiklik + geçmiş TEK işlemde."""
     yeni = {kod: ad for kod, _ana, ad in satirlar}
     ana_kodlar = {kod: ana for kod, ana, _ad in satirlar}
     if not yeni:
         raise GuncellemeHatasi(
-            "Mizan dosyasında 3 seviyeli hesap (örn. 320.01.00272) bulunamadı — sütun başlıkları ya da HESAP KODU "
+            "Mizan dosyasında alt hesap (örn. 320.01.00272 ya da 600.01) bulunamadı — sütun başlıkları ya da HESAP KODU "
             "hücrelerinin metin biçimi kontrol edilmeli. Mevcut mizan DEĞİŞTİRİLMEDİ."
         )
     gecmisi_hazirla(cur)
