@@ -5,7 +5,8 @@ paketin tamamıdır.
 
 | Dosya | Ne işe yarar |
 |---|---|
-| [`DEGISIKLIK-NOTU-2026-10-16.md`](DEGISIKLIK-NOTU-2026-10-16.md) | **En güncel** — toplu fatura işleme (zip), paralel istek davranışı |
+| [`DEGISIKLIK-NOTU-2026-10-19.md`](DEGISIKLIK-NOTU-2026-10-19.md) | **En güncel** — bitiş sinyali/durum değerleri (`guncellendi`), mizanda her derinlikteki hesap, hesap kodu biçimi, dosya saklama değişikliği |
+| [`DEGISIKLIK-NOTU-2026-10-16.md`](DEGISIKLIK-NOTU-2026-10-16.md) | Bir önceki güncelleme — toplu fatura işleme (zip), paralel istek davranışı |
 | [`FATURA-ISLEME-KILAVUZU.md`](FATURA-ISLEME-KILAVUZU.md) | **Yeni:** fatura işlemenin baştan sona anlatımı (tek fatura, paralel, toplu zip, onay, hata kodları, örnek kod) |
 | [`DEGISIKLIK-NOTU-2026-10-06.md`](DEGISIKLIK-NOTU-2026-10-06.md) | Bir önceki güncelleme — 2026-10-02 paketine göre ne değişti (zip ile şirket yükleme, `onerilen_yeni_kod`, büyük XML düzeltmesi) |
 | [`DEGISIKLIK-NOTU-2026-10-01.md`](DEGISIKLIK-NOTU-2026-10-01.md) | **Daha önce elinizdeki sürümle karşılaştırıldığında ne değişti** — önce bunu okuyun |

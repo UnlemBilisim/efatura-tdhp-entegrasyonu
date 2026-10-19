@@ -292,6 +292,8 @@ class TestPredictSingleInvoiceAltKirilim:
         }
 
     def test_alt_kirilim_replaces_3_digit_codes(self, monkeypatch):
+        """KDV ve gider hesaplari LLM secimiyle alt kirilima cevrilir. CARI hesap (320) LLM'in secimine BIRAKILMAZ (2026-10-19,
+        CARI_HESAPTA_LLM_SECIMI=False): LLM 320 icin bir kod secse bile yok sayilir, 320 3 haneli kalir + uyari alir."""
         spec = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
         monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._fake_alt_kirilimlar())
 
@@ -314,7 +316,7 @@ class TestPredictSingleInvoiceAltKirilim:
         by_dc = {e["dc"]: e["account_code"] for e in result["entries"]}
         assert by_dc["Borc"] in ("191.05.00005", "770.01.00027")
         codes = {e["account_code"] for e in result["entries"]}
-        assert codes == {"191.05.00005", "770.01.00027", "320.01.00018"}
+        assert codes == {"191.05.00005", "770.01.00027", "320"}  # 320: LLM secimi YOK SAYILDI
 
     def test_alt_kirilim_skips_code_not_in_llm_choice(self, monkeypatch):
         """LLM bir kod icin secim yapmazsa (ya da uygun secenek bulamadigini
@@ -760,3 +762,69 @@ class TestDuzHesapPlani:
         assert single._yeni_alt_kod_oner("320", uc_agirlikli) == "320.01.003"
         duz_agirlikli = {"320": [("320.01", "A"), ("320.02", "B"), ("320.05.001", "C")]}
         assert single._yeni_alt_kod_oner("320", duz_agirlikli) == "320.03"
+
+
+class TestCariLlmSecimiKapali:
+    """Canli bulgu (2026-10-19): karsi taraf mizanda yokken LLM "en yakin isimli BASKA musteriyi" secti (POCAN LOJISTIK -> Cansarp Nakliye,
+    FARUK KARAGOZ -> FARUK KARAMAN) ve dogrulama yakalayamadi (secilen kod mizanda var) -> yanlis kart + approvable=True. Cari hesaplar artik
+    yalnizca deterministik ad eslesmesiyle baglanir; ayrica LLM'in "kod: ad" bicimindeki cevabi KDV/gider icin kabul edilir."""
+
+    SPEC = {"provider": "ollama", "model": "test-model", "base_url": "http://x", "api_key_env": None, "label": "ollama:test-model"}
+
+    def _mizan(self):
+        return {
+            "191": [("191.05.00005", "%20 5/10 Tevkifatli KDV")],
+            "770": [("770.01.00027", "Diger Cesitli Giderler")],
+            "320": [("320.01.00018", "Baska Firma Insaat Nakliyat Ltd Sti"), ("320.01.00019", "Bir Digeri Ticaret A.S.")],
+        }
+
+    def _calistir(self, monkeypatch, secim_response, tekrar=1):
+        monkeypatch.setattr(single, "get_alt_kirilimlar", lambda tenant_vkn=None: self._mizan())
+        responses = [_balanced_response()] + [(secim_response, 0.2, None)] * tekrar
+        with patch.object(single, "call_model", side_effect=responses) as mock_call:
+            sonuc = single.predict_single_invoice(
+                SAMPLE_XML, model=self.SPEC, own_vkn=OWN_VKN,
+                rag=False, self_correct=False, tevkifat_hint=False, iade_hint=False, alt_kirilim=True,
+            )
+        return sonuc, mock_call
+
+    def test_llm_yanlis_musteri_secse_de_cari_kod_atanmaz_uyari_ve_oneri_gelir(self, monkeypatch):
+        sonuc, _ = self._calistir(monkeypatch, '{"secimler": [{"ana_kod": "320", "alt_kod": "320.01.00018"}]}', tekrar=2)
+        cari = next(e for e in sonuc["entries"] if e["account_code"].startswith("320"))
+        assert cari["account_code"] == "320"  # LLM'in secimi (yanlis musteri) ASLA uygulanmaz
+        assert "mizanda bulunamadı" in cari["uyari"] and cari["onerilen_yeni_kod"] == "320.01.00020"
+
+    def test_cari_secenekleri_llm_istemine_hic_gonderilmez(self, monkeypatch):
+        """Prompt'ta cari liste olmamali: hem yanlis secim firsati yok hem de 2090 satirlik liste istemi sismiyor."""
+        _, mock_call = self._calistir(monkeypatch, '{"secimler": [{"ana_kod": "191", "alt_kod": "191.05.00005"}]}')
+        alt_kirilim_istemi = mock_call.call_args_list[1].args[2]
+        assert "320.01.00018" not in alt_kirilim_istemi and "191.05.00005" in alt_kirilim_istemi
+
+    def test_bayrak_acilirsa_eski_davranis_geri_gelir(self, monkeypatch):
+        monkeypatch.setattr(single, "CARI_HESAPTA_LLM_SECIMI", True)
+        sonuc, _ = self._calistir(monkeypatch, '{"secimler": [{"ana_kod": "320", "alt_kod": "320.01.00018"}]}')
+        assert "320.01.00018" in {e["account_code"] for e in sonuc["entries"]}
+
+    def test_kod_ad_bicimi_kdv_icin_kabul_edilir(self, monkeypatch):
+        """Canlida LLM '391.20: %20 Hessaplanan KDV' yazdi, kod yalniz saf kodu kabul ettigi icin KDV cozulemedi."""
+        sonuc, _ = self._calistir(monkeypatch, '{"secimler": [{"ana_kod": "191", "alt_kod": "191.05.00005: %20 5/10 Tevkifatli KDV"}, '
+                                                '{"ana_kod": "770", "alt_kod": "770.01.00027 Diger Cesitli Giderler"}]}')
+        kodlar = {e["account_code"] for e in sonuc["entries"]}
+        assert {"191.05.00005", "770.01.00027"} <= kodlar
+
+    def test_kod_ad_bicimi_uydurma_kodu_yine_reddeder(self, monkeypatch):
+        sonuc, _ = self._calistir(monkeypatch, '{"secimler": [{"ana_kod": "191", "alt_kod": "191.99.99999: Uydurma"}]}', tekrar=2)
+        assert "191" in {e["account_code"] for e in sonuc["entries"]}
+
+    def test_kod_ad_bicimi_cari_icin_bayrak_acik_olsa_bile_kabul_edilmez(self, monkeypatch):
+        """Cari'de ': ad' kabul etmek yanlis musteri secimini de kabul etmek olurdu (canli: '120.1241: FEHMI KARAGOZ')."""
+        monkeypatch.setattr(single, "CARI_HESAPTA_LLM_SECIMI", True)
+        sonuc, _ = self._calistir(monkeypatch, '{"secimler": [{"ana_kod": "320", "alt_kod": "320.01.00018: Baska Firma Insaat Nakliyat Ltd Sti"}]}', tekrar=2)
+        assert "320" in {e["account_code"] for e in sonuc["entries"]}
+
+    @pytest.mark.parametrize("ham,beklenen", [
+        ("391.20: %20 Hessaplanan KDV", "391.20"), ("391.20 %20 Hessaplanan KDV", "391.20"), ("  391.20  ", "391.20"),
+        ("391.20", "391.20"), ("", ""), (None, None), (391, 391),
+    ])
+    def test_alt_kod_temizle(self, ham, beklenen):
+        assert single._alt_kod_temizle(ham) == beklenen

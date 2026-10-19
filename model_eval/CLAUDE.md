@@ -685,6 +685,17 @@ bir mimari denetim geçirdi:**
 > kanıt zinciri: kök [`../CLAUDE.md`](../CLAUDE.md) 2026-10-19 notu. Testler: `tests/test_mizan_excel_yukle.py::TestMizanOku`, `test_validation.py`, `test_single.py::TestDuzHesapPlani`,
 > `test_musteri_guncelle_orkestrasyon.py` (gerçek PostgreSQL). **Yalnızca İLK sayfa okunmaya devam eder** (ek sayfalar uyarıda görünür).
 
+> ✅ **Düzeltildi** (2026-10-19, canlı test bulgusu — dış ekibin ilk `/fatura/isle` denemeleri): **cari hesapta alt kod artık LLM'e SEÇTİRİLMEZ.** Mizan 17 satırken görünmeyen bir hata, 2090
+> müşteri kartı gelince çıktı: karşı taraf mizanda YOKKEN LLM "en yakın isimli BAŞKA müşteriyi" seçti — POÇAN LOJİSTİK → `120.075 Cansarp Nakliye`, FARUK KARAGÖZ → `120.126 FARUK KARAMAN` —
+> ve doğrulama bunu yakalayamadı (seçilen kod mizanda VAR), `approvable: true` döndü. Aynı çağrı tekrarlandığında seçim değişiyordu (`120.1241 FEHMİ KARAGÖZ`). Çözüm (`core/single.py`,
+> `CARI_HESAPTA_LLM_SECIMI = False`): `CARI_HESAP_KODLARI` yalnızca deterministik ad eşleşmesiyle (`_cari_fuzzy_esles`, %85) bağlanır; eşleşme yoksa kod 3 haneli kalır +
+> "karşı taraf mizanda bulunamadı" uyarısı + `onerilen_yeni_kod` + `UNRESOLVED_COUNTERPARTY` (`approvable=False`, insan kontrolü). Cari seçenekleri LLM istemine de gönderilmez (2090 satırlık liste
+> istemi şişiriyordu). **2026-07-27 notundaki "eşik altında kalan cari kodlar LLM alt kırılım adımına bırakılır" artık GEÇERLİ DEĞİL.** Bedeli: ağır kısaltılmış bir ad (benzerlik < %85, örn.
+> `POÇAN LOJ.HİZ.A.Ş.` 0,82) mizanda olsa da "bulunamadı" sayılır ve insan kontrolüne düşer. Bayrak `True` yapılırsa eski davranış döner — ancak seçilen adın faturadaki ünvanla doğrulanması
+> gibi bir koruma eklendikten sonra. **İkinci düzeltme:** LLM bazen alt kodu adıyla yazıyordu (`"391.20: %20 Hessaplanan KDV"`); kod yalnızca saf kodu kabul ettiği için KDV çözülemiyordu.
+> `_alt_kod_temizle` baştaki kodu alır (KDV/gider/gelir için; seçim yine mizan listesine karşı doğrulanır, uydurma kod reddedilir; cari'de YAPILMAZ — `": ad"` kabulü yanlış müşteri seçimini de
+> kabul etmek olurdu). Testler: `tests/test_single.py::TestCariLlmSecimiKapali` (düzeltme olmadan 6 test düşüyor, doğrulandı).
+
 ## Mimari (özet)
 
 - **`core/parsing.py`** — `parse_invoice()` (JSON+ground-truth),

@@ -74,6 +74,14 @@ KDV_HESAP_KODLARI = {"191", "391"}
 # kutuphanede - ek bagimlilik yok.
 CARI_FUZZY_ESIK = 0.85
 
+# 2026-10-19 (canlı bulgu): Cari hesaplarda (120/320/...) alt kodu LLM'e SEÇTİRME. Karşı taraf mizanda yoksa LLM "en yakın isimli BAŞKA
+# müşteriyi" seçebiliyor ve doğrulama bunu yakalayamıyor (seçilen kod mizanda VAR): POÇAN LOJİSTİK → Cansarp Nakliye (120.075),
+# FARUK KARAGÖZ → FARUK KARAMAN (120.126), `approvable: true` ile. Mizan 17 satırken görünmüyordu, 2090 müşteri kartı gelince ortaya çıktı.
+# Cari yalnızca deterministik ad eşleşmesiyle (CARI_FUZZY_ESIK) bağlanır; eşleşme yoksa kod 3 haneli kalır + "karşı taraf mizanda bulunamadı"
+# uyarısı + yeni kart önerisi (approvable=False, insan kontrolü). Bedeli: ağır kısaltılmış bir ad (benzerlik < %85) gerçekte mizanda olsa da
+# çözülemedi sayılır. True yapmak LLM'in cari seçimini geri açar — ancak seçilen adın faturadaki ünvanla doğrulanması gibi bir koruma eklendikten sonra.
+CARI_HESAPTA_LLM_SECIMI = False
+
 
 def _unvan_normalize(s):
     """Turkce unvanlari karsilastirma icin normalize eder: buyuk harfe cevirir,
@@ -205,6 +213,16 @@ def _fatura_kdv_oranlari(invoice):
         except (TypeError, ValueError):
             continue
     return oranlar
+
+
+def _alt_kod_temizle(alt_kod):
+    """LLM bazen alt kodu ADIYLA birlikte yazar ("391.20: %20 Hessaplanan KDV", "391.20 %20 ..."): baştaki kod parçasını döner (2026-10-19).
+    Geçerlilik çağıranda mizan seçenek listesiyle denetlenir — uydurma bir kod yine reddedilir."""
+    if not isinstance(alt_kod, str):
+        return alt_kod
+    ilk = alt_kod.strip().split(":")[0].strip()
+    parcalar = ilk.split()
+    return parcalar[0] if parcalar else ilk
 
 
 def _kdv_orani_isimden(ad):
@@ -545,9 +563,11 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
             ana_koddan_alt_koda[kod] = secilen
             kod_kaynagi[kod] = {"kaynak": "fuzzy_kalem", "benzerlik": oran, "oran_duzeltildi": False}
 
-    # LLM'e sadece fuzzy'nin cozemedigi kodlar sorulur (cozulmus kodlari cikar).
+    # LLM'e sadece fuzzy'nin cozemedigi kodlar sorulur (cozulmus kodlari cikar). CARI kodlar (120/320/...) LLM'e SORULMAZ
+    # (CARI_HESAPTA_LLM_SECIMI=False): cozulemeyen cari 3 haneli kalir + "karsi taraf mizanda bulunamadi" + yeni kart onerisi.
     llm_kodlari = {
-        kod: sec for kod, sec in ilgili_alt_kirilimlar.items() if kod not in ana_koddan_alt_koda
+        kod: sec for kod, sec in ilgili_alt_kirilimlar.items()
+        if kod not in ana_koddan_alt_koda and (CARI_HESAPTA_LLM_SECIMI or kod not in CARI_HESAP_KODLARI)
     }
 
     # 2) LLM ALT KIRILIM ADIMI (kalan kodlar icin - mevcut davranis, degismedi).
@@ -587,6 +607,10 @@ def _alt_kirilim_uygula(invoice, entry_dicts, spec, system_prompt, temperature, 
             # olabilir, bu durumda o secim yok sayilir (3 haneli kodda kalinir).
             secenekler = llm_kodlari.get(ana_kod, [])
             gecerli_alt_kodlar = {kod for kod, _ad in secenekler}
+            if alt_kod not in gecerli_alt_kodlar and ana_kod not in CARI_HESAP_KODLARI:
+                # "kod: ad" biciminde yazilmis cevabi toparla (canlida 391.20 bu yuzden reddedilmisti). Cari kodlarda YAPILMAZ:
+                # orada ": ad" bicimini kabul etmek yanlis musteri secimini de kabul etmek olurdu (bkz. CARI_HESAPTA_LLM_SECIMI).
+                alt_kod = _alt_kod_temizle(alt_kod)
             if alt_kod in gecerli_alt_kodlar:
                 # KDV oran duzeltmesi (2026-07-27): LLM'in sectigi KDV alt kodunun
                 # ORANI faturadaki KDV oraniyla celisiyorsa, ayni tur icinde dogru
